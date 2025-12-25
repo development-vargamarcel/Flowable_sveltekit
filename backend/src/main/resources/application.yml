@@ -1,0 +1,44 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: bpm-backend
+
+  datasource:
+    url: jdbc:h2:mem:flowabledb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  session:
+    store-type: none
+
+# Flowable Configuration
+flowable:
+  database-schema-update: true
+  async-executor-activate: true
+  history-level: full
+  process-definition-location-prefix: classpath*:/processes/
+  process-definition-location-suffixes: "**.bpmn20.xml,**.bpmn"
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    org.flowable: INFO
+    com.demo.bpm: DEBUG

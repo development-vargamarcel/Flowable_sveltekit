@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://demo.com/bpm"
+             xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL
+                                 http://www.omg.org/spec/BPMN/20100524/MODEL/BPMN20.xsd">
+
+    <process id="leave-request" name="Leave Request" isExecutable="true">
+        <documentation>Sequential leave request approval workflow</documentation>
+
+        <!-- Start Event -->
+        <startEvent id="startEvent" name="Leave Requested">
+            <documentation>Employee submits leave request</documentation>
+        </startEvent>
+
+        <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="supervisorApproval"/>
+
+        <!-- User Task: Supervisor Approval -->
+        <userTask id="supervisorApproval" name="Review Leave Request"
+                  flowable:candidateGroups="supervisors"
+                  flowable:formKey="leave-approval-form">
+            <documentation>Review leave request: ${leaveType} from ${startDate} to ${endDate} (${days} days)</documentation>
+        </userTask>
+
+        <sequenceFlow id="flow2" sourceRef="supervisorApproval" targetRef="checkSupervisorDecision"/>
+
+        <!-- Gateway: Check Supervisor Decision -->
+        <exclusiveGateway id="checkSupervisorDecision" name="Supervisor Decision"/>
+
+        <!-- Approved and short leave -->
+        <sequenceFlow id="flowShortApproved" sourceRef="checkSupervisorDecision" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'approved' && days <= 5}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- Approved but long leave - needs executive -->
+        <sequenceFlow id="flowLongApproved" sourceRef="checkSupervisorDecision" targetRef="executiveApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'approved' && days > 5}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- Escalated to executive -->
+        <sequenceFlow id="flowEscalated" sourceRef="checkSupervisorDecision" targetRef="executiveApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'escalate'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- Rejected -->
+        <sequenceFlow id="flowRejected" sourceRef="checkSupervisorDecision" targetRef="endRejected">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'rejected'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- User Task: Executive Approval -->
+        <userTask id="executiveApproval" name="Executive Leave Approval"
+                  flowable:candidateGroups="executives"
+                  flowable:formKey="leave-approval-form">
+            <documentation>Final approval for extended leave: ${leaveType} from ${startDate} to ${endDate} (${days} days)</documentation>
+        </userTask>
+
+        <sequenceFlow id="flow3" sourceRef="executiveApproval" targetRef="checkExecutiveDecision"/>
+
+        <!-- Gateway: Check Executive Decision -->
+        <exclusiveGateway id="checkExecutiveDecision" name="Executive Decision"/>
+
+        <sequenceFlow id="flowExecApproved" sourceRef="checkExecutiveDecision" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'approved'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowExecRejected" sourceRef="checkExecutiveDecision" targetRef="endRejected">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'rejected'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- End Events -->
+        <endEvent id="endApproved" name="Leave Approved">
+            <documentation>Leave request has been approved</documentation>
+        </endEvent>
+
+        <endEvent id="endRejected" name="Leave Rejected">
+            <documentation>Leave request has been rejected</documentation>
+        </endEvent>
+
+    </process>
+</definitions>

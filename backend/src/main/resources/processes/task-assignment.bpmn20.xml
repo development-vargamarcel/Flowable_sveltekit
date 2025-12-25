@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://demo.com/bpm"
+             xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL
+                                 http://www.omg.org/spec/BPMN/20100524/MODEL/BPMN20.xsd">
+
+    <process id="task-assignment" name="Task Assignment" isExecutable="true">
+        <documentation>Simple task assignment and completion workflow</documentation>
+
+        <!-- Start Event -->
+        <startEvent id="startEvent" name="Task Created">
+            <documentation>A new task has been created</documentation>
+        </startEvent>
+
+        <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="checkAssignment"/>
+
+        <!-- Gateway: Check if pre-assigned -->
+        <exclusiveGateway id="checkAssignment" name="Has Assignee?"/>
+
+        <!-- Pre-assigned path -->
+        <sequenceFlow id="flowAssigned" sourceRef="checkAssignment" targetRef="workOnTask">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${assignee != null && assignee != ''}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- Unassigned path - needs claiming -->
+        <sequenceFlow id="flowUnassigned" sourceRef="checkAssignment" targetRef="claimTask">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${assignee == null || assignee == ''}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- User Task: Claim Task (for unassigned tasks) -->
+        <userTask id="claimTask" name="Claim Task"
+                  flowable:candidateGroups="users,supervisors,executives"
+                  flowable:formKey="claim-task-form">
+            <documentation>Task available for claiming: ${title}</documentation>
+        </userTask>
+
+        <sequenceFlow id="flow2" sourceRef="claimTask" targetRef="workOnTask"/>
+
+        <!-- User Task: Work on Task -->
+        <userTask id="workOnTask" name="Complete Task"
+                  flowable:assignee="${assignee}"
+                  flowable:formKey="complete-task-form">
+            <documentation>${title}: ${description}</documentation>
+        </userTask>
+
+        <sequenceFlow id="flow3" sourceRef="workOnTask" targetRef="endCompleted"/>
+
+        <!-- End Event -->
+        <endEvent id="endCompleted" name="Task Completed">
+            <documentation>Task has been completed</documentation>
+        </endEvent>
+
+    </process>
+</definitions>
