@@ -20,4 +20,10 @@ COPY --from=build /app/target/*.jar app.jar
 ENV PORT=8080
 
 # Optimize JVM for container environment and faster startup
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-Dspring.jmx.enabled=false", \
+  "-Dserver.address=0.0.0.0", \
+  "-jar", "app.jar"]
