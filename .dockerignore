@@ -6,6 +6,6 @@ backend/target/
 .idea/
 *.iml
 backend/.mvn/wrapper/maven-wrapper.jar
-frontend/
+frontend/node_modules/
 node_modules/
 .env
