@@ -7,7 +7,7 @@
   },
   "deploy": {
     "numReplicas": 1,
-    "healthcheckPath": "/actuator/health",
+    "healthcheckPath": "/actuator/health/liveness",
     "healthcheckTimeout": 300,
     "startCommand": null,
     "restartPolicyType": "ON_FAILURE",
