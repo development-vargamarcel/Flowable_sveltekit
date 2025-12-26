@@ -8,6 +8,8 @@
 
 	let { task, onclick }: Props = $props();
 
+	const displays = $derived(getVariableDisplay(task.variables));
+
 	function getPriorityColor(priority: number): string {
 		if (priority >= 75) return 'bg-red-100 text-red-800 border-red-200';
 		if (priority >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
@@ -87,7 +89,6 @@
 		<p class="text-sm text-gray-600 mb-3 line-clamp-2">{task.description}</p>
 	{/if}
 
-	{@const displays = getVariableDisplay(task.variables)}
 	{#if displays.length > 0}
 		<div class="flex flex-wrap gap-2 mb-3">
 			{#each displays as { label, value }}
