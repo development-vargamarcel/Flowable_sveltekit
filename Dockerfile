@@ -16,6 +16,8 @@ USER spring:spring
 
 COPY --from=build /app/target/*.jar app.jar
 
-EXPOSE 8080
+# Railway injects PORT env var at runtime
+ENV PORT=8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Optimize JVM for container environment and faster startup
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
