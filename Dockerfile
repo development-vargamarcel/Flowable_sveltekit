@@ -151,9 +151,9 @@ stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 
 [program:frontend]
-command=node /app/frontend/build
+command=/app/start-frontend.sh
 directory=/app/frontend
-environment=NODE_ENV="production",PORT="3000",ORIGIN="https://flowablesveltekit-production.up.railway.app"
+environment=NODE_ENV="production",PORT="3000"
 autostart=true
 autorestart=true
 stdout_logfile=/dev/stdout
@@ -161,6 +161,23 @@ stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 EOF
+
+# Create frontend wrapper script to set ORIGIN dynamically
+RUN cat > /app/start-frontend.sh << 'EOF'
+#!/bin/sh
+# Set ORIGIN dynamically from Railway environment or fallback
+if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
+    export ORIGIN="https://${RAILWAY_PUBLIC_DOMAIN}"
+elif [ -n "$RAILWAY_STATIC_URL" ]; then
+    export ORIGIN="${RAILWAY_STATIC_URL}"
+else
+    export ORIGIN="http://localhost:3000"
+fi
+echo "Starting frontend with ORIGIN=$ORIGIN"
+exec node /app/frontend/build
+EOF
+
+RUN chmod +x /app/start-frontend.sh
 
 # Create startup script
 RUN cat > /app/start.sh << 'EOF'

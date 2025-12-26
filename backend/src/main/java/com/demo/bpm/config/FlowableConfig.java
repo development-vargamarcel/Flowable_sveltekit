@@ -7,27 +7,42 @@ import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.idm.api.Group;
 import org.flowable.idm.api.User;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
 @Configuration
+@EnableAsync
 @RequiredArgsConstructor
 public class FlowableConfig {
 
-    @Bean
-    public CommandLineRunner initFlowableData(
-            IdentityService identityService,
-            RuntimeService runtimeService,
-            TaskService taskService) {
+    private final IdentityService identityService;
+    private final RuntimeService runtimeService;
 
-        return args -> {
-            log.info("Initializing Flowable demo data...");
+    /**
+     * Initialize demo data asynchronously after the application is fully ready.
+     * This ensures the health check endpoint is available before demo data loading.
+     */
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void initFlowableData() {
+        // Small delay to ensure all services are fully ready
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
 
+        log.info("Initializing Flowable demo data (async)...");
+
+        try {
             // Create groups
             createGroupIfNotExists(identityService, "users", "Users");
             createGroupIfNotExists(identityService, "supervisors", "Supervisors");
@@ -42,7 +57,9 @@ public class FlowableConfig {
             startDemoProcesses(runtimeService);
 
             log.info("Demo data initialization complete!");
-        };
+        } catch (Exception e) {
+            log.error("Failed to initialize demo data: {}", e.getMessage(), e);
+        }
     }
 
     private void createGroupIfNotExists(IdentityService identityService, String groupId, String groupName) {
