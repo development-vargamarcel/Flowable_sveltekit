@@ -68,16 +68,24 @@ http {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 
     upstream backend {
-        server 127.0.0.1:8080;
+        server 127.0.0.1:8080 max_fails=0;
     }
 
     upstream frontend {
-        server 127.0.0.1:3000;
+        server 127.0.0.1:3000 max_fails=0;
     }
 
     server {
         listen ${PORT};
         server_name _;
+
+        # Simple health endpoint - nginx itself responds
+        # This is the primary Railway health check endpoint
+        location = /health {
+            access_log off;
+            default_type application/json;
+            return 200 '{"status":"UP","nginx":"healthy"}';
+        }
 
         # API requests -> Spring Boot backend
         location /api/ {
@@ -89,6 +97,8 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Cookie $http_cookie;
             proxy_pass_header Set-Cookie;
+            proxy_connect_timeout 10s;
+            proxy_read_timeout 60s;
         }
 
         # Actuator endpoints -> Spring Boot backend
@@ -97,6 +107,8 @@ http {
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
+            proxy_connect_timeout 10s;
+            proxy_read_timeout 30s;
         }
 
         # H2 Console -> Spring Boot backend (for dev)
@@ -132,13 +144,14 @@ pidfile=/run/supervisord.pid
 user=root
 
 [program:nginx]
-command=/usr/sbin/nginx -g "daemon off;"
+command=/app/start-nginx.sh
 autostart=true
 autorestart=true
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
+startsecs=0
 
 [program:backend]
 command=java -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8080 -jar /app/backend/app.jar
@@ -149,6 +162,7 @@ stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
+priority=100
 
 [program:frontend]
 command=/app/start-frontend.sh
@@ -160,7 +174,38 @@ stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
+priority=200
 EOF
+
+# Create nginx wrapper script that waits for backend to be ready
+RUN cat > /app/start-nginx.sh << 'EOF'
+#!/bin/sh
+echo "Waiting for Spring Boot backend to be ready..."
+
+# Wait for backend health endpoint with timeout (max 300 seconds)
+MAX_WAIT=300
+WAITED=0
+INTERVAL=2
+
+while [ $WAITED -lt $MAX_WAIT ]; do
+    # Check if backend health endpoint responds with UP status
+    RESPONSE=$(wget -q -O - --timeout=5 http://127.0.0.1:8080/actuator/health 2>/dev/null || echo "")
+
+    if echo "$RESPONSE" | grep -q '"status":"UP"'; then
+        echo "Backend is healthy after ${WAITED}s! Starting nginx..."
+        exec /usr/sbin/nginx -g "daemon off;"
+    fi
+
+    echo "Backend not ready yet (waited ${WAITED}s)..."
+    sleep $INTERVAL
+    WAITED=$((WAITED + INTERVAL))
+done
+
+echo "ERROR: Backend failed to become healthy within ${MAX_WAIT}s"
+exit 1
+EOF
+
+RUN chmod +x /app/start-nginx.sh
 
 # Create frontend wrapper script to set ORIGIN dynamically
 RUN cat > /app/start-frontend.sh << 'EOF'
