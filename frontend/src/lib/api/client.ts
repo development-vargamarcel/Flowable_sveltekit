@@ -16,10 +16,15 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 
 	if (!response.ok) {
 		if (response.status === 401) {
-			throw new Error('Unauthorized');
+			// Try to get a more specific error message from the response
+			const errorBody = await response.json().catch(() => null);
+			const errorMessage = errorBody?.error || errorBody?.message || 'Invalid credentials';
+			throw new Error(errorMessage);
 		}
-		const error = await response.json().catch(() => ({ error: 'Request failed' }));
-		throw new Error(error.error || 'Request failed');
+		const errorBody = await response.json().catch(() => null);
+		// Handle different error response formats: { error: "..." }, { message: "..." }, or validation errors
+		const errorMessage = errorBody?.error || errorBody?.message || `Request failed (${response.status})`;
+		throw new Error(errorMessage);
 	}
 
 	return response.json();
