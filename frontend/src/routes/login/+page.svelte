@@ -10,6 +10,34 @@
 	let errorStatus = $state(0);
 	let fieldErrors = $state<Record<string, string>>({});
 	let loading = $state(false);
+	let cookiesCleared = $state(false);
+
+	/**
+	 * Clears all cookies for the current domain to resolve "Request Header Or Cookie Too Large" errors.
+	 * This typically happens when session cookies accumulate over time.
+	 */
+	function clearAllCookies(): void {
+		const cookies = document.cookie.split(';');
+		for (const cookie of cookies) {
+			const eqPos = cookie.indexOf('=');
+			const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
+			if (name) {
+				// Clear the cookie with various path combinations
+				document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+				document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api`;
+			}
+		}
+		cookiesCleared = true;
+		console.log('Cleared all cookies to resolve header size issue');
+	}
+
+	/**
+	 * Checks if the error is related to request headers or cookies being too large
+	 */
+	function isHeaderTooLargeError(errorMessage: string, details: string): boolean {
+		const combined = `${errorMessage} ${details}`.toLowerCase();
+		return combined.includes('header') && (combined.includes('too large') || combined.includes('400'));
+	}
 
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
@@ -30,6 +58,12 @@
 				errorStatus = err.status;
 				fieldErrors = err.fieldErrors || {};
 
+				// Check for cookie/header too large error (400 from nginx)
+				if (err.status === 400 && isHeaderTooLargeError(err.message, err.details || '')) {
+					error = 'Request headers too large';
+					errorDetails = 'Your browser has accumulated too many cookies. Click "Clear Cookies & Retry" below to fix this.';
+				}
+
 				// Log detailed error info for debugging
 				console.error('Login failed:', {
 					status: err.status,
@@ -42,6 +76,12 @@
 				});
 			} else if (err instanceof Error) {
 				error = err.message;
+				// Check for header too large error in generic Error
+				if (isHeaderTooLargeError(err.message, '')) {
+					error = 'Request headers too large';
+					errorDetails = 'Your browser has accumulated too many cookies. Click "Clear Cookies & Retry" below to fix this.';
+					errorStatus = 400;
+				}
 				console.error('Login error:', err);
 			} else {
 				error = 'An unexpected error occurred';
@@ -84,6 +124,13 @@
 
 		<div class="card">
 			<form onsubmit={handleSubmit} class="space-y-4">
+				{#if cookiesCleared}
+					<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+						<div class="font-medium">Cookies cleared successfully</div>
+						<div class="mt-1 text-green-600 text-xs">Please try logging in again.</div>
+					</div>
+				{/if}
+
 				{#if error}
 					<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
 						<div class="flex items-start justify-between">
@@ -106,6 +153,15 @@
 									{/each}
 								</ul>
 							</div>
+						{/if}
+						{#if errorStatus === 400 && error.includes('headers too large')}
+							<button
+								type="button"
+								onclick={() => { clearAllCookies(); error = ''; errorDetails = ''; errorStatus = 0; }}
+								class="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+							>
+								Clear Cookies & Retry
+							</button>
 						{/if}
 					</div>
 				{/if}
