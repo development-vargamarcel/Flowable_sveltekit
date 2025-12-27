@@ -28,7 +28,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://backend:8080
+      - BACKEND_URL=http://backend:8080
       - ORIGIN=http://localhost:3000
     depends_on:
       backend:
