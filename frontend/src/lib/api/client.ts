@@ -252,6 +252,14 @@ export const api = {
 		await fetchApi('/api/auth/logout', { method: 'POST' });
 	},
 
+	/**
+	 * Clear all session cookies including HttpOnly cookies.
+	 * Used to recover from "Request Header Or Cookie Too Large" errors.
+	 */
+	async clearSession(): Promise<{ message: string; details: string }> {
+		return fetchApi('/api/auth/clear-session', { method: 'POST' });
+	},
+
 	async getCurrentUser(): Promise<User> {
 		return fetchApi('/api/auth/me');
 	},

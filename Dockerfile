@@ -122,6 +122,17 @@ http {
 
             # Return friendly error when backend is starting
             error_page 502 = @api_starting;
+
+            # Return JSON for request header/cookie too large errors
+            error_page 400 = @request_too_large;
+            error_page 413 = @request_too_large;
+            error_page 431 = @request_too_large;
+        }
+
+        # Handle request header/cookie too large errors with JSON response
+        location @request_too_large {
+            default_type application/json;
+            return 400 '{"error":"Request headers too large","message":"Your browser has sent request headers that are too large","details":"This is usually caused by accumulated cookies or session data. Try clearing your browser cookies for this site.","status":400}';
         }
 
         location @api_starting {
@@ -158,6 +169,11 @@ http {
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection 'upgrade';
             proxy_cache_bypass $http_upgrade;
+
+            # Return JSON for request header/cookie too large errors
+            error_page 400 = @request_too_large;
+            error_page 413 = @request_too_large;
+            error_page 431 = @request_too_large;
         }
     }
 }
