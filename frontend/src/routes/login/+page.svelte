@@ -13,6 +13,8 @@
 	let cookiesCleared = $state(false);
 	let clearingCookies = $state(false);
 	let cookieDiagnostics = $state('');
+	let backendReady = $state(false);
+	let checkingBackend = $state(false);
 
 	/**
 	 * Get diagnostic information about current cookies
@@ -22,6 +24,45 @@
 		const totalSize = document.cookie.length;
 		const cookieNames = cookies.map(c => c.split('=')[0].trim()).join(', ');
 		return `Found ${cookies.length} accessible cookies (${totalSize} bytes): ${cookieNames || 'none'}. Note: HttpOnly cookies (like JSESSIONID) are not visible to JavaScript.`;
+	}
+
+	/**
+	 * Check if the backend is healthy and ready to accept requests.
+	 * Retries up to 3 times with increasing delays.
+	 */
+	async function checkBackendHealth(retries = 3): Promise<boolean> {
+		for (let i = 0; i < retries; i++) {
+			try {
+				// Try the health endpoint first
+				const response = await fetch('/health', {
+					method: 'GET',
+					headers: { 'Accept': 'application/json' }
+				});
+
+				if (response.ok) {
+					// Also try the ready endpoint to check backend specifically
+					const readyResponse = await fetch('/ready', {
+						method: 'GET',
+						headers: { 'Accept': 'application/json' }
+					});
+
+					if (readyResponse.ok) {
+						return true;
+					}
+
+					// If ready returns 503 (backend starting), wait and retry
+					if (readyResponse.status === 503) {
+						console.log(`Backend not ready yet, attempt ${i + 1}/${retries}...`);
+						await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+						continue;
+					}
+				}
+			} catch (e) {
+				console.log(`Health check failed, attempt ${i + 1}/${retries}:`, e);
+				await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -106,6 +147,17 @@
 			} else {
 				cookieDiagnostics = `Cleared ${clearedCount} browser cookies. Server session cookies will expire automatically. Please refresh the page and try again.`;
 			}
+
+			// Check if backend is healthy before telling user to proceed
+			checkingBackend = true;
+			try {
+				backendReady = await checkBackendHealth(3);
+				if (!backendReady) {
+					cookieDiagnostics += ' Warning: Backend may still be starting up. Please wait a moment before trying again.';
+				}
+			} finally {
+				checkingBackend = false;
+			}
 		} catch (e) {
 			console.error('Error clearing cookies:', e);
 			// As a last resort, redirect to clear-cookies page
@@ -171,6 +223,19 @@
 				errorDetails = err.details || '';
 				errorStatus = err.status;
 				fieldErrors = err.fieldErrors || {};
+
+				// Check for 502/503 errors (backend unavailable or starting)
+				if (err.status === 502 || err.status === 503) {
+					error = 'Backend is unavailable';
+					errorDetails = 'The backend server is not responding. This could mean:\n' +
+						'• The backend is still starting up (please wait 30-60 seconds)\n' +
+						'• The backend has crashed or is overloaded\n' +
+						'• There is a network issue\n\n' +
+						'Please wait a moment and try again, or check the server logs.';
+
+					// Don't show cookie clearing button for 502/503 since it won't help
+					cookieDiagnostics = '';
+				}
 
 				// Check for cookie/header too large error (400 from nginx or similar)
 				// This can happen with status 400, 413, or 431
@@ -269,13 +334,46 @@
 								{cookieDiagnostics}
 							</div>
 						{/if}
-						<button
-							type="button"
-							onclick={() => window.location.reload()}
-							class="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-						>
-							Refresh Page & Try Again
-						</button>
+						{#if checkingBackend}
+							<div class="mt-3 flex items-center justify-center gap-2 text-green-600">
+								<div class="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+								<span class="text-sm">Checking backend availability...</span>
+							</div>
+						{:else if backendReady}
+							<button
+								type="button"
+								onclick={() => window.location.reload()}
+								class="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+							>
+								Refresh Page & Try Again
+							</button>
+						{:else}
+							<div class="mt-3 space-y-2">
+								<div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-2 rounded text-xs">
+									<span class="font-medium">Backend may be starting up.</span> Please wait a moment or try the login form directly below.
+								</div>
+								<div class="flex gap-2">
+									<button
+										type="button"
+										onclick={() => window.location.reload()}
+										class="flex-1 py-2 px-3 text-sm font-medium text-green-700 bg-green-100 hover:bg-green-200 rounded-lg transition-colors"
+									>
+										Refresh Anyway
+									</button>
+									<button
+										type="button"
+										onclick={async () => {
+											checkingBackend = true;
+											backendReady = await checkBackendHealth(3);
+											checkingBackend = false;
+										}}
+										class="flex-1 py-2 px-3 text-sm font-medium text-green-700 bg-green-100 hover:bg-green-200 rounded-lg transition-colors"
+									>
+										Re-check Backend
+									</button>
+								</div>
+							</div>
+						{/if}
 					</div>
 				{/if}
 
@@ -290,7 +388,43 @@
 							{/if}
 						</div>
 						{#if errorDetails}
-							<div class="mt-2 text-red-600 text-xs leading-relaxed">{errorDetails}</div>
+							<div class="mt-2 text-red-600 text-xs leading-relaxed whitespace-pre-line">{errorDetails}</div>
+						{/if}
+						{#if [502, 503].includes(errorStatus)}
+							<div class="mt-3 flex gap-2">
+								<button
+									type="button"
+									onclick={async () => {
+										error = '';
+										errorDetails = '';
+										errorStatus = 0;
+										loading = true;
+										// Wait a moment then check backend
+										await new Promise(resolve => setTimeout(resolve, 2000));
+										const ready = await checkBackendHealth(2);
+										loading = false;
+										if (ready) {
+											// Backend is ready, user can try login now
+											error = '';
+										} else {
+											error = 'Backend still unavailable';
+											errorDetails = 'The backend is still not responding. Please wait longer or check the server logs.';
+											errorStatus = 503;
+										}
+									}}
+									disabled={loading}
+									class="flex-1 py-2 px-3 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+								>
+									{loading ? 'Checking...' : 'Check Backend & Retry'}
+								</button>
+								<button
+									type="button"
+									onclick={() => window.location.reload()}
+									class="flex-1 py-2 px-3 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors"
+								>
+									Refresh Page
+								</button>
+							</div>
 						{/if}
 						{#if cookieDiagnostics && error.includes('headers too large')}
 							<div class="mt-2 text-red-600 text-xs bg-red-100 p-2 rounded font-mono break-words">
