@@ -27,6 +27,7 @@
 	/**
 	 * Clears all cookies for the current domain to resolve "Request Header Or Cookie Too Large" errors.
 	 * This clears both JavaScript-accessible cookies and calls the backend to clear HttpOnly cookies.
+	 * Uses a fallback endpoint (without sending cookies) when headers are too large.
 	 */
 	async function clearAllCookies(): Promise<void> {
 		clearingCookies = true;
@@ -52,17 +53,48 @@
 			}
 			console.log(`Cleared ${clearedCount} JavaScript-accessible cookies`);
 
-			// Call the backend to clear HttpOnly cookies (like JSESSIONID)
+			// Try to clear HttpOnly cookies (like JSESSIONID) using multiple strategies
+			let serverCleared = false;
+			let clearDetails = '';
+
+			// Strategy 1: Try the normal backend endpoint
 			try {
 				const result = await api.clearSession();
 				console.log('Backend session cleared:', result);
-				cookiesCleared = true;
-				cookieDiagnostics = `Cleared ${clearedCount} browser cookies and server session. ${result.details}`;
+				serverCleared = true;
+				clearDetails = result.details;
 			} catch (backendError) {
-				// If we can't reach the backend (headers too large), at least we cleared local cookies
-				console.warn('Could not reach backend to clear session:', backendError);
-				cookiesCleared = true;
-				cookieDiagnostics = `Cleared ${clearedCount} browser cookies. Could not reach server to clear session - the server may have already cleared it due to the error.`;
+				console.warn('Normal clear-session failed, trying fallback:', backendError);
+
+				// Strategy 2: Use nginx fallback endpoint WITHOUT sending cookies
+				// This bypasses the "headers too large" issue entirely
+				try {
+					const fallbackResponse = await fetch('/api/auth/clear-session-fallback', {
+						method: 'POST',
+						credentials: 'omit', // Don't send cookies - this is the key!
+						headers: {
+							'Accept': 'application/json'
+						}
+					});
+
+					if (fallbackResponse.ok) {
+						const result = await fallbackResponse.json();
+						console.log('Fallback session clear succeeded:', result);
+						serverCleared = true;
+						clearDetails = result.details || 'Session cleared via fallback endpoint';
+					} else {
+						console.warn('Fallback endpoint returned error:', fallbackResponse.status);
+					}
+				} catch (fallbackError) {
+					console.warn('Fallback clear also failed:', fallbackError);
+				}
+			}
+
+			cookiesCleared = true;
+			if (serverCleared) {
+				cookieDiagnostics = `Cleared ${clearedCount} browser cookies and server session. ${clearDetails}`;
+			} else {
+				cookieDiagnostics = `Cleared ${clearedCount} browser cookies. Server session cookies will expire automatically. Please refresh the page and try again.`;
 			}
 		} catch (e) {
 			console.error('Error clearing cookies:', e);
@@ -135,10 +167,22 @@
 					isHeaderTooLargeError(err.message, err.details || '');
 
 				if (isHeaderError) {
-					error = 'Request headers too large';
-					errorDetails = 'Your browser has accumulated too many cookies or the session data is too large. ' +
-						'This is a common issue that can be resolved by clearing cookies.';
-					cookieDiagnostics = getCookieDiagnostics();
+					// Check if nginx auto-cleared the cookies (look for "cookiesCleared" or "automatically cleared" in details)
+					const autoClearedByNginx = err.details?.includes('automatically cleared') ||
+						err.details?.includes('cookiesCleared');
+
+					if (autoClearedByNginx) {
+						error = 'Session cookies cleared';
+						errorDetails = 'Your session cookies were too large and have been automatically cleared. ' +
+							'Please refresh the page and try logging in again.';
+						cookiesCleared = true;
+						cookieDiagnostics = 'Cookies were automatically cleared by the server. Refresh and try again.';
+					} else {
+						error = 'Request headers too large';
+						errorDetails = 'Your browser has accumulated too many cookies or the session data is too large. ' +
+							'This is a common issue that can be resolved by clearing cookies.';
+						cookieDiagnostics = getCookieDiagnostics();
+					}
 				}
 
 				// Log detailed error info for debugging
@@ -214,6 +258,13 @@
 								{cookieDiagnostics}
 							</div>
 						{/if}
+						<button
+							type="button"
+							onclick={() => window.location.reload()}
+							class="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+						>
+							Refresh Page & Try Again
+						</button>
 					</div>
 				{/if}
 

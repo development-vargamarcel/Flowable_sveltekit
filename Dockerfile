@@ -107,6 +107,20 @@ http {
             return 503 '{"status":"STARTING","message":"backend initializing"}';
         }
 
+        # Special endpoint to clear session cookies - handles large header cases
+        # This endpoint responds directly from nginx with Set-Cookie headers to clear JSESSIONID
+        # This is the fallback when headers are too large to reach the backend
+        location = /api/auth/clear-session-fallback {
+            default_type application/json;
+
+            # Clear JSESSIONID cookies on multiple paths
+            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly" always;
+
+            return 200 '{"message":"Session cleared successfully","details":"Cookies have been cleared by nginx fallback. Please try logging in again.","timestamp":"$time_iso8601","fallback":true}';
+        }
+
         # API requests -> Spring Boot backend
         location /api/ {
             proxy_pass http://backend;
@@ -130,9 +144,16 @@ http {
         }
 
         # Handle request header/cookie too large errors with JSON response
+        # Also include Set-Cookie headers to clear JSESSIONID automatically
         location @request_too_large {
             default_type application/json;
-            return 400 '{"error":"Request headers too large","message":"Your browser has sent request headers that are too large","details":"This is usually caused by accumulated cookies or session data. Try clearing your browser cookies for this site.","status":400}';
+
+            # Automatically clear JSESSIONID cookies when this error occurs
+            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly" always;
+
+            return 400 '{"error":"Request headers too large","message":"Your browser has sent request headers that are too large","details":"Session cookies have been automatically cleared. Please refresh the page and try again.","status":400,"cookiesCleared":true}';
         }
 
         location @api_starting {
