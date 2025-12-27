@@ -41,7 +41,14 @@ public class SecurityConfig {
                 .authenticationEntryPoint((request, response, authException) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
-                    response.getWriter().write("{\"error\": \"Unauthorized\"}");
+                    response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"" +
+                        authException.getMessage().replace("\"", "'") + "\"}");
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"" +
+                        accessDeniedException.getMessage().replace("\"", "'") + "\"}");
                 })
             );
 

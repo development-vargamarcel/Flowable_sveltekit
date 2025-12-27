@@ -15,13 +15,27 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 	});
 
 	if (!response.ok) {
+		// Try to get a more specific error message from the response body
+		const errorBody = await response.json().catch(() => null);
+
 		if (response.status === 401) {
-			// Try to get a more specific error message from the response
-			const errorBody = await response.json().catch(() => null);
 			const errorMessage = errorBody?.error || errorBody?.message || 'Invalid credentials';
 			throw new Error(errorMessage);
 		}
-		const errorBody = await response.json().catch(() => null);
+
+		if (response.status === 403) {
+			// 403 can be CORS issue or authorization issue
+			const errorMessage = errorBody?.error || errorBody?.message ||
+				'Access forbidden - this may be a CORS or authorization issue. Please check the server logs.';
+			throw new Error(errorMessage);
+		}
+
+		if (response.status === 502 || response.status === 503 || response.status === 504) {
+			const errorMessage = errorBody?.error || errorBody?.message ||
+				`Backend service unavailable (${response.status}). Please try again later.`;
+			throw new Error(errorMessage);
+		}
+
 		// Handle different error response formats: { error: "..." }, { message: "..." }, or validation errors
 		const errorMessage = errorBody?.error || errorBody?.message || `Request failed (${response.status})`;
 		throw new Error(errorMessage);
