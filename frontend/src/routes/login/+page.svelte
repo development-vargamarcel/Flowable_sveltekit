@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { api } from '$lib/api/client';
+	import { api, ApiError } from '$lib/api/client';
 	import { authStore } from '$lib/stores/auth.svelte';
 
 	let username = $state('');
 	let password = $state('');
 	let error = $state('');
+	let errorDetails = $state('');
 	let loading = $state(false);
 
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
 		error = '';
+		errorDetails = '';
 		loading = true;
 
 		try {
@@ -18,7 +20,22 @@
 			authStore.setUser(response.user);
 			goto('/');
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Login failed';
+			if (err instanceof ApiError) {
+				error = err.message;
+				errorDetails = err.details || '';
+				// Log detailed error info for debugging
+				console.error('Login failed:', {
+					status: err.status,
+					message: err.message,
+					details: err.details,
+					fieldErrors: err.fieldErrors,
+					timestamp: err.timestamp
+				});
+			} else if (err instanceof Error) {
+				error = err.message;
+			} else {
+				error = 'Login failed';
+			}
 		} finally {
 			loading = false;
 		}
@@ -48,7 +65,10 @@
 			<form onsubmit={handleSubmit} class="space-y-4">
 				{#if error}
 					<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-						{error}
+						<div class="font-medium">{error}</div>
+						{#if errorDetails}
+							<div class="mt-1 text-red-600 text-xs">{errorDetails}</div>
+						{/if}
 					</div>
 				{/if}
 

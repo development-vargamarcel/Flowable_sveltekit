@@ -10,13 +10,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
@@ -30,10 +37,15 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        String username = request.getUsername();
+        String clientIp = getClientIpAddress(httpRequest);
+
+        log.info("Login attempt for user '{}' from IP: {}", username, clientIp);
+
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            request.getUsername(),
+                            username,
                             request.getPassword()
                     )
             );
@@ -46,38 +58,126 @@ public class AuthController {
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             UserDTO user = userService.getUserInfo(userDetails);
 
-            log.info("User {} logged in successfully", request.getUsername());
+            log.info("User '{}' logged in successfully from IP: {}, session: {}",
+                    username, clientIp, session.getId());
 
             return ResponseEntity.ok(Map.of(
                     "message", "Login successful",
                     "user", user
             ));
+        } catch (BadCredentialsException e) {
+            log.warn("Login failed for user '{}' from IP {}: Bad credentials", username, clientIp);
+            return ResponseEntity.status(401).body(buildErrorResponse(
+                    "Invalid username or password",
+                    "Please check your credentials and try again"
+            ));
+        } catch (UsernameNotFoundException e) {
+            log.warn("Login failed for user '{}' from IP {}: User not found", username, clientIp);
+            // Return same message as bad credentials to prevent user enumeration
+            return ResponseEntity.status(401).body(buildErrorResponse(
+                    "Invalid username or password",
+                    "Please check your credentials and try again"
+            ));
+        } catch (DisabledException e) {
+            log.warn("Login failed for user '{}' from IP {}: Account disabled", username, clientIp);
+            return ResponseEntity.status(401).body(buildErrorResponse(
+                    "Account disabled",
+                    "Your account has been disabled. Please contact an administrator."
+            ));
+        } catch (LockedException e) {
+            log.warn("Login failed for user '{}' from IP {}: Account locked", username, clientIp);
+            return ResponseEntity.status(401).body(buildErrorResponse(
+                    "Account locked",
+                    "Your account has been locked. Please try again later or contact an administrator."
+            ));
+        } catch (AuthenticationException e) {
+            log.warn("Login failed for user '{}' from IP {}: {} - {}",
+                    username, clientIp, e.getClass().getSimpleName(), e.getMessage());
+            return ResponseEntity.status(401).body(buildErrorResponse(
+                    "Authentication failed",
+                    e.getMessage()
+            ));
         } catch (Exception e) {
-            log.warn("Login failed for user {}: {}", request.getUsername(), e.getMessage());
-            return ResponseEntity.status(401).body(Map.of(
-                    "error", "Invalid username or password"
+            log.error("Unexpected error during login for user '{}' from IP {}: {} - {}",
+                    username, clientIp, e.getClass().getSimpleName(), e.getMessage(), e);
+            return ResponseEntity.status(500).body(buildErrorResponse(
+                    "Login failed",
+                    "An unexpected error occurred. Please try again later."
             ));
         }
     }
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest request) {
+        String clientIp = getClientIpAddress(request);
         HttpSession session = request.getSession(false);
+
         if (session != null) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            String username = auth != null ? auth.getName() : "unknown";
+            log.info("User '{}' logging out from IP: {}, session: {}", username, clientIp, session.getId());
             session.invalidate();
+        } else {
+            log.debug("Logout requested from IP {} but no active session found", clientIp);
         }
+
         SecurityContextHolder.clearContext();
 
-        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+        return ResponseEntity.ok(Map.of(
+                "message", "Logged out successfully",
+                "timestamp", Instant.now().toString()
+        ));
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request) {
         if (userDetails == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
+            String clientIp = getClientIpAddress(request);
+            log.debug("Unauthenticated request to /me from IP: {}", clientIp);
+            return ResponseEntity.status(401).body(buildErrorResponse(
+                    "Not authenticated",
+                    "Please log in to access this resource"
+            ));
         }
 
-        UserDTO user = userService.getUserInfo(userDetails);
-        return ResponseEntity.ok(user);
+        try {
+            UserDTO user = userService.getUserInfo(userDetails);
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            log.error("Error fetching user info for '{}': {}", userDetails.getUsername(), e.getMessage(), e);
+            return ResponseEntity.status(500).body(buildErrorResponse(
+                    "Error fetching user info",
+                    "Could not retrieve user information. Please try again."
+            ));
+        }
+    }
+
+    /**
+     * Build a consistent error response
+     */
+    private Map<String, Object> buildErrorResponse(String error, String message) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("error", error);
+        response.put("message", message);
+        response.put("timestamp", Instant.now().toString());
+        return response;
+    }
+
+    /**
+     * Extract client IP address from request, considering proxies
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            // Take the first IP in the chain (original client)
+            return xForwardedFor.split(",")[0].trim();
+        }
+
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+
+        return request.getRemoteAddr();
     }
 }
