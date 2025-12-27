@@ -517,97 +517,147 @@
 			<div class="mt-6 pt-6 border-t border-gray-200">
 				<p class="text-sm text-gray-600 mb-4 text-center">Quick login <span class="text-xs text-gray-400">(password: "password")</span></p>
 
-				<!-- Leadership -->
+				<!-- Tabs for department selection -->
+				{#snippet userButton(username: string, displayName: string, role: string, colorClass: string)}
+					<button
+						type="button"
+						onclick={() => selectUser(username)}
+						class="px-2 py-1.5 text-xs {colorClass} rounded-lg transition-colors text-left truncate"
+						title="{displayName} ({username})"
+					>
+						<div class="font-medium truncate">{displayName}</div>
+						<div class="text-[10px] opacity-75 truncate">{role}</div>
+					</button>
+				{/snippet}
+
+				<!-- Executive Leadership -->
 				<div class="mb-3">
-					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Leadership</div>
-					<div class="grid grid-cols-2 gap-2">
-						<button
-							type="button"
-							onclick={() => selectUser('executive1')}
-							class="px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 border border-purple-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-purple-900">Executive</div>
-							<div class="text-xs text-purple-600">executive1</div>
-						</button>
-						<button
-							type="button"
-							onclick={() => selectUser('director1')}
-							class="px-3 py-2 text-sm bg-indigo-100 hover:bg-indigo-200 border border-indigo-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-indigo-900">Director</div>
-							<div class="text-xs text-indigo-600">director1</div>
-						</button>
+					<div class="text-xs font-medium text-purple-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-purple-500 rounded-full"></span>
+						Executive Leadership
+					</div>
+					<div class="grid grid-cols-3 gap-1.5">
+						{@render userButton('exec.ceo', 'Elizabeth R.', 'CEO', 'bg-purple-100 hover:bg-purple-200 border border-purple-200 text-purple-900')}
+						{@render userButton('executive1', 'Executive', 'Legacy', 'bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-800')}
+						{@render userButton('director1', 'Director', 'Legacy', 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-800')}
 					</div>
 				</div>
 
-				<!-- Management -->
+				<!-- Engineering Department -->
 				<div class="mb-3">
-					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Management</div>
-					<div class="grid grid-cols-2 gap-2">
-						<button
-							type="button"
-							onclick={() => selectUser('manager1')}
-							class="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 border border-blue-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-blue-900">Manager</div>
-							<div class="text-xs text-blue-600">manager1</div>
-						</button>
-						<button
-							type="button"
-							onclick={() => selectUser('manager2')}
-							class="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 border border-blue-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-blue-900">Manager</div>
-							<div class="text-xs text-blue-600">manager2</div>
-						</button>
+					<div class="text-xs font-medium text-blue-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+						Engineering
+					</div>
+					<div class="grid grid-cols-4 gap-1.5">
+						{@render userButton('eng.lisa', 'Lisa W.', 'Manager', 'bg-blue-100 hover:bg-blue-200 border border-blue-200 text-blue-900')}
+						{@render userButton('eng.mike', 'Mike J.', 'Tech Lead', 'bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-800')}
+						{@render userButton('eng.john', 'John C.', 'Engineer', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+						{@render userButton('eng.sarah', 'Sarah M.', 'Engineer', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
 					</div>
 				</div>
 
-				<!-- Team Leads -->
+				<!-- Finance Department -->
 				<div class="mb-3">
-					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Team Leads</div>
-					<div class="grid grid-cols-2 gap-2">
-						<button
-							type="button"
-							onclick={() => selectUser('supervisor1')}
-							class="px-3 py-2 text-sm bg-teal-100 hover:bg-teal-200 border border-teal-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-teal-900">Supervisor</div>
-							<div class="text-xs text-teal-600">supervisor1</div>
-						</button>
-						<button
-							type="button"
-							onclick={() => selectUser('supervisor2')}
-							class="px-3 py-2 text-sm bg-teal-100 hover:bg-teal-200 border border-teal-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-teal-900">Supervisor</div>
-							<div class="text-xs text-teal-600">supervisor2</div>
-						</button>
+					<div class="text-xs font-medium text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+						Finance
+					</div>
+					<div class="grid grid-cols-5 gap-1.5">
+						{@render userButton('fin.cfo', 'Michael T.', 'CFO', 'bg-emerald-100 hover:bg-emerald-200 border border-emerald-200 text-emerald-900')}
+						{@render userButton('fin.david', 'David W.', 'Manager', 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-800')}
+						{@render userButton('fin.carol', 'Carol D.', 'Sr Acct', 'bg-teal-50 hover:bg-teal-100 border border-teal-100 text-teal-800')}
+						{@render userButton('fin.bob', 'Bob S.', 'Acct', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+						{@render userButton('fin.alice', 'Alice B.', 'Acct', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
 					</div>
 				</div>
 
-				<!-- Employees -->
-				<div>
-					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Employees</div>
-					<div class="grid grid-cols-2 gap-2">
-						<button
-							type="button"
-							onclick={() => selectUser('user1')}
-							class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-gray-900">User</div>
-							<div class="text-xs text-gray-500">user1</div>
-						</button>
-						<button
-							type="button"
-							onclick={() => selectUser('user2')}
-							class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors text-left"
-						>
-							<div class="font-medium text-gray-900">User</div>
-							<div class="text-xs text-gray-500">user2</div>
-						</button>
+				<!-- HR Department -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-pink-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-pink-500 rounded-full"></span>
+						Human Resources
+					</div>
+					<div class="grid grid-cols-5 gap-1.5">
+						{@render userButton('hr.chro', 'Patricia J.', 'CHRO', 'bg-pink-100 hover:bg-pink-200 border border-pink-200 text-pink-900')}
+						{@render userButton('hr.tom', 'Tom T.', 'Manager', 'bg-pink-50 hover:bg-pink-100 border border-pink-100 text-pink-800')}
+						{@render userButton('hr.nina', 'Nina A.', 'HRBP', 'bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-800')}
+						{@render userButton('hr.emma', 'Emma G.', 'HR Spec', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+						{@render userButton('hr.james', 'James M.', 'HR Spec', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
 					</div>
 				</div>
+
+				<!-- Sales Department -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-orange-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-orange-500 rounded-full"></span>
+						Sales
+					</div>
+					<div class="grid grid-cols-4 gap-1.5">
+						{@render userButton('sales.rachel', 'Rachel T.', 'Manager', 'bg-orange-100 hover:bg-orange-200 border border-orange-200 text-orange-900')}
+						{@render userButton('sales.peter', 'Peter M.', 'Team Lead', 'bg-orange-50 hover:bg-orange-100 border border-orange-100 text-orange-800')}
+						{@render userButton('sales.kevin', 'Kevin W.', 'Sales Rep', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+						{@render userButton('sales.maria', 'Maria H.', 'Sales Rep', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+					</div>
+				</div>
+
+				<!-- Operations Department -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-amber-500 rounded-full"></span>
+						Operations
+					</div>
+					<div class="grid grid-cols-5 gap-1.5">
+						{@render userButton('ops.coo', 'Robert W.', 'COO', 'bg-amber-100 hover:bg-amber-200 border border-amber-200 text-amber-900')}
+						{@render userButton('ops.grace', 'Grace L.', 'Manager', 'bg-amber-50 hover:bg-amber-100 border border-amber-100 text-amber-800')}
+						{@render userButton('ops.frank', 'Frank L.', 'Supervisor', 'bg-yellow-50 hover:bg-yellow-100 border border-yellow-100 text-yellow-800')}
+						{@render userButton('ops.steve', 'Steve R.', 'Analyst', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+						{@render userButton('ops.linda', 'Linda C.', 'Analyst', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+					</div>
+				</div>
+
+				<!-- IT Department -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-cyan-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-cyan-500 rounded-full"></span>
+						IT / Technology
+					</div>
+					<div class="grid grid-cols-5 gap-1.5">
+						{@render userButton('it.cto', 'William S.', 'CTO', 'bg-cyan-100 hover:bg-cyan-200 border border-cyan-200 text-cyan-900')}
+						{@render userButton('it.olivia', 'Olivia K.', 'Manager', 'bg-cyan-50 hover:bg-cyan-100 border border-cyan-100 text-cyan-800')}
+						{@render userButton('it.henry', 'Henry Y.', 'Team Lead', 'bg-sky-50 hover:bg-sky-100 border border-sky-100 text-sky-800')}
+						{@render userButton('it.alex', 'Alex H.', 'IT Spec', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+						{@render userButton('it.diana', 'Diana A.', 'IT Spec', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+					</div>
+				</div>
+
+				<!-- Legal Department -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-violet-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+						<span class="w-2 h-2 bg-violet-500 rounded-full"></span>
+						Legal / Compliance
+					</div>
+					<div class="grid grid-cols-3 gap-1.5">
+						{@render userButton('legal.claire', 'Claire N.', 'Manager', 'bg-violet-100 hover:bg-violet-200 border border-violet-200 text-violet-900')}
+						{@render userButton('legal.ben', 'Ben A.', 'Sr Counsel', 'bg-violet-50 hover:bg-violet-100 border border-violet-100 text-violet-800')}
+						{@render userButton('legal.amy', 'Amy G.', 'Analyst', 'bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800')}
+					</div>
+				</div>
+
+				<!-- Legacy Users (Collapsible) -->
+				<details class="mt-4">
+					<summary class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2 cursor-pointer hover:text-gray-600">
+						Legacy Test Users
+					</summary>
+					<div class="grid grid-cols-4 gap-1.5 mt-2">
+						{@render userButton('manager1', 'Manager 1', 'Manager', 'bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-800')}
+						{@render userButton('manager2', 'Manager 2', 'Manager', 'bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-800')}
+						{@render userButton('supervisor1', 'Supervisor 1', 'Supervisor', 'bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-800')}
+						{@render userButton('supervisor2', 'Supervisor 2', 'Supervisor', 'bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-800')}
+						{@render userButton('user1', 'User 1', 'Employee', 'bg-gray-50 hover:bg-gray-100 border border-gray-100 text-gray-700')}
+						{@render userButton('user2', 'User 2', 'Employee', 'bg-gray-50 hover:bg-gray-100 border border-gray-100 text-gray-700')}
+					</div>
+				</details>
 			</div>
 		</div>
 
