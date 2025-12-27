@@ -43,14 +43,30 @@ public class FlowableConfig {
         log.info("Initializing Flowable demo data (async)...");
 
         try {
-            // Create groups
+            // Create groups for hierarchical approval levels
             createGroupIfNotExists(identityService, "users", "Users");
             createGroupIfNotExists(identityService, "supervisors", "Supervisors");
+            createGroupIfNotExists(identityService, "managers", "Managers");
+            createGroupIfNotExists(identityService, "directors", "Directors");
             createGroupIfNotExists(identityService, "executives", "Executives");
 
-            // Create users in Flowable identity
+            // Create users in Flowable identity with hierarchical roles
+            // Level 1: Regular users
             createUserIfNotExists(identityService, "user1", "User", "One", "user1@demo.com", "users");
+            createUserIfNotExists(identityService, "user2", "User", "Two", "user2@demo.com", "users");
+
+            // Level 2: Supervisors (can approve up to $1000)
             createUserIfNotExists(identityService, "supervisor1", "Supervisor", "One", "supervisor1@demo.com", "supervisors");
+            createUserIfNotExists(identityService, "supervisor2", "Supervisor", "Two", "supervisor2@demo.com", "supervisors");
+
+            // Level 3: Managers (can approve up to $5000, manager of supervisors)
+            createUserIfNotExists(identityService, "manager1", "Manager", "One", "manager1@demo.com", "managers");
+            createUserIfNotExists(identityService, "manager2", "Manager", "Two", "manager2@demo.com", "managers");
+
+            // Level 4: Directors (can approve up to $20000, manager of managers)
+            createUserIfNotExists(identityService, "director1", "Director", "One", "director1@demo.com", "directors");
+
+            // Level 5: Executives (final approval authority)
             createUserIfNotExists(identityService, "executive1", "Executive", "One", "executive1@demo.com", "executives");
 
             // Start demo process instances
@@ -149,6 +165,88 @@ public class FlowableConfig {
             log.info("Started demo task: TASK-001");
         } catch (Exception e) {
             log.warn("Could not start task process: {}", e.getMessage());
+        }
+
+        // Demo Purchase Request 1: Medium amount - needs manager approval
+        Map<String, Object> purchase1 = new HashMap<>();
+        purchase1.put("employeeId", "user1");
+        purchase1.put("employeeName", "User One");
+        purchase1.put("amount", 7500.00);
+        purchase1.put("department", "Engineering");
+        purchase1.put("urgency", "normal");
+        purchase1.put("description", "Software licenses for development team");
+        purchase1.put("vendor", "TechCorp Inc.");
+        purchase1.put("justification", "Required for new project development");
+        purchase1.put("initiator", "user1");
+        purchase1.put("startedBy", "user1");
+
+        try {
+            runtimeService.startProcessInstanceByKey("purchase-request", "PUR-001", purchase1);
+            log.info("Started demo purchase request: PUR-001 (amount: $7,500 - needs Manager approval)");
+        } catch (Exception e) {
+            log.warn("Could not start purchase process: {}", e.getMessage());
+        }
+
+        // Demo Purchase Request 2: Large amount - needs director approval
+        Map<String, Object> purchase2 = new HashMap<>();
+        purchase2.put("employeeId", "user2");
+        purchase2.put("employeeName", "User Two");
+        purchase2.put("amount", 35000.00);
+        purchase2.put("department", "Marketing");
+        purchase2.put("urgency", "high");
+        purchase2.put("description", "Annual marketing campaign materials");
+        purchase2.put("vendor", "Creative Agency LLC");
+        purchase2.put("justification", "Q1 marketing initiative");
+        purchase2.put("initiator", "user2");
+        purchase2.put("startedBy", "user2");
+
+        try {
+            runtimeService.startProcessInstanceByKey("purchase-request", "PUR-002", purchase2);
+            log.info("Started demo purchase request: PUR-002 (amount: $35,000 - needs Director approval)");
+        } catch (Exception e) {
+            log.warn("Could not start purchase process: {}", e.getMessage());
+        }
+
+        // Demo Project Approval 1: Medium project - parallel review
+        Map<String, Object> project1 = new HashMap<>();
+        project1.put("employeeId", "user1");
+        project1.put("employeeName", "User One");
+        project1.put("projectName", "Customer Portal Redesign");
+        project1.put("budget", 45000.00);
+        project1.put("timeline", "3 months");
+        project1.put("department", "Engineering");
+        project1.put("projectType", "standard");
+        project1.put("expectedROI", "25% increase in customer engagement");
+        project1.put("description", "Modernize the customer self-service portal with new UI/UX");
+        project1.put("initiator", "user1");
+        project1.put("startedBy", "user1");
+
+        try {
+            runtimeService.startProcessInstanceByKey("project-approval", "PROJ-001", project1);
+            log.info("Started demo project approval: PROJ-001 (budget: $45,000 - parallel review)");
+        } catch (Exception e) {
+            log.warn("Could not start project process: {}", e.getMessage());
+        }
+
+        // Demo Project Approval 2: Large project - requires executive
+        Map<String, Object> project2 = new HashMap<>();
+        project2.put("employeeId", "manager1");
+        project2.put("employeeName", "Manager One");
+        project2.put("projectName", "ERP System Implementation");
+        project2.put("budget", 250000.00);
+        project2.put("timeline", "12 months");
+        project2.put("department", "Operations");
+        project2.put("projectType", "enterprise");
+        project2.put("expectedROI", "40% operational efficiency improvement");
+        project2.put("description", "Full ERP system replacement with modern cloud-based solution");
+        project2.put("initiator", "manager1");
+        project2.put("startedBy", "manager1");
+
+        try {
+            runtimeService.startProcessInstanceByKey("project-approval", "PROJ-002", project2);
+            log.info("Started demo project approval: PROJ-002 (budget: $250,000 - requires executive)");
+        } catch (Exception e) {
+            log.warn("Could not start project process: {}", e.getMessage());
         }
     }
 }

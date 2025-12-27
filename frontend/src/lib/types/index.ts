@@ -55,3 +55,121 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+// Escalation Types
+export interface Escalation {
+  id: string;
+  taskId: string;
+  processInstanceId: string;
+  fromUserId: string;
+  fromUserName: string | null;
+  toUserId: string | null;
+  toUserName: string | null;
+  fromLevel: string;
+  toLevel: string;
+  reason: string;
+  type: 'ESCALATE' | 'DE_ESCALATE';
+  timestamp: string;
+}
+
+export interface EscalationRequest {
+  reason: string;
+  targetUserId?: string;
+  targetLevel?: string;
+  comments?: string;
+}
+
+export interface EscalationOptions {
+  escalateTo: string[];
+  deEscalateTo: string[];
+}
+
+// Approval Types
+export interface Approval {
+  id: string;
+  processInstanceId: string;
+  taskId: string;
+  taskName: string;
+  approverId: string;
+  approverName: string | null;
+  approverLevel: string;
+  decision: 'APPROVED' | 'REJECTED' | 'ESCALATED' | 'DE_ESCALATED' | 'REQUEST_CHANGES';
+  comments: string | null;
+  timestamp: string;
+  stepOrder: number;
+  isRequired: boolean;
+}
+
+// Task History Types
+export interface TaskHistory {
+  id: string;
+  taskDefinitionKey: string;
+  name: string;
+  description: string | null;
+  processInstanceId: string;
+  assignee: string | null;
+  owner: string | null;
+  createTime: string;
+  claimTime: string | null;
+  endTime: string | null;
+  durationInMillis: number | null;
+  deleteReason: string | null;
+  variables: Record<string, unknown>;
+}
+
+// Workflow History Types
+export interface WorkflowHistory {
+  processInstanceId: string;
+  processDefinitionKey: string;
+  processDefinitionName: string | null;
+  businessKey: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'SUSPENDED' | 'TERMINATED';
+  initiatorId: string | null;
+  initiatorName: string | null;
+  startTime: string;
+  endTime: string | null;
+  durationInMillis: number | null;
+  currentTaskId: string | null;
+  currentTaskName: string | null;
+  currentAssignee: string | null;
+  currentLevel: string;
+  escalationCount: number;
+  variables: Record<string, unknown>;
+  taskHistory: TaskHistory[];
+  escalationHistory: Escalation[];
+  approvals: Approval[];
+}
+
+// Dashboard Types
+export interface DashboardStats {
+  totalActive: number;
+  totalCompleted: number;
+  totalPending: number;
+  myTasks: number;
+  myProcesses: number;
+  pendingEscalations: number;
+  avgCompletionTimeHours: number;
+}
+
+export interface EscalationMetrics {
+  totalEscalations: number;
+  totalDeEscalations: number;
+  activeEscalatedProcesses: number;
+  escalationsByLevel: Record<string, number>;
+}
+
+export interface Dashboard {
+  stats: DashboardStats;
+  activeByType: Record<string, number>;
+  byStatus: Record<string, number>;
+  recentCompleted: WorkflowHistory[];
+  activeProcesses: WorkflowHistory[];
+  myPendingApprovals: WorkflowHistory[];
+  escalationMetrics: EscalationMetrics;
+}
+
+// Handoff Types
+export interface HandoffRequest {
+  toUserId: string;
+  reason: string;
+}

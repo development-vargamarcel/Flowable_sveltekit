@@ -4,7 +4,14 @@ import type {
   TaskDetails,
   ProcessDefinition,
   ProcessInstance,
-  LoginRequest
+  LoginRequest,
+  Dashboard,
+  WorkflowHistory,
+  EscalationRequest,
+  Escalation,
+  EscalationOptions,
+  Approval,
+  HandoffRequest
 } from '$lib/types';
 import { createLogger } from '$lib/utils/logger';
 
@@ -332,5 +339,96 @@ export const api = {
 
   async getUsers(): Promise<User[]> {
     return fetchApi('/api/processes/users');
+  },
+
+  // Workflow Dashboard
+  async getDashboard(): Promise<Dashboard> {
+    return fetchApi('/api/workflow/dashboard');
+  },
+
+  // Workflow History & Processes
+  async getAllWorkflowProcesses(
+    status?: string,
+    processType?: string,
+    page: number = 0,
+    size: number = 20
+  ): Promise<WorkflowHistory[]> {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (processType) params.append('processType', processType);
+    params.append('page', page.toString());
+    params.append('size', size.toString());
+    return fetchApi(`/api/workflow/processes?${params.toString()}`);
+  },
+
+  async getWorkflowHistory(processInstanceId: string): Promise<WorkflowHistory> {
+    return fetchApi(`/api/workflow/processes/${processInstanceId}`);
+  },
+
+  // Escalation
+  async getEscalationOptions(taskId: string): Promise<EscalationOptions> {
+    return fetchApi(`/api/workflow/tasks/${taskId}/escalation-options`);
+  },
+
+  async escalateTask(
+    taskId: string,
+    request: EscalationRequest
+  ): Promise<{ message: string; escalation: Escalation }> {
+    return fetchApi(`/api/workflow/tasks/${taskId}/escalate`, {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+  },
+
+  async deEscalateTask(
+    taskId: string,
+    request: EscalationRequest
+  ): Promise<{ message: string; deEscalation: Escalation }> {
+    return fetchApi(`/api/workflow/tasks/${taskId}/de-escalate`, {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+  },
+
+  // Handoff
+  async handoffTask(
+    taskId: string,
+    request: HandoffRequest
+  ): Promise<{ message: string }> {
+    return fetchApi(`/api/workflow/tasks/${taskId}/handoff`, {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+  },
+
+  // Approvals
+  async approveTask(
+    taskId: string,
+    comments?: string
+  ): Promise<{ message: string; approval: Approval }> {
+    return fetchApi(`/api/workflow/tasks/${taskId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ comments })
+    });
+  },
+
+  async rejectTask(
+    taskId: string,
+    comments: string
+  ): Promise<{ message: string; approval: Approval }> {
+    return fetchApi(`/api/workflow/tasks/${taskId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ comments })
+    });
+  },
+
+  async requestChanges(
+    taskId: string,
+    comments: string
+  ): Promise<{ message: string; approval: Approval }> {
+    return fetchApi(`/api/workflow/tasks/${taskId}/request-changes`, {
+      method: 'POST',
+      body: JSON.stringify({ comments })
+    });
   }
 };

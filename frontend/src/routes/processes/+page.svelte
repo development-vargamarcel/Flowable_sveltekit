@@ -12,6 +12,26 @@
 		<p class="text-gray-600 mt-1">Select a workflow to begin</p>
 	</div>
 
+	<h2 class="text-lg font-semibold text-gray-800 mb-4">Advanced Multi-Step Workflows</h2>
+	<div class="grid gap-4 mb-8">
+		<ProcessCard
+			title="Purchase Request"
+			description="Submit a purchase request with hierarchical multi-level approval. Supports escalation to manager, director, and executive levels."
+			icon="🛒"
+			color="purple"
+			href="/processes/purchase"
+		/>
+
+		<ProcessCard
+			title="Project Approval"
+			description="Submit a project proposal for multi-stakeholder approval. Includes parallel technical, financial, and legal reviews with executive sign-off."
+			icon="📊"
+			color="indigo"
+			href="/processes/project"
+		/>
+	</div>
+
+	<h2 class="text-lg font-semibold text-gray-800 mb-4">Simple Workflows</h2>
 	<div class="grid gap-4">
 		<ProcessCard
 			title="Expense Request"

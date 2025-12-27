@@ -17,6 +17,10 @@
 		switch (role) {
 			case 'EXECUTIVE':
 				return 'bg-purple-100 text-purple-800';
+			case 'DIRECTOR':
+				return 'bg-pink-100 text-pink-800';
+			case 'MANAGER':
+				return 'bg-indigo-100 text-indigo-800';
 			case 'SUPERVISOR':
 				return 'bg-blue-100 text-blue-800';
 			default:
@@ -42,7 +46,13 @@
 							href="/"
 							class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
 						>
-							Dashboard
+							Home
+						</a>
+						<a
+							href="/dashboard"
+							class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
+						>
+							Workflow Dashboard
 						</a>
 						<a
 							href="/tasks"
@@ -86,7 +96,10 @@
 		<div class="sm:hidden border-t border-gray-200">
 			<div class="flex space-x-1 px-2 py-2">
 				<a href="/" class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md">
-					Dashboard
+					Home
+				</a>
+				<a href="/dashboard" class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md">
+					Workflows
 				</a>
 				<a href="/tasks" class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md">
 					Tasks

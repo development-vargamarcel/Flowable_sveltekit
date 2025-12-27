@@ -84,10 +84,42 @@
 			</div>
 		</div>
 
+		<!-- Workflow Dashboard Link -->
+		<div class="mb-8">
+			<a
+				href="/dashboard"
+				class="block bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-6 text-white hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg"
+			>
+				<div class="flex items-center justify-between">
+					<div>
+						<h2 class="text-xl font-bold">Workflow Dashboard</h2>
+						<p class="text-indigo-100 mt-1">View all past, ongoing, and planned processes with escalation tracking</p>
+					</div>
+					<svg class="w-8 h-8 text-white opacity-75" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+					</svg>
+				</div>
+			</a>
+		</div>
+
 		<!-- Quick Actions -->
 		<div class="mb-8">
 			<h2 class="text-lg font-semibold text-gray-900 mb-4">Start a New Process</h2>
-			<div class="grid sm:grid-cols-3 gap-4">
+			<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+				<ProcessCard
+					title="Purchase Request"
+					description="Multi-level hierarchical approval"
+					icon="🛒"
+					color="purple"
+					href="/processes/purchase"
+				/>
+				<ProcessCard
+					title="Project Approval"
+					description="Multi-stakeholder parallel review"
+					icon="📊"
+					color="indigo"
+					href="/processes/project"
+				/>
 				<ProcessCard
 					title="Expense Request"
 					description="Submit an expense for approval"

@@ -57,25 +57,63 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        var user = User.builder()
+        // Level 1: Regular users
+        var user1 = User.builder()
             .username("user1")
             .password(passwordEncoder().encode("password"))
             .roles("USER")
             .build();
 
-        var supervisor = User.builder()
+        var user2 = User.builder()
+            .username("user2")
+            .password(passwordEncoder().encode("password"))
+            .roles("USER")
+            .build();
+
+        // Level 2: Supervisors (can approve up to $1000)
+        var supervisor1 = User.builder()
             .username("supervisor1")
             .password(passwordEncoder().encode("password"))
             .roles("SUPERVISOR", "USER")
             .build();
 
-        var executive = User.builder()
-            .username("executive1")
+        var supervisor2 = User.builder()
+            .username("supervisor2")
             .password(passwordEncoder().encode("password"))
-            .roles("EXECUTIVE", "SUPERVISOR", "USER")
+            .roles("SUPERVISOR", "USER")
             .build();
 
-        return new InMemoryUserDetailsManager(user, supervisor, executive);
+        // Level 3: Managers (can approve up to $5000, manager of supervisors)
+        var manager1 = User.builder()
+            .username("manager1")
+            .password(passwordEncoder().encode("password"))
+            .roles("MANAGER", "SUPERVISOR", "USER")
+            .build();
+
+        var manager2 = User.builder()
+            .username("manager2")
+            .password(passwordEncoder().encode("password"))
+            .roles("MANAGER", "SUPERVISOR", "USER")
+            .build();
+
+        // Level 4: Directors (can approve up to $20000, manager of managers)
+        var director1 = User.builder()
+            .username("director1")
+            .password(passwordEncoder().encode("password"))
+            .roles("DIRECTOR", "MANAGER", "SUPERVISOR", "USER")
+            .build();
+
+        // Level 5: Executives (final approval authority)
+        var executive1 = User.builder()
+            .username("executive1")
+            .password(passwordEncoder().encode("password"))
+            .roles("EXECUTIVE", "DIRECTOR", "MANAGER", "SUPERVISOR", "USER")
+            .build();
+
+        return new InMemoryUserDetailsManager(
+            user1, user2, supervisor1, supervisor2,
+            manager1, manager2, director1, executive1
+        );
     }
 
     @Bean

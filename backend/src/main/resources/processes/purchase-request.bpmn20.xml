@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://demo.com/bpm"
+             xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL
+                                 http://www.omg.org/spec/BPMN/20100524/MODEL/BPMN20.xsd">
+
+    <process id="purchase-request" name="Purchase Request with Hierarchical Approval" isExecutable="true">
+        <documentation>
+            Advanced purchase request workflow with multi-level hierarchical approval.
+            Supports escalation to manager, director, and executive levels.
+            Includes de-escalation capability and multi-stakeholder sign-off.
+        </documentation>
+
+        <!-- Start Event -->
+        <startEvent id="startEvent" name="Purchase Request Submitted">
+            <documentation>Employee submits purchase request</documentation>
+        </startEvent>
+
+        <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="determineApprovalPath"/>
+
+        <!-- Service Task: Determine Approval Path -->
+        <scriptTask id="determineApprovalPath" name="Determine Approval Path"
+                    scriptFormat="javascript" flowable:autoStoreVariables="true">
+            <script>
+                <![CDATA[
+                var amount = execution.getVariable('amount');
+                var department = execution.getVariable('department') || 'General';
+                var urgency = execution.getVariable('urgency') || 'normal';
+
+                // Determine required approval levels based on amount and department
+                var approvalLevel = 'SUPERVISOR';
+                var requiresMultiApproval = false;
+                var requiredApprovers = [];
+
+                if (amount > 50000) {
+                    approvalLevel = 'EXECUTIVE';
+                    requiresMultiApproval = true;
+                    requiredApprovers = ['SUPERVISOR', 'MANAGER', 'DIRECTOR', 'EXECUTIVE'];
+                } else if (amount > 20000) {
+                    approvalLevel = 'DIRECTOR';
+                    requiresMultiApproval = true;
+                    requiredApprovers = ['SUPERVISOR', 'MANAGER', 'DIRECTOR'];
+                } else if (amount > 5000) {
+                    approvalLevel = 'MANAGER';
+                    requiresMultiApproval = true;
+                    requiredApprovers = ['SUPERVISOR', 'MANAGER'];
+                } else if (amount > 1000) {
+                    approvalLevel = 'SUPERVISOR';
+                    requiredApprovers = ['SUPERVISOR'];
+                } else {
+                    approvalLevel = 'AUTO_APPROVED';
+                    requiredApprovers = [];
+                }
+
+                execution.setVariable('approvalLevel', approvalLevel);
+                execution.setVariable('currentLevel', 'SUPERVISOR');
+                execution.setVariable('requiresMultiApproval', requiresMultiApproval);
+                execution.setVariable('requiredApprovers', Java.to(requiredApprovers, 'java.lang.String[]'));
+                execution.setVariable('completedApprovals', Java.to([], 'java.lang.String[]'));
+                execution.setVariable('escalationCount', 0);
+                execution.setVariable('escalationHistory', '[]');
+                execution.setVariable('approvalHistory', '[]');
+                ]]>
+            </script>
+        </scriptTask>
+
+        <sequenceFlow id="flow2" sourceRef="determineApprovalPath" targetRef="checkAutoApproval"/>
+
+        <!-- Gateway: Check if Auto-Approved -->
+        <exclusiveGateway id="checkAutoApproval" name="Auto-Approved?"/>
+
+        <sequenceFlow id="flowAutoApproved" sourceRef="checkAutoApproval" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${approvalLevel == 'AUTO_APPROVED'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowNeedsApproval" sourceRef="checkAutoApproval" targetRef="supervisorApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${approvalLevel != 'AUTO_APPROVED'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- User Task: Supervisor Approval -->
+        <userTask id="supervisorApproval" name="Supervisor Approval"
+                  flowable:candidateGroups="supervisors"
+                  flowable:formKey="purchase-approval-form">
+            <documentation>
+                Review purchase request (Amount: $${amount}).
+                Current Level: Supervisor.
+                Actions: Approve, Reject, Escalate to Manager, Request Changes.
+            </documentation>
+        </userTask>
+
+        <sequenceFlow id="flow3" sourceRef="supervisorApproval" targetRef="checkSupervisorDecision"/>
+
+        <!-- Gateway: Check Supervisor Decision -->
+        <exclusiveGateway id="checkSupervisorDecision" name="Supervisor Decision"/>
+
+        <sequenceFlow id="flowSupApproved" sourceRef="checkSupervisorDecision" targetRef="checkNeedsMoreApprovals">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'approved'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowSupRejected" sourceRef="checkSupervisorDecision" targetRef="endRejected">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'rejected'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowSupEscalate" sourceRef="checkSupervisorDecision" targetRef="managerApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'escalate'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowSupRequestChanges" sourceRef="checkSupervisorDecision" targetRef="requestChanges">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'request_changes'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- User Task: Request Changes -->
+        <userTask id="requestChanges" name="Address Requested Changes"
+                  flowable:assignee="${initiator}"
+                  flowable:formKey="purchase-revision-form">
+            <documentation>
+                Please address the requested changes: ${changeRequestReason}.
+                Update your purchase request and resubmit.
+            </documentation>
+        </userTask>
+
+        <sequenceFlow id="flowChangesAddressed" sourceRef="requestChanges" targetRef="supervisorApproval"/>
+
+        <!-- Gateway: Check if more approvals needed -->
+        <exclusiveGateway id="checkNeedsMoreApprovals" name="More Approvals Needed?"/>
+
+        <sequenceFlow id="flowComplete" sourceRef="checkNeedsMoreApprovals" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${currentLevel == approvalLevel || approvalLevel == 'SUPERVISOR'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowNeedsManager" sourceRef="checkNeedsMoreApprovals" targetRef="managerApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${currentLevel == 'SUPERVISOR' && (approvalLevel == 'MANAGER' || approvalLevel == 'DIRECTOR' || approvalLevel == 'EXECUTIVE')}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- User Task: Manager Approval -->
+        <userTask id="managerApproval" name="Manager Approval"
+                  flowable:candidateGroups="managers"
+                  flowable:formKey="purchase-approval-form">
+            <documentation>
+                Review purchase request (Amount: $${amount}).
+                Current Level: Manager.
+                Previous Approvals: ${completedApprovals}.
+                Actions: Approve, Reject, Escalate to Director, De-escalate to Supervisor.
+            </documentation>
+        </userTask>
+
+        <sequenceFlow id="flow4" sourceRef="managerApproval" targetRef="checkManagerDecision"/>
+
+        <!-- Gateway: Check Manager Decision -->
+        <exclusiveGateway id="checkManagerDecision" name="Manager Decision"/>
+
+        <sequenceFlow id="flowMgrApproved" sourceRef="checkManagerDecision" targetRef="updateLevelAfterManager">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'approved'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowMgrRejected" sourceRef="checkManagerDecision" targetRef="endRejected">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'rejected'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowMgrEscalate" sourceRef="checkManagerDecision" targetRef="directorApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'escalate'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowMgrDeEscalate" sourceRef="checkManagerDecision" targetRef="supervisorApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'de_escalate'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- Script Task: Update Level After Manager -->
+        <scriptTask id="updateLevelAfterManager" name="Update Level"
+                    scriptFormat="javascript" flowable:autoStoreVariables="true">
+            <script>
+                <![CDATA[
+                execution.setVariable('currentLevel', 'MANAGER');
+                ]]>
+            </script>
+        </scriptTask>
+
+        <sequenceFlow id="flow5" sourceRef="updateLevelAfterManager" targetRef="checkNeedsDirector"/>
+
+        <!-- Gateway: Check if Director needed -->
+        <exclusiveGateway id="checkNeedsDirector" name="Needs Director?"/>
+
+        <sequenceFlow id="flowDirectorNotNeeded" sourceRef="checkNeedsDirector" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${approvalLevel == 'MANAGER'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowNeedsDirector" sourceRef="checkNeedsDirector" targetRef="directorApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${approvalLevel == 'DIRECTOR' || approvalLevel == 'EXECUTIVE'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- User Task: Director Approval -->
+        <userTask id="directorApproval" name="Director Approval"
+                  flowable:candidateGroups="directors"
+                  flowable:formKey="purchase-approval-form">
+            <documentation>
+                Review purchase request (Amount: $${amount}).
+                Current Level: Director.
+                Previous Approvals: ${completedApprovals}.
+                Actions: Approve, Reject, Escalate to Executive, De-escalate to Manager.
+            </documentation>
+        </userTask>
+
+        <sequenceFlow id="flow6" sourceRef="directorApproval" targetRef="checkDirectorDecision"/>
+
+        <!-- Gateway: Check Director Decision -->
+        <exclusiveGateway id="checkDirectorDecision" name="Director Decision"/>
+
+        <sequenceFlow id="flowDirApproved" sourceRef="checkDirectorDecision" targetRef="updateLevelAfterDirector">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'approved'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowDirRejected" sourceRef="checkDirectorDecision" targetRef="endRejected">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'rejected'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowDirEscalate" sourceRef="checkDirectorDecision" targetRef="executiveApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'escalate'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowDirDeEscalate" sourceRef="checkDirectorDecision" targetRef="managerApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'de_escalate'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- Script Task: Update Level After Director -->
+        <scriptTask id="updateLevelAfterDirector" name="Update Level"
+                    scriptFormat="javascript" flowable:autoStoreVariables="true">
+            <script>
+                <![CDATA[
+                execution.setVariable('currentLevel', 'DIRECTOR');
+                ]]>
+            </script>
+        </scriptTask>
+
+        <sequenceFlow id="flow7" sourceRef="updateLevelAfterDirector" targetRef="checkNeedsExecutive"/>
+
+        <!-- Gateway: Check if Executive needed -->
+        <exclusiveGateway id="checkNeedsExecutive" name="Needs Executive?"/>
+
+        <sequenceFlow id="flowExecutiveNotNeeded" sourceRef="checkNeedsExecutive" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${approvalLevel == 'DIRECTOR'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowNeedsExecutive" sourceRef="checkNeedsExecutive" targetRef="executiveApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${approvalLevel == 'EXECUTIVE'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- User Task: Executive Approval -->
+        <userTask id="executiveApproval" name="Executive Final Approval"
+                  flowable:candidateGroups="executives"
+                  flowable:formKey="purchase-approval-form">
+            <documentation>
+                FINAL APPROVAL: Purchase request (Amount: $${amount}).
+                Current Level: Executive.
+                Previous Approvals: ${completedApprovals}.
+                This is the final approval step.
+                Actions: Approve, Reject, De-escalate to Director.
+            </documentation>
+        </userTask>
+
+        <sequenceFlow id="flow8" sourceRef="executiveApproval" targetRef="checkExecutiveDecision"/>
+
+        <!-- Gateway: Check Executive Decision -->
+        <exclusiveGateway id="checkExecutiveDecision" name="Executive Decision"/>
+
+        <sequenceFlow id="flowExecApproved" sourceRef="checkExecutiveDecision" targetRef="endApproved">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'approved'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowExecRejected" sourceRef="checkExecutiveDecision" targetRef="endRejected">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'rejected'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flowExecDeEscalate" sourceRef="checkExecutiveDecision" targetRef="directorApproval">
+            <conditionExpression xsi:type="tFormalExpression">
+                <![CDATA[${decision == 'de_escalate'}]]>
+            </conditionExpression>
+        </sequenceFlow>
+
+        <!-- End Events -->
+        <endEvent id="endApproved" name="Purchase Approved">
+            <documentation>Purchase request has been fully approved by all required stakeholders</documentation>
+        </endEvent>
+
+        <endEvent id="endRejected" name="Purchase Rejected">
+            <documentation>Purchase request has been rejected</documentation>
+        </endEvent>
+
+    </process>
+</definitions>
