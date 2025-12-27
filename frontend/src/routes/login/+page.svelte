@@ -515,32 +515,98 @@
 			</form>
 
 			<div class="mt-6 pt-6 border-t border-gray-200">
-				<p class="text-sm text-gray-600 mb-3 text-center">Quick login (password: "password")</p>
-				<div class="grid grid-cols-3 gap-2">
-					<button
-						type="button"
-						onclick={() => selectUser('user1')}
-						class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-					>
-						<div class="font-medium">User</div>
-						<div class="text-xs text-gray-500">user1</div>
-					</button>
-					<button
-						type="button"
-						onclick={() => selectUser('supervisor1')}
-						class="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
-					>
-						<div class="font-medium">Supervisor</div>
-						<div class="text-xs text-gray-500">supervisor1</div>
-					</button>
-					<button
-						type="button"
-						onclick={() => selectUser('executive1')}
-						class="px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
-					>
-						<div class="font-medium">Executive</div>
-						<div class="text-xs text-gray-500">executive1</div>
-					</button>
+				<p class="text-sm text-gray-600 mb-4 text-center">Quick login <span class="text-xs text-gray-400">(password: "password")</span></p>
+
+				<!-- Leadership -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Leadership</div>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onclick={() => selectUser('executive1')}
+							class="px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 border border-purple-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-purple-900">Executive</div>
+							<div class="text-xs text-purple-600">executive1</div>
+						</button>
+						<button
+							type="button"
+							onclick={() => selectUser('director1')}
+							class="px-3 py-2 text-sm bg-indigo-100 hover:bg-indigo-200 border border-indigo-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-indigo-900">Director</div>
+							<div class="text-xs text-indigo-600">director1</div>
+						</button>
+					</div>
+				</div>
+
+				<!-- Management -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Management</div>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onclick={() => selectUser('manager1')}
+							class="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 border border-blue-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-blue-900">Manager</div>
+							<div class="text-xs text-blue-600">manager1</div>
+						</button>
+						<button
+							type="button"
+							onclick={() => selectUser('manager2')}
+							class="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 border border-blue-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-blue-900">Manager</div>
+							<div class="text-xs text-blue-600">manager2</div>
+						</button>
+					</div>
+				</div>
+
+				<!-- Team Leads -->
+				<div class="mb-3">
+					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Team Leads</div>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onclick={() => selectUser('supervisor1')}
+							class="px-3 py-2 text-sm bg-teal-100 hover:bg-teal-200 border border-teal-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-teal-900">Supervisor</div>
+							<div class="text-xs text-teal-600">supervisor1</div>
+						</button>
+						<button
+							type="button"
+							onclick={() => selectUser('supervisor2')}
+							class="px-3 py-2 text-sm bg-teal-100 hover:bg-teal-200 border border-teal-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-teal-900">Supervisor</div>
+							<div class="text-xs text-teal-600">supervisor2</div>
+						</button>
+					</div>
+				</div>
+
+				<!-- Employees -->
+				<div>
+					<div class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Employees</div>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onclick={() => selectUser('user1')}
+							class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-gray-900">User</div>
+							<div class="text-xs text-gray-500">user1</div>
+						</button>
+						<button
+							type="button"
+							onclick={() => selectUser('user2')}
+							class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors text-left"
+						>
+							<div class="font-medium text-gray-900">User</div>
+							<div class="text-xs text-gray-500">user2</div>
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
