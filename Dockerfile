@@ -79,12 +79,28 @@ http {
         listen ${PORT};
         server_name _;
 
-        # Simple health endpoint - nginx itself responds
+        # Simple health endpoint - nginx itself responds immediately
         # This is the primary Railway health check endpoint
+        # Must return 200 right away for Railway replica health checks
         location = /health {
             access_log off;
             default_type application/json;
-            return 200 '{"status":"UP","nginx":"healthy"}';
+            return 200 '{"status":"UP","nginx":"healthy","message":"proxy ready"}';
+        }
+
+        # Readiness check - verifies backend is also ready
+        location = /ready {
+            access_log off;
+            default_type application/json;
+            proxy_pass http://backend/actuator/health;
+            proxy_connect_timeout 2s;
+            proxy_read_timeout 5s;
+            error_page 502 503 504 = @backend_not_ready;
+        }
+
+        location @backend_not_ready {
+            default_type application/json;
+            return 503 '{"status":"STARTING","message":"backend initializing"}';
         }
 
         # API requests -> Spring Boot backend
@@ -99,6 +115,14 @@ http {
             proxy_pass_header Set-Cookie;
             proxy_connect_timeout 10s;
             proxy_read_timeout 60s;
+
+            # Return friendly error when backend is starting
+            error_page 502 = @api_starting;
+        }
+
+        location @api_starting {
+            default_type application/json;
+            return 503 '{"error":"Service starting","message":"Backend is initializing, please retry in a few seconds"}';
         }
 
         # Actuator endpoints -> Spring Boot backend
@@ -152,6 +176,7 @@ stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 startsecs=0
+priority=10
 
 [program:backend]
 command=java -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8080 -jar /app/backend/app.jar
@@ -174,35 +199,20 @@ stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
-priority=200
+priority=100
 EOF
 
-# Create nginx wrapper script that waits for backend to be ready
+# Create nginx wrapper script - starts immediately for health checks
+# Railway health checks need nginx to respond right away
 RUN cat > /app/start-nginx.sh << 'EOF'
 #!/bin/sh
-echo "Waiting for Spring Boot backend to be ready..."
+echo "Starting nginx immediately for health checks..."
+echo "Backend will be available once Spring Boot finishes starting."
 
-# Wait for backend health endpoint with timeout (max 300 seconds)
-MAX_WAIT=300
-WAITED=0
-INTERVAL=2
-
-while [ $WAITED -lt $MAX_WAIT ]; do
-    # Check if backend health endpoint responds with UP status
-    RESPONSE=$(wget -q -O - --timeout=5 http://127.0.0.1:8080/actuator/health 2>/dev/null || echo "")
-
-    if echo "$RESPONSE" | grep -q '"status":"UP"'; then
-        echo "Backend is healthy after ${WAITED}s! Starting nginx..."
-        exec /usr/sbin/nginx -g "daemon off;"
-    fi
-
-    echo "Backend not ready yet (waited ${WAITED}s)..."
-    sleep $INTERVAL
-    WAITED=$((WAITED + INTERVAL))
-done
-
-echo "ERROR: Backend failed to become healthy within ${MAX_WAIT}s"
-exit 1
+# Start nginx immediately - health checks must respond right away
+# The /health endpoint responds with nginx status
+# The /api/ endpoints will return 502 until backend is ready (expected behavior)
+exec /usr/sbin/nginx -g "daemon off;"
 EOF
 
 RUN chmod +x /app/start-nginx.sh
