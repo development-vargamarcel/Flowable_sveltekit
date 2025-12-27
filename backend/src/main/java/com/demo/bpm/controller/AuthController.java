@@ -3,7 +3,9 @@ package com.demo.bpm.controller;
 import com.demo.bpm.dto.LoginRequest;
 import com.demo.bpm.dto.UserDTO;
 import com.demo.bpm.service.UserService;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -125,6 +127,48 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of(
                 "message", "Logged out successfully",
+                "timestamp", Instant.now().toString()
+        ));
+    }
+
+    /**
+     * Clear all session cookies to resolve "Request Header Or Cookie Too Large" errors.
+     * This endpoint clears HttpOnly cookies that JavaScript cannot access.
+     */
+    @PostMapping("/clear-session")
+    public ResponseEntity<?> clearSession(HttpServletRequest request, HttpServletResponse response) {
+        String clientIp = getClientIpAddress(request);
+        log.info("Session clear requested from IP: {}", clientIp);
+
+        // Invalidate any existing session
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            log.debug("Invalidating session: {}", session.getId());
+            session.invalidate();
+        }
+
+        // Clear Spring Security context
+        SecurityContextHolder.clearContext();
+
+        // Explicitly clear the JSESSIONID cookie by setting it with maxAge=0
+        Cookie sessionCookie = new Cookie("JSESSIONID", "");
+        sessionCookie.setPath("/");
+        sessionCookie.setMaxAge(0);
+        sessionCookie.setHttpOnly(true);
+        response.addCookie(sessionCookie);
+
+        // Also clear with /api path in case it was set there
+        Cookie apiSessionCookie = new Cookie("JSESSIONID", "");
+        apiSessionCookie.setPath("/api");
+        apiSessionCookie.setMaxAge(0);
+        apiSessionCookie.setHttpOnly(true);
+        response.addCookie(apiSessionCookie);
+
+        log.info("Session and cookies cleared for IP: {}", clientIp);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Session cleared successfully",
+                "details", "All session cookies have been removed. You can now try logging in again.",
                 "timestamp", Instant.now().toString()
         ));
     }

@@ -27,7 +27,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> {})
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/login", "/api/auth/logout", "/h2-console/**", "/actuator/**").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/clear-session", "/h2-console/**", "/actuator/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             )

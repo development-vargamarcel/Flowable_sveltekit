@@ -11,32 +11,101 @@
 	let fieldErrors = $state<Record<string, string>>({});
 	let loading = $state(false);
 	let cookiesCleared = $state(false);
+	let clearingCookies = $state(false);
+	let cookieDiagnostics = $state('');
 
 	/**
-	 * Clears all cookies for the current domain to resolve "Request Header Or Cookie Too Large" errors.
-	 * This typically happens when session cookies accumulate over time.
+	 * Get diagnostic information about current cookies
 	 */
-	function clearAllCookies(): void {
-		const cookies = document.cookie.split(';');
-		for (const cookie of cookies) {
-			const eqPos = cookie.indexOf('=');
-			const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
-			if (name) {
-				// Clear the cookie with various path combinations
-				document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-				document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api`;
-			}
-		}
-		cookiesCleared = true;
-		console.log('Cleared all cookies to resolve header size issue');
+	function getCookieDiagnostics(): string {
+		const cookies = document.cookie.split(';').filter(c => c.trim());
+		const totalSize = document.cookie.length;
+		const cookieNames = cookies.map(c => c.split('=')[0].trim()).join(', ');
+		return `Found ${cookies.length} accessible cookies (${totalSize} bytes): ${cookieNames || 'none'}. Note: HttpOnly cookies (like JSESSIONID) are not visible to JavaScript.`;
 	}
 
 	/**
-	 * Checks if the error is related to request headers or cookies being too large
+	 * Clears all cookies for the current domain to resolve "Request Header Or Cookie Too Large" errors.
+	 * This clears both JavaScript-accessible cookies and calls the backend to clear HttpOnly cookies.
 	 */
-	function isHeaderTooLargeError(errorMessage: string, details: string): boolean {
-		const combined = `${errorMessage} ${details}`.toLowerCase();
-		return combined.includes('header') && (combined.includes('too large') || combined.includes('400'));
+	async function clearAllCookies(): Promise<void> {
+		clearingCookies = true;
+		error = '';
+		errorDetails = '';
+		errorStatus = 0;
+
+		try {
+			// First, clear JavaScript-accessible cookies locally
+			const cookies = document.cookie.split(';');
+			let clearedCount = 0;
+			for (const cookie of cookies) {
+				const eqPos = cookie.indexOf('=');
+				const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
+				if (name) {
+					// Clear the cookie with various path and domain combinations
+					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api`;
+					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
+					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api;domain=${window.location.hostname}`;
+					clearedCount++;
+				}
+			}
+			console.log(`Cleared ${clearedCount} JavaScript-accessible cookies`);
+
+			// Call the backend to clear HttpOnly cookies (like JSESSIONID)
+			try {
+				const result = await api.clearSession();
+				console.log('Backend session cleared:', result);
+				cookiesCleared = true;
+				cookieDiagnostics = `Cleared ${clearedCount} browser cookies and server session. ${result.details}`;
+			} catch (backendError) {
+				// If we can't reach the backend (headers too large), at least we cleared local cookies
+				console.warn('Could not reach backend to clear session:', backendError);
+				cookiesCleared = true;
+				cookieDiagnostics = `Cleared ${clearedCount} browser cookies. Could not reach server to clear session - the server may have already cleared it due to the error.`;
+			}
+		} catch (e) {
+			console.error('Error clearing cookies:', e);
+			error = 'Failed to clear cookies';
+			errorDetails = e instanceof Error ? e.message : 'Unknown error occurred while clearing cookies';
+		} finally {
+			clearingCookies = false;
+		}
+	}
+
+	/**
+	 * Checks if the error is related to request headers or cookies being too large.
+	 * Detects various error message formats from nginx, proxies, and browsers.
+	 */
+	function isHeaderTooLargeError(errorMessage: string, details: string, rawText?: string): boolean {
+		const combined = `${errorMessage} ${details} ${rawText || ''}`.toLowerCase();
+
+		// Check for common nginx/proxy error patterns
+		const patterns = [
+			'header.*too large',
+			'cookie.*too large',
+			'request header or cookie too large',
+			'request entity too large',
+			'request-uri too long',
+			'413 request entity',
+			'431 request header',
+			'header fields too large',
+			'bad request.*header',
+			'header.*overflow'
+		];
+
+		for (const pattern of patterns) {
+			if (new RegExp(pattern).test(combined)) {
+				return true;
+			}
+		}
+
+		// Also check for 400 errors with HTML responses (nginx default error page)
+		if (combined.includes('400') && (combined.includes('<html') || combined.includes('<!doctype'))) {
+			return true;
+		}
+
+		return false;
 	}
 
 	async function handleSubmit(event: Event) {
@@ -45,6 +114,8 @@
 		errorDetails = '';
 		errorStatus = 0;
 		fieldErrors = {};
+		cookiesCleared = false;
+		cookieDiagnostics = '';
 		loading = true;
 
 		try {
@@ -58,10 +129,16 @@
 				errorStatus = err.status;
 				fieldErrors = err.fieldErrors || {};
 
-				// Check for cookie/header too large error (400 from nginx)
-				if (err.status === 400 && isHeaderTooLargeError(err.message, err.details || '')) {
+				// Check for cookie/header too large error (400 from nginx or similar)
+				// This can happen with status 400, 413, or 431
+				const isHeaderError = [400, 413, 431].includes(err.status) &&
+					isHeaderTooLargeError(err.message, err.details || '');
+
+				if (isHeaderError) {
 					error = 'Request headers too large';
-					errorDetails = 'Your browser has accumulated too many cookies. Click "Clear Cookies & Retry" below to fix this.';
+					errorDetails = 'Your browser has accumulated too many cookies or the session data is too large. ' +
+						'This is a common issue that can be resolved by clearing cookies.';
+					cookieDiagnostics = getCookieDiagnostics();
 				}
 
 				// Log detailed error info for debugging
@@ -72,15 +149,19 @@
 					details: err.details,
 					fieldErrors: err.fieldErrors,
 					timestamp: err.timestamp,
-					fullMessage: err.getFullMessage()
+					fullMessage: err.getFullMessage(),
+					isHeaderError,
+					cookieDiagnostics: getCookieDiagnostics()
 				});
 			} else if (err instanceof Error) {
 				error = err.message;
 				// Check for header too large error in generic Error
 				if (isHeaderTooLargeError(err.message, '')) {
 					error = 'Request headers too large';
-					errorDetails = 'Your browser has accumulated too many cookies. Click "Clear Cookies & Retry" below to fix this.';
+					errorDetails = 'Your browser has accumulated too many cookies or the session data is too large. ' +
+						'This is a common issue that can be resolved by clearing cookies.';
 					errorStatus = 400;
+					cookieDiagnostics = getCookieDiagnostics();
 				}
 				console.error('Login error:', err);
 			} else {
@@ -126,8 +207,13 @@
 			<form onsubmit={handleSubmit} class="space-y-4">
 				{#if cookiesCleared}
 					<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-						<div class="font-medium">Cookies cleared successfully</div>
+						<div class="font-medium">Cookies and session cleared successfully</div>
 						<div class="mt-1 text-green-600 text-xs">Please try logging in again.</div>
+						{#if cookieDiagnostics}
+							<div class="mt-2 text-green-600 text-xs bg-green-100 p-2 rounded font-mono break-words">
+								{cookieDiagnostics}
+							</div>
+						{/if}
 					</div>
 				{/if}
 
@@ -144,6 +230,11 @@
 						{#if errorDetails}
 							<div class="mt-2 text-red-600 text-xs leading-relaxed">{errorDetails}</div>
 						{/if}
+						{#if cookieDiagnostics && error.includes('headers too large')}
+							<div class="mt-2 text-red-600 text-xs bg-red-100 p-2 rounded font-mono break-words">
+								<span class="font-medium">Diagnostics:</span> {cookieDiagnostics}
+							</div>
+						{/if}
 						{#if Object.keys(fieldErrors).length > 0}
 							<div class="mt-2 border-t border-red-200 pt-2">
 								<div class="text-xs font-medium text-red-800 mb-1">Field errors:</div>
@@ -154,14 +245,22 @@
 								</ul>
 							</div>
 						{/if}
-						{#if errorStatus === 400 && error.includes('headers too large')}
+						{#if [400, 413, 431].includes(errorStatus) && error.includes('headers too large')}
 							<button
 								type="button"
-								onclick={() => { clearAllCookies(); error = ''; errorDetails = ''; errorStatus = 0; }}
-								class="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+								onclick={clearAllCookies}
+								disabled={clearingCookies}
+								class="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed rounded-lg transition-colors"
 							>
-								Clear Cookies & Retry
+								{#if clearingCookies}
+									Clearing cookies...
+								{:else}
+									Clear Cookies & Session
+								{/if}
 							</button>
+							<p class="mt-2 text-xs text-red-500">
+								This will clear both browser cookies and server session data to resolve the issue.
+							</p>
 						{/if}
 					</div>
 				{/if}
