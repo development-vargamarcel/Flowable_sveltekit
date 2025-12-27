@@ -7,6 +7,9 @@ import type { Handle } from '@sveltejs/kit';
 const BACKEND_URL = process.env.BACKEND_URL || process.env.VITE_API_URL || 'http://localhost:8080';
 const isDev = process.env.NODE_ENV === 'development';
 
+// Maximum cookie header size before we consider it too large (16KB is a safe limit)
+const MAX_COOKIE_SIZE = 16 * 1024;
+
 // Headers that should NOT be forwarded to the backend
 // These are hop-by-hop headers or headers that should be recalculated
 const HEADERS_TO_SKIP = new Set([
@@ -21,6 +24,24 @@ const HEADERS_TO_SKIP = new Set([
 	'te',                    // Hop-by-hop header
 	'trailer',               // Hop-by-hop header
 ]);
+
+/**
+ * Build a redirect response to clear cookies
+ */
+function buildClearCookiesRedirect(): Response {
+	return new Response(null, {
+		status: 302,
+		headers: {
+			'Location': '/clear-cookies',
+			'Set-Cookie': [
+				'JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+				'JSESSIONID=; Path=/api; Max-Age=0; HttpOnly; SameSite=Lax',
+				'SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+			].join(', '),
+			'Cache-Control': 'no-cache, no-store, must-revalidate'
+		}
+	});
+}
 
 /**
  * Build a consistent JSON error response
@@ -46,6 +67,17 @@ function buildErrorResponse(
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Check if cookie header is too large and redirect to clear cookies page
+	// This prevents the "Request headers too large" error
+	const cookieHeader = event.request.headers.get('cookie') || '';
+	if (cookieHeader.length > MAX_COOKIE_SIZE) {
+		console.warn(`[Hooks] Cookie header too large (${cookieHeader.length} bytes), redirecting to clear cookies`);
+		// Don't redirect for clear-cookies page itself to avoid infinite loop
+		if (event.url.pathname !== '/clear-cookies') {
+			return buildClearCookiesRedirect();
+		}
+	}
+
 	// Proxy /api/* requests to the backend
 	if (event.url.pathname.startsWith('/api/')) {
 		const backendUrl = `${BACKEND_URL}${event.url.pathname}${event.url.search}`;

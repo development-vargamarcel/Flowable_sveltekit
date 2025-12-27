@@ -63,9 +63,14 @@ http {
     sendfile on;
     keepalive_timeout 65;
 
-    # Increase header buffer sizes to prevent "Request Header Or Cookie Too Large" errors
-    client_header_buffer_size 4k;
-    large_client_header_buffers 8 16k;
+    # Increase header buffer sizes significantly to prevent "Request Header Or Cookie Too Large" errors
+    # These large values ensure nginx can read the full request before deciding to reject it
+    # This allows the @request_too_large handler to send Set-Cookie headers to clear cookies
+    client_header_buffer_size 16k;
+    large_client_header_buffers 16 32k;
+
+    # Also set max body size
+    client_max_body_size 10m;
 
     # Gzip compression
     gzip on;
@@ -113,12 +118,58 @@ http {
         location = /api/auth/clear-session-fallback {
             default_type application/json;
 
-            # Clear JSESSIONID cookies on multiple paths
-            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly" always;
-            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly" always;
-            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly" always;
+            # Clear JSESSIONID cookies on ALL possible paths
+            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
 
             return 200 '{"message":"Session cleared successfully","details":"Cookies have been cleared by nginx fallback. Please try logging in again.","timestamp":"$time_iso8601","fallback":true}';
+        }
+
+        # Static HTML page to clear cookies when JavaScript/SvelteKit can't help
+        # This works even when the main app is inaccessible due to large headers
+        location = /clear-cookies {
+            default_type text/html;
+
+            # Clear all session cookies on every possible path
+            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+
+            return 200 '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Cleared - BPM Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); padding: 2rem; max-width: 28rem; width: 100%; text-align: center; }
+        .icon { width: 4rem; height: 4rem; background: #22c55e; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+        .icon svg { width: 2rem; height: 2rem; color: white; }
+        h1 { color: #1f2937; font-size: 1.5rem; margin-bottom: 0.5rem; }
+        p { color: #6b7280; margin-bottom: 1.5rem; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: 500; transition: background 0.2s; }
+        .btn:hover { background: #1d4ed8; }
+        .note { font-size: 0.875rem; color: #9ca3af; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <h1>Session Cleared Successfully</h1>
+        <p>Your browser cookies and session data have been cleared. You can now return to the login page.</p>
+        <a href="/login" class="btn">Go to Login</a>
+        <p class="note">If you still see errors, try using an incognito/private browser window.</p>
+    </div>
+</body>
+</html>';
         }
 
         # API requests -> Spring Boot backend
@@ -148,12 +199,14 @@ http {
         location @request_too_large {
             default_type application/json;
 
-            # Automatically clear JSESSIONID cookies when this error occurs
-            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly" always;
-            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly" always;
-            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly" always;
+            # Automatically clear ALL session cookies when this error occurs
+            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Cache-Control "no-cache, no-store, must-revalidate" always;
 
-            return 400 '{"error":"Request headers too large","message":"Your browser has sent request headers that are too large","details":"Session cookies have been automatically cleared. Please refresh the page and try again.","status":400,"cookiesCleared":true}';
+            return 400 '{"error":"Request headers too large","message":"Your browser has sent request headers that are too large","details":"Session cookies have been automatically cleared. Please refresh the page and try again. If the problem persists, visit /clear-cookies directly.","status":400,"cookiesCleared":true,"clearCookiesUrl":"/clear-cookies"}';
         }
 
         location @api_starting {
@@ -191,10 +244,56 @@ http {
             proxy_set_header Connection 'upgrade';
             proxy_cache_bypass $http_upgrade;
 
-            # Return JSON for request header/cookie too large errors
-            error_page 400 = @request_too_large;
-            error_page 413 = @request_too_large;
-            error_page 431 = @request_too_large;
+            # Increase proxy buffer sizes to handle large headers from frontend
+            proxy_buffer_size 32k;
+            proxy_buffers 8 32k;
+            proxy_busy_buffers_size 64k;
+
+            # Return HTML error page for request header/cookie too large errors
+            # This redirects to clear-cookies page which works without JS
+            error_page 400 = @frontend_too_large;
+            error_page 413 = @frontend_too_large;
+            error_page 431 = @frontend_too_large;
+        }
+
+        # Special error handler for frontend that shows HTML with redirect
+        location @frontend_too_large {
+            default_type text/html;
+
+            # Clear cookies immediately
+            add_header Set-Cookie "JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "JSESSIONID=; Path=/api/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Set-Cookie "SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax" always;
+            add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+
+            return 400 '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="2;url=/clear-cookies">
+    <title>Clearing Session - BPM Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); padding: 2rem; max-width: 28rem; width: 100%; text-align: center; }
+        .spinner { width: 3rem; height: 3rem; border: 4px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1.5rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        h1 { color: #1f2937; font-size: 1.25rem; margin-bottom: 0.5rem; }
+        p { color: #6b7280; margin-bottom: 1rem; }
+        a { color: #2563eb; text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="spinner"></div>
+        <h1>Session Cookies Too Large</h1>
+        <p>Clearing your session cookies automatically...</p>
+        <p>If you are not redirected, <a href="/clear-cookies">click here</a>.</p>
+    </div>
+</body>
+</html>';
         }
     }
 }

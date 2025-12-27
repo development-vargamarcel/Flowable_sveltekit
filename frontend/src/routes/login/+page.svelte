@@ -27,7 +27,7 @@
 	/**
 	 * Clears all cookies for the current domain to resolve "Request Header Or Cookie Too Large" errors.
 	 * This clears both JavaScript-accessible cookies and calls the backend to clear HttpOnly cookies.
-	 * Uses a fallback endpoint (without sending cookies) when headers are too large.
+	 * Uses multiple fallback strategies when headers are too large.
 	 */
 	async function clearAllCookies(): Promise<void> {
 		clearingCookies = true;
@@ -44,10 +44,15 @@
 				const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
 				if (name) {
 					// Clear the cookie with various path and domain combinations
-					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api`;
-					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
-					document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/api;domain=${window.location.hostname}`;
+					const paths = ['/', '/api', '/api/'];
+					const domains = ['', window.location.hostname];
+					for (const path of paths) {
+						for (const domain of domains) {
+							const domainPart = domain ? `;domain=${domain}` : '';
+							document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}${domainPart}`;
+							document.cookie = `${name}=;max-age=0;path=${path}${domainPart}`;
+						}
+					}
 					clearedCount++;
 				}
 			}
@@ -57,36 +62,41 @@
 			let serverCleared = false;
 			let clearDetails = '';
 
-			// Strategy 1: Try the normal backend endpoint
+			// Strategy 1: Try the nginx fallback endpoint FIRST (more reliable when headers are large)
+			// This endpoint uses credentials: 'include' but nginx will set Set-Cookie headers to clear
 			try {
-				const result = await api.clearSession();
-				console.log('Backend session cleared:', result);
-				serverCleared = true;
-				clearDetails = result.details;
-			} catch (backendError) {
-				console.warn('Normal clear-session failed, trying fallback:', backendError);
-
-				// Strategy 2: Use nginx fallback endpoint WITHOUT sending cookies
-				// This bypasses the "headers too large" issue entirely
-				try {
-					const fallbackResponse = await fetch('/api/auth/clear-session-fallback', {
-						method: 'POST',
-						credentials: 'omit', // Don't send cookies - this is the key!
-						headers: {
-							'Accept': 'application/json'
-						}
-					});
-
-					if (fallbackResponse.ok) {
-						const result = await fallbackResponse.json();
-						console.log('Fallback session clear succeeded:', result);
-						serverCleared = true;
-						clearDetails = result.details || 'Session cleared via fallback endpoint';
-					} else {
-						console.warn('Fallback endpoint returned error:', fallbackResponse.status);
+				const fallbackResponse = await fetch('/api/auth/clear-session-fallback', {
+					method: 'POST',
+					credentials: 'include', // Send cookies so browser associates the Set-Cookie response
+					headers: {
+						'Accept': 'application/json'
 					}
-				} catch (fallbackError) {
-					console.warn('Fallback clear also failed:', fallbackError);
+				});
+
+				if (fallbackResponse.ok) {
+					const result = await fallbackResponse.json();
+					console.log('Fallback session clear succeeded:', result);
+					serverCleared = true;
+					clearDetails = result.details || 'Session cleared via nginx fallback';
+				} else {
+					console.warn('Fallback endpoint returned error:', fallbackResponse.status);
+				}
+			} catch (fallbackError) {
+				console.warn('Fallback clear failed, trying backend:', fallbackError);
+
+				// Strategy 2: Try the normal backend endpoint
+				try {
+					const result = await api.clearSession();
+					console.log('Backend session cleared:', result);
+					serverCleared = true;
+					clearDetails = result.details;
+				} catch (backendError) {
+					console.warn('Backend clear-session also failed:', backendError);
+
+					// Strategy 3: Redirect to the static clear-cookies page
+					console.log('Redirecting to /clear-cookies page as last resort');
+					window.location.href = '/clear-cookies';
+					return;
 				}
 			}
 
@@ -98,8 +108,9 @@
 			}
 		} catch (e) {
 			console.error('Error clearing cookies:', e);
-			error = 'Failed to clear cookies';
-			errorDetails = e instanceof Error ? e.message : 'Unknown error occurred while clearing cookies';
+			// As a last resort, redirect to clear-cookies page
+			console.log('Redirecting to /clear-cookies page after error');
+			window.location.href = '/clear-cookies';
 		} finally {
 			clearingCookies = false;
 		}
@@ -297,21 +308,26 @@
 							</div>
 						{/if}
 						{#if [400, 413, 431].includes(errorStatus) && error.includes('headers too large')}
-							<button
-								type="button"
-								onclick={clearAllCookies}
-								disabled={clearingCookies}
-								class="mt-3 w-full py-2 px-3 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed rounded-lg transition-colors"
-							>
-								{#if clearingCookies}
-									Clearing cookies...
-								{:else}
-									Clear Cookies & Session
-								{/if}
-							</button>
-							<p class="mt-2 text-xs text-red-500">
-								This will clear both browser cookies and server session data to resolve the issue.
-							</p>
+							<div class="mt-3 space-y-2">
+								<button
+									type="button"
+									onclick={clearAllCookies}
+									disabled={clearingCookies}
+									class="w-full py-2 px-3 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+								>
+									{#if clearingCookies}
+										Clearing cookies...
+									{:else}
+										Clear Cookies & Session
+									{/if}
+								</button>
+								<p class="text-xs text-red-500">
+									This will clear both browser cookies and server session data to resolve the issue.
+								</p>
+								<p class="text-xs text-red-400">
+									If the button above doesn't work, <a href="/clear-cookies" class="underline font-medium hover:text-red-600">click here to clear cookies directly</a>.
+								</p>
+							</div>
 						{/if}
 					</div>
 				{/if}

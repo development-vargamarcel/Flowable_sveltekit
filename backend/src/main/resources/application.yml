@@ -1,6 +1,25 @@
 server:
   port: ${PORT:8080}
   address: 0.0.0.0
+  servlet:
+    session:
+      # Set session timeout to 30 minutes to prevent cookie accumulation
+      timeout: 30m
+      cookie:
+        # Use secure cookies in production (behind HTTPS proxy)
+        secure: false
+        # Set SameSite to Lax for security while allowing normal navigation
+        same-site: lax
+        # Cookie path
+        path: /
+        # Session cookie name
+        name: JSESSIONID
+        # Make cookie HttpOnly to prevent XSS
+        http-only: true
+        # Max age in seconds (30 minutes)
+        max-age: 1800
+  # Increase max header size for Tomcat
+  max-http-request-header-size: 64KB
 
 spring:
   application:
