@@ -22,6 +22,9 @@ public class CorsConfig {
     @Value("${CORS_ALLOWED_ORIGINS:}")
     private String corsAllowedOrigins;
 
+    @Value("${NETLIFY_URL:}")
+    private String netlifyUrl;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -38,6 +41,12 @@ public class CorsConfig {
             allowedOrigins.add("https://" + railwayPublicDomain);
             // Also allow the internal nginx proxy (requests come from localhost in container)
             allowedOrigins.add("http://127.0.0.1");
+        }
+
+        // Add Netlify URL if configured (for frontend deployed on Netlify)
+        if (netlifyUrl != null && !netlifyUrl.isEmpty()) {
+            allowedOrigins.add(netlifyUrl);
+            log.info("Netlify URL added to CORS: {}", netlifyUrl);
         }
 
         // Add any custom CORS origins from environment

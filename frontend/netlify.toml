@@ -1,0 +1,32 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Environment variables for the frontend
+# BACKEND_URL must be set in Netlify dashboard to point to Railway backend
+# Example: https://your-app.railway.app
+
+# SvelteKit serverless functions
+[functions]
+  node_bundler = "esbuild"
+  directory = ".netlify/functions-internal"
+
+# Headers for security and CORS
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Cache static assets
+[[headers]]
+  for = "/_app/immutable/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Redirect rules - SvelteKit handles all routing via functions
+# The adapter-netlify handles this automatically

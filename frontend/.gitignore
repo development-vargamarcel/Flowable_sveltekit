@@ -1,0 +1,22 @@
+# Netlify build output
+.netlify/
+
+# SvelteKit build output  
+build/
+.svelte-kit/
+
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

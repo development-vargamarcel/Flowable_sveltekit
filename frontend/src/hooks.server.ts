@@ -1,11 +1,16 @@
 import type { Handle } from '@sveltejs/kit';
 
 // Backend URL for server-side API proxying
-// In docker-compose: http://backend:8080
-// In production with nginx: requests don't reach here (nginx handles /api/)
-// Fallback: http://localhost:8080 for local development
+// For Netlify deployment: Set BACKEND_URL in Netlify dashboard (e.g., https://your-app.railway.app)
+// For local development: http://localhost:8080
 const BACKEND_URL = process.env.BACKEND_URL || process.env.VITE_API_URL || 'http://localhost:8080';
 const isDev = process.env.NODE_ENV === 'development';
+
+// Check if we're running on Netlify (serverless functions)
+const isNetlify = !!process.env.NETLIFY;
+
+// Log backend URL at startup (helpful for debugging)
+console.log(`[Hooks] Backend URL configured: ${BACKEND_URL}, isNetlify: ${isNetlify}`);
 
 // Maximum cookie header size before we consider it too large (16KB is a safe limit)
 const MAX_COOKIE_SIZE = 16 * 1024;
