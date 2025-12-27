@@ -51,6 +51,18 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- GraalVM JavaScript Engine (required for Java 17+ since Nashorn was removed in Java 15) -->
+        <dependency>
+            <groupId>org.graalvm.js</groupId>
+            <artifactId>js-scriptengine</artifactId>
+            <version>23.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.js</groupId>
+            <artifactId>js</artifactId>
+            <version>23.0.0</version>
+        </dependency>
+
         <!-- Session Management -->
         <dependency>
             <groupId>org.springframework.session</groupId>
