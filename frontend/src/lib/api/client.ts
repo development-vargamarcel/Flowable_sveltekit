@@ -55,59 +55,102 @@ export class ApiError extends Error {
 function parseErrorResponse(
 	status: number,
 	statusText: string,
-	errorBody: Record<string, unknown> | null
+	errorBody: Record<string, unknown> | null,
+	rawResponse?: string
 ): ApiError {
-	// Default error messages by status code
-	const defaultMessages: Record<number, string> = {
-		400: 'Bad request',
-		401: 'Invalid credentials',
-		403: 'Access forbidden',
-		404: 'Resource not found',
-		405: 'Method not allowed',
-		415: 'Unsupported media type',
-		422: 'Validation error',
-		500: 'Internal server error',
-		502: 'Backend unavailable',
-		503: 'Service unavailable',
-		504: 'Gateway timeout'
+	// Default error messages by status code with more helpful descriptions
+	const defaultMessages: Record<number, { error: string; details: string }> = {
+		400: { error: 'Bad request', details: 'The request was malformed or contained invalid data' },
+		401: { error: 'Authentication failed', details: 'Invalid credentials or session expired' },
+		403: { error: 'Access forbidden', details: 'You do not have permission to access this resource' },
+		404: { error: 'Resource not found', details: 'The requested resource does not exist' },
+		405: { error: 'Method not allowed', details: 'This HTTP method is not supported for this endpoint' },
+		415: { error: 'Unsupported media type', details: 'The Content-Type header is missing or unsupported' },
+		422: { error: 'Validation error', details: 'The submitted data failed validation' },
+		500: { error: 'Internal server error', details: 'An unexpected error occurred on the server' },
+		502: { error: 'Backend unavailable', details: 'The backend server is not responding' },
+		503: { error: 'Service unavailable', details: 'The service is temporarily unavailable' },
+		504: { error: 'Gateway timeout', details: 'The backend server took too long to respond' }
 	};
 
+	const defaultInfo = defaultMessages[status] || { error: `Request failed (${status})`, details: statusText };
+
 	if (!errorBody) {
+		// If we have a raw response that's not JSON, include it in details
+		const detailsWithRaw = rawResponse
+			? `${defaultInfo.details}. Server response: ${rawResponse.substring(0, 200)}${rawResponse.length > 200 ? '...' : ''}`
+			: defaultInfo.details;
+
 		return new ApiError(
-			defaultMessages[status] || `Request failed (${status})`,
+			defaultInfo.error,
 			status,
-			statusText
+			statusText,
+			detailsWithRaw
 		);
 	}
 
 	// Extract error information from various response formats
-	const error = errorBody.error as string | undefined;
-	const message = errorBody.message as string | undefined;
-	const details = errorBody.details as string | undefined;
-	const fieldErrors = errorBody.fieldErrors as Record<string, string> | undefined;
-	const timestamp = errorBody.timestamp as string | undefined;
+	// Handle both Spring Boot and custom error formats
+	const error = (errorBody.error as string) ?? undefined;
+	const message = (errorBody.message as string) ?? undefined;
+	const details = (errorBody.details as string) ?? undefined;
+	const fieldErrors = (errorBody.fieldErrors as Record<string, string>) ?? undefined;
+	const timestamp = (errorBody.timestamp as string) ?? undefined;
+	// Spring Boot specific fields
+	const path = (errorBody.path as string) ?? undefined;
+	const trace = (errorBody.trace as string) ?? undefined;
 
-	// Build the error message
+	// Build the error message - prefer specific message over generic error
 	let errorMessage: string;
-	if (error && message && error !== message) {
-		// Backend uses separate error and message fields
+	let errorDetails: string | undefined;
+
+	if (message && message.length > 0 && message !== error) {
+		// Use message as primary (usually more descriptive)
+		if (error && error.length > 0) {
+			errorMessage = error;
+			errorDetails = message;
+		} else {
+			errorMessage = message;
+			errorDetails = details;
+		}
+	} else if (error && error.length > 0) {
 		errorMessage = error;
-	} else if (error) {
-		errorMessage = error;
-	} else if (message) {
-		errorMessage = message;
+		errorDetails = details || message;
+	} else if (details && details.length > 0) {
+		errorMessage = defaultInfo.error;
+		errorDetails = details;
 	} else {
-		errorMessage = defaultMessages[status] || `Request failed (${status})`;
+		errorMessage = defaultInfo.error;
+		errorDetails = defaultInfo.details;
 	}
 
-	// Use message as details if details not provided
-	const errorDetails = details || (error && message && error !== message ? message : undefined);
+	// Format field errors into details if present
+	if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+		const fieldErrorMessages = Object.entries(fieldErrors)
+			.map(([field, msg]) => `${field}: ${msg}`)
+			.join('; ');
+		errorDetails = errorDetails
+			? `${errorDetails}. Field errors: ${fieldErrorMessages}`
+			: `Field errors: ${fieldErrorMessages}`;
+	}
+
+	// Add path info for debugging if available
+	if (path && !errorDetails?.includes(path)) {
+		errorDetails = errorDetails ? `${errorDetails} (path: ${path})` : `Path: ${path}`;
+	}
 
 	return new ApiError(errorMessage, status, statusText, errorDetails, fieldErrors, timestamp);
 }
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
 	const url = `${API_BASE}${endpoint}`;
+	const method = options.method || 'GET';
+
+	// Debug logging in development
+	const isDev = import.meta.env.DEV;
+	if (isDev) {
+		console.log(`[API] ${method} ${url}`, options.body ? JSON.parse(options.body as string) : '');
+	}
 
 	try {
 		const response = await fetch(url, {
@@ -115,23 +158,43 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 			credentials: 'include',
 			headers: {
 				'Content-Type': 'application/json',
+				Accept: 'application/json',
 				...options.headers
 			}
 		});
 
 		if (!response.ok) {
-			// Try to parse error response body
+			// Read the raw response text first
+			let rawText = '';
 			let errorBody: Record<string, unknown> | null = null;
+
 			try {
-				const text = await response.text();
-				if (text) {
-					errorBody = JSON.parse(text);
+				rawText = await response.text();
+				if (rawText && rawText.trim()) {
+					// Check if it looks like JSON before parsing
+					const trimmed = rawText.trim();
+					if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+						errorBody = JSON.parse(rawText);
+					}
 				}
-			} catch {
-				// Response body is not valid JSON, that's ok
+			} catch (parseError) {
+				// Response body is not valid JSON
+				if (isDev) {
+					console.warn('[API] Failed to parse error response as JSON:', rawText.substring(0, 200));
+				}
 			}
 
-			throw parseErrorResponse(response.status, response.statusText, errorBody);
+			// Log error details in development
+			if (isDev) {
+				console.error(`[API] ${method} ${url} failed:`, {
+					status: response.status,
+					statusText: response.statusText,
+					errorBody,
+					rawText: rawText.substring(0, 500)
+				});
+			}
+
+			throw parseErrorResponse(response.status, response.statusText, errorBody, rawText);
 		}
 
 		// Handle empty responses (204 No Content)
@@ -140,29 +203,38 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 			return {} as T;
 		}
 
-		return response.json();
+		const data = await response.json();
+		if (isDev) {
+			console.log(`[API] ${method} ${url} success:`, data);
+		}
+		return data;
 	} catch (error) {
 		// Re-throw ApiErrors as-is
 		if (error instanceof ApiError) {
 			throw error;
 		}
 
-		// Handle network errors
+		// Handle network errors with more specific messages
 		if (error instanceof TypeError) {
+			const isConnectionRefused = error.message.includes('fetch') || error.message.includes('network');
 			throw new ApiError(
-				'Network error',
+				'Connection failed',
 				0,
 				'Network Error',
-				'Unable to connect to the server. Please check your internet connection and try again.'
+				isConnectionRefused
+					? `Unable to connect to ${url}. The server may be down or there may be a network issue.`
+					: `Network error: ${error.message}`
 			);
 		}
 
 		// Handle other errors
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+		console.error('[API] Unexpected error:', error);
 		throw new ApiError(
-			error instanceof Error ? error.message : 'Unknown error',
+			'Request failed',
 			0,
 			'Unknown Error',
-			'An unexpected error occurred'
+			`An unexpected error occurred: ${errorMessage}`
 		);
 	}
 }

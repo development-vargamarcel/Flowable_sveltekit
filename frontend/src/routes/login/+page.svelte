@@ -7,12 +7,16 @@
 	let password = $state('');
 	let error = $state('');
 	let errorDetails = $state('');
+	let errorStatus = $state(0);
+	let fieldErrors = $state<Record<string, string>>({});
 	let loading = $state(false);
 
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
 		error = '';
 		errorDetails = '';
+		errorStatus = 0;
+		fieldErrors = {};
 		loading = true;
 
 		try {
@@ -23,18 +27,25 @@
 			if (err instanceof ApiError) {
 				error = err.message;
 				errorDetails = err.details || '';
+				errorStatus = err.status;
+				fieldErrors = err.fieldErrors || {};
+
 				// Log detailed error info for debugging
 				console.error('Login failed:', {
 					status: err.status,
+					statusText: err.statusText,
 					message: err.message,
 					details: err.details,
 					fieldErrors: err.fieldErrors,
-					timestamp: err.timestamp
+					timestamp: err.timestamp,
+					fullMessage: err.getFullMessage()
 				});
 			} else if (err instanceof Error) {
 				error = err.message;
+				console.error('Login error:', err);
 			} else {
-				error = 'Login failed';
+				error = 'An unexpected error occurred';
+				console.error('Unknown login error:', err);
 			}
 		} finally {
 			loading = false;
@@ -44,6 +55,16 @@
 	function selectUser(user: string) {
 		username = user;
 		password = 'password';
+		// Clear any previous errors when selecting a quick login
+		error = '';
+		errorDetails = '';
+		errorStatus = 0;
+		fieldErrors = {};
+	}
+
+	// Check if a specific field has an error
+	function hasFieldError(field: string): boolean {
+		return field in fieldErrors;
 	}
 </script>
 
@@ -65,9 +86,26 @@
 			<form onsubmit={handleSubmit} class="space-y-4">
 				{#if error}
 					<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-						<div class="font-medium">{error}</div>
+						<div class="flex items-start justify-between">
+							<div class="font-medium">{error}</div>
+							{#if errorStatus > 0}
+								<span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full ml-2">
+									HTTP {errorStatus}
+								</span>
+							{/if}
+						</div>
 						{#if errorDetails}
-							<div class="mt-1 text-red-600 text-xs">{errorDetails}</div>
+							<div class="mt-2 text-red-600 text-xs leading-relaxed">{errorDetails}</div>
+						{/if}
+						{#if Object.keys(fieldErrors).length > 0}
+							<div class="mt-2 border-t border-red-200 pt-2">
+								<div class="text-xs font-medium text-red-800 mb-1">Field errors:</div>
+								<ul class="text-xs text-red-600 list-disc list-inside space-y-0.5">
+									{#each Object.entries(fieldErrors) as [field, message]}
+										<li><span class="font-medium">{field}:</span> {message}</li>
+									{/each}
+								</ul>
+							</div>
 						{/if}
 					</div>
 				{/if}
@@ -79,9 +117,13 @@
 						type="text"
 						bind:value={username}
 						class="input"
+						class:border-red-500={hasFieldError('username')}
 						placeholder="Enter username"
 						required
 					/>
+					{#if hasFieldError('username')}
+						<p class="mt-1 text-xs text-red-600">{fieldErrors.username}</p>
+					{/if}
 				</div>
 
 				<div>
@@ -91,9 +133,13 @@
 						type="password"
 						bind:value={password}
 						class="input"
+						class:border-red-500={hasFieldError('password')}
 						placeholder="Enter password"
 						required
 					/>
+					{#if hasFieldError('password')}
+						<p class="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+					{/if}
 				</div>
 
 				<button
