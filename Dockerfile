@@ -63,6 +63,10 @@ http {
     sendfile on;
     keepalive_timeout 65;
 
+    # Increase header buffer sizes to prevent "Request Header Or Cookie Too Large" errors
+    client_header_buffer_size 4k;
+    large_client_header_buffers 8 16k;
+
     # Gzip compression
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
