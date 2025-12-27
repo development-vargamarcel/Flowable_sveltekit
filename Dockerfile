@@ -77,7 +77,7 @@ http {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 
     upstream backend {
-        server 127.0.0.1:8080 max_fails=0;
+        server 127.0.0.1:8081 max_fails=0;
     }
 
     upstream frontend {
@@ -327,7 +327,7 @@ startsecs=0
 priority=10
 
 [program:backend]
-command=java -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8080 -jar /app/backend/app.jar
+command=java -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8081 -jar /app/backend/app.jar
 directory=/app/backend
 autostart=true
 autorestart=true
@@ -395,7 +395,7 @@ envsubst '${PORT}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
 
 echo "Starting services on port $PORT..."
 echo "  - nginx (reverse proxy) on port $PORT"
-echo "  - backend (Spring Boot) on port 8080"
+echo "  - backend (Spring Boot) on port 8081"
 echo "  - frontend (SvelteKit) on port 3000"
 
 # Start supervisor which manages all processes
