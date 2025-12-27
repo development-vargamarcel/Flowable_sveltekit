@@ -38,7 +38,7 @@
 
 		submitting = true;
 		try {
-			const response = await api.startProcess('task-assignment', {
+			await api.startProcess('task-assignment', {
 				title,
 				description,
 				priority,
@@ -108,8 +108,8 @@
 				></textarea>
 			</div>
 
-			<div>
-				<label class="label">Priority</label>
+			<fieldset>
+				<legend class="label">Priority</legend>
 				<div class="flex space-x-4">
 					{#each priorities as p}
 						<label class="flex items-center space-x-2 cursor-pointer">
@@ -124,7 +124,7 @@
 						</label>
 					{/each}
 				</div>
-			</div>
+			</fieldset>
 
 			<div>
 				<label for="assignee" class="label">Assign To</label>

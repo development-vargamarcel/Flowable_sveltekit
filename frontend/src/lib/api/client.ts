@@ -1,318 +1,336 @@
-import type { User, Task, TaskDetails, ProcessDefinition, ProcessInstance, LoginRequest } from '$lib/types';
+import type {
+  User,
+  Task,
+  TaskDetails,
+  ProcessDefinition,
+  ProcessInstance,
+  LoginRequest
+} from '$lib/types';
+import { createLogger } from '$lib/utils/logger';
 
 // In production, use relative URLs (empty string) so nginx can proxy /api/* to backend
 // In development, use localhost:8080 for direct backend access
-const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : '');
+const API_BASE =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : '');
+
+const log = createLogger('api');
 
 /**
  * Custom API error with detailed information
  */
 export class ApiError extends Error {
-	public readonly status: number;
-	public readonly statusText: string;
-	public readonly details?: string;
-	public readonly fieldErrors?: Record<string, string>;
-	public readonly timestamp?: string;
+  public readonly status: number;
+  public readonly statusText: string;
+  public readonly details?: string;
+  public readonly fieldErrors?: Record<string, string>;
+  public readonly timestamp?: string;
 
-	constructor(
-		message: string,
-		status: number,
-		statusText: string,
-		details?: string,
-		fieldErrors?: Record<string, string>,
-		timestamp?: string
-	) {
-		super(message);
-		this.name = 'ApiError';
-		this.status = status;
-		this.statusText = statusText;
-		this.details = details;
-		this.fieldErrors = fieldErrors;
-		this.timestamp = timestamp;
-	}
+  constructor(
+    message: string,
+    status: number,
+    statusText: string,
+    details?: string,
+    fieldErrors?: Record<string, string>,
+    timestamp?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.statusText = statusText;
+    this.details = details;
+    this.fieldErrors = fieldErrors;
+    this.timestamp = timestamp;
+  }
 
-	/**
-	 * Get a user-friendly error message with details
-	 */
-	getFullMessage(): string {
-		if (this.details && this.details !== this.message) {
-			return `${this.message}: ${this.details}`;
-		}
-		return this.message;
-	}
+  /**
+   * Get a user-friendly error message with details
+   */
+  getFullMessage(): string {
+    if (this.details && this.details !== this.message) {
+      return `${this.message}: ${this.details}`;
+    }
+    return this.message;
+  }
 
-	/**
-	 * Check if this is a validation error
-	 */
-	isValidationError(): boolean {
-		return this.status === 400 && !!this.fieldErrors && Object.keys(this.fieldErrors).length > 0;
-	}
+  /**
+   * Check if this is a validation error
+   */
+  isValidationError(): boolean {
+    return this.status === 400 && !!this.fieldErrors && Object.keys(this.fieldErrors).length > 0;
+  }
 }
 
 /**
  * Parse error response body and extract meaningful error information
  */
 function parseErrorResponse(
-	status: number,
-	statusText: string,
-	errorBody: Record<string, unknown> | null,
-	rawResponse?: string
+  status: number,
+  statusText: string,
+  errorBody: Record<string, unknown> | null,
+  rawResponse?: string
 ): ApiError {
-	// Default error messages by status code with more helpful descriptions
-	const defaultMessages: Record<number, { error: string; details: string }> = {
-		400: { error: 'Bad request', details: 'The request was malformed or contained invalid data' },
-		401: { error: 'Authentication failed', details: 'Invalid credentials or session expired' },
-		403: { error: 'Access forbidden', details: 'You do not have permission to access this resource' },
-		404: { error: 'Resource not found', details: 'The requested resource does not exist' },
-		405: { error: 'Method not allowed', details: 'This HTTP method is not supported for this endpoint' },
-		415: { error: 'Unsupported media type', details: 'The Content-Type header is missing or unsupported' },
-		422: { error: 'Validation error', details: 'The submitted data failed validation' },
-		500: { error: 'Internal server error', details: 'An unexpected error occurred on the server' },
-		502: { error: 'Backend unavailable', details: 'The backend server is not responding' },
-		503: { error: 'Service unavailable', details: 'The service is temporarily unavailable' },
-		504: { error: 'Gateway timeout', details: 'The backend server took too long to respond' }
-	};
+  // Default error messages by status code with more helpful descriptions
+  const defaultMessages: Record<number, { error: string; details: string }> = {
+    400: { error: 'Bad request', details: 'The request was malformed or contained invalid data' },
+    401: { error: 'Authentication failed', details: 'Invalid credentials or session expired' },
+    403: {
+      error: 'Access forbidden',
+      details: 'You do not have permission to access this resource'
+    },
+    404: { error: 'Resource not found', details: 'The requested resource does not exist' },
+    405: {
+      error: 'Method not allowed',
+      details: 'This HTTP method is not supported for this endpoint'
+    },
+    415: {
+      error: 'Unsupported media type',
+      details: 'The Content-Type header is missing or unsupported'
+    },
+    422: { error: 'Validation error', details: 'The submitted data failed validation' },
+    500: { error: 'Internal server error', details: 'An unexpected error occurred on the server' },
+    502: { error: 'Backend unavailable', details: 'The backend server is not responding' },
+    503: { error: 'Service unavailable', details: 'The service is temporarily unavailable' },
+    504: { error: 'Gateway timeout', details: 'The backend server took too long to respond' }
+  };
 
-	const defaultInfo = defaultMessages[status] || { error: `Request failed (${status})`, details: statusText };
+  const defaultInfo = defaultMessages[status] || {
+    error: `Request failed (${status})`,
+    details: statusText
+  };
 
-	if (!errorBody) {
-		// If we have a raw response that's not JSON, include it in details
-		const detailsWithRaw = rawResponse
-			? `${defaultInfo.details}. Server response: ${rawResponse.substring(0, 200)}${rawResponse.length > 200 ? '...' : ''}`
-			: defaultInfo.details;
+  if (!errorBody) {
+    // If we have a raw response that's not JSON, include it in details
+    const detailsWithRaw = rawResponse
+      ? `${defaultInfo.details}. Server response: ${rawResponse.substring(0, 200)}${rawResponse.length > 200 ? '...' : ''}`
+      : defaultInfo.details;
 
-		return new ApiError(
-			defaultInfo.error,
-			status,
-			statusText,
-			detailsWithRaw
-		);
-	}
+    return new ApiError(defaultInfo.error, status, statusText, detailsWithRaw);
+  }
 
-	// Extract error information from various response formats
-	// Handle both Spring Boot and custom error formats
-	const error = (errorBody.error as string) ?? undefined;
-	const message = (errorBody.message as string) ?? undefined;
-	const details = (errorBody.details as string) ?? undefined;
-	const fieldErrors = (errorBody.fieldErrors as Record<string, string>) ?? undefined;
-	const timestamp = (errorBody.timestamp as string) ?? undefined;
-	// Spring Boot specific fields
-	const path = (errorBody.path as string) ?? undefined;
-	const trace = (errorBody.trace as string) ?? undefined;
+  // Extract error information from various response formats
+  // Handle both Spring Boot and custom error formats
+  const error = (errorBody.error as string) ?? undefined;
+  const message = (errorBody.message as string) ?? undefined;
+  const details = (errorBody.details as string) ?? undefined;
+  const fieldErrors = (errorBody.fieldErrors as Record<string, string>) ?? undefined;
+  const timestamp = (errorBody.timestamp as string) ?? undefined;
+  // Spring Boot specific fields
+  const path = (errorBody.path as string) ?? undefined;
+  // Note: trace is available but not used to avoid exposing stack traces to users
+  const _trace = (errorBody.trace as string) ?? undefined;
+  void _trace; // Suppress unused variable warning
 
-	// Build the error message - prefer specific message over generic error
-	let errorMessage: string;
-	let errorDetails: string | undefined;
+  // Build the error message - prefer specific message over generic error
+  let errorMessage: string;
+  let errorDetails: string | undefined;
 
-	if (message && message.length > 0 && message !== error) {
-		// Use message as primary (usually more descriptive)
-		if (error && error.length > 0) {
-			errorMessage = error;
-			errorDetails = message;
-		} else {
-			errorMessage = message;
-			errorDetails = details;
-		}
-	} else if (error && error.length > 0) {
-		errorMessage = error;
-		errorDetails = details || message;
-	} else if (details && details.length > 0) {
-		errorMessage = defaultInfo.error;
-		errorDetails = details;
-	} else {
-		errorMessage = defaultInfo.error;
-		errorDetails = defaultInfo.details;
-	}
+  if (message && message.length > 0 && message !== error) {
+    // Use message as primary (usually more descriptive)
+    if (error && error.length > 0) {
+      errorMessage = error;
+      errorDetails = message;
+    } else {
+      errorMessage = message;
+      errorDetails = details;
+    }
+  } else if (error && error.length > 0) {
+    errorMessage = error;
+    errorDetails = details || message;
+  } else if (details && details.length > 0) {
+    errorMessage = defaultInfo.error;
+    errorDetails = details;
+  } else {
+    errorMessage = defaultInfo.error;
+    errorDetails = defaultInfo.details;
+  }
 
-	// Format field errors into details if present
-	if (fieldErrors && Object.keys(fieldErrors).length > 0) {
-		const fieldErrorMessages = Object.entries(fieldErrors)
-			.map(([field, msg]) => `${field}: ${msg}`)
-			.join('; ');
-		errorDetails = errorDetails
-			? `${errorDetails}. Field errors: ${fieldErrorMessages}`
-			: `Field errors: ${fieldErrorMessages}`;
-	}
+  // Format field errors into details if present
+  if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+    const fieldErrorMessages = Object.entries(fieldErrors)
+      .map(([field, msg]) => `${field}: ${msg}`)
+      .join('; ');
+    errorDetails = errorDetails
+      ? `${errorDetails}. Field errors: ${fieldErrorMessages}`
+      : `Field errors: ${fieldErrorMessages}`;
+  }
 
-	// Add path info for debugging if available
-	if (path && !errorDetails?.includes(path)) {
-		errorDetails = errorDetails ? `${errorDetails} (path: ${path})` : `Path: ${path}`;
-	}
+  // Add path info for debugging if available
+  if (path && !errorDetails?.includes(path)) {
+    errorDetails = errorDetails ? `${errorDetails} (path: ${path})` : `Path: ${path}`;
+  }
 
-	return new ApiError(errorMessage, status, statusText, errorDetails, fieldErrors, timestamp);
+  return new ApiError(errorMessage, status, statusText, errorDetails, fieldErrors, timestamp);
 }
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-	const url = `${API_BASE}${endpoint}`;
-	const method = options.method || 'GET';
+  const url = `${API_BASE}${endpoint}`;
+  const method = options.method || 'GET';
 
-	// Debug logging in development
-	const isDev = import.meta.env.DEV;
-	if (isDev) {
-		console.log(`[API] ${method} ${url}`, options.body ? JSON.parse(options.body as string) : '');
-	}
+  log.debug(`${method} ${url}`, {
+    body: options.body ? JSON.parse(options.body as string) : undefined
+  });
 
-	try {
-		const response = await fetch(url, {
-			...options,
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-				Accept: 'application/json',
-				...options.headers
-			}
-		});
+  try {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...options.headers
+      }
+    });
 
-		if (!response.ok) {
-			// Read the raw response text first
-			let rawText = '';
-			let errorBody: Record<string, unknown> | null = null;
+    if (!response.ok) {
+      // Read the raw response text first
+      let rawText = '';
+      let errorBody: Record<string, unknown> | null = null;
 
-			try {
-				rawText = await response.text();
-				if (rawText && rawText.trim()) {
-					// Check if it looks like JSON before parsing
-					const trimmed = rawText.trim();
-					if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-						errorBody = JSON.parse(rawText);
-					}
-				}
-			} catch (parseError) {
-				// Response body is not valid JSON
-				if (isDev) {
-					console.warn('[API] Failed to parse error response as JSON:', rawText.substring(0, 200));
-				}
-			}
+      try {
+        rawText = await response.text();
+        if (rawText && rawText.trim()) {
+          // Check if it looks like JSON before parsing
+          const trimmed = rawText.trim();
+          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            errorBody = JSON.parse(rawText);
+          }
+        }
+      } catch {
+        // Response body is not valid JSON
+        log.warn('Failed to parse error response as JSON', {
+          rawText: rawText.substring(0, 200)
+        });
+      }
 
-			// Log error details in development
-			if (isDev) {
-				console.error(`[API] ${method} ${url} failed:`, {
-					status: response.status,
-					statusText: response.statusText,
-					errorBody,
-					rawText: rawText.substring(0, 500)
-				});
-			}
+      log.error(`${method} ${url} failed`, undefined, {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody,
+        rawText: rawText.substring(0, 500)
+      });
 
-			throw parseErrorResponse(response.status, response.statusText, errorBody, rawText);
-		}
+      throw parseErrorResponse(response.status, response.statusText, errorBody, rawText);
+    }
 
-		// Handle empty responses (204 No Content)
-		const contentLength = response.headers.get('content-length');
-		if (response.status === 204 || contentLength === '0') {
-			return {} as T;
-		}
+    // Handle empty responses (204 No Content)
+    const contentLength = response.headers.get('content-length');
+    if (response.status === 204 || contentLength === '0') {
+      return {} as T;
+    }
 
-		const data = await response.json();
-		if (isDev) {
-			console.log(`[API] ${method} ${url} success:`, data);
-		}
-		return data;
-	} catch (error) {
-		// Re-throw ApiErrors as-is
-		if (error instanceof ApiError) {
-			throw error;
-		}
+    const data = await response.json();
+    log.debug(`${method} ${url} success`, { data });
+    return data;
+  } catch (error) {
+    // Re-throw ApiErrors as-is
+    if (error instanceof ApiError) {
+      throw error;
+    }
 
-		// Handle network errors with more specific messages
-		if (error instanceof TypeError) {
-			const isConnectionRefused = error.message.includes('fetch') || error.message.includes('network');
-			throw new ApiError(
-				'Connection failed',
-				0,
-				'Network Error',
-				isConnectionRefused
-					? `Unable to connect to ${url}. The server may be down or there may be a network issue.`
-					: `Network error: ${error.message}`
-			);
-		}
+    // Handle network errors with more specific messages
+    if (error instanceof TypeError) {
+      const isConnectionRefused =
+        error.message.includes('fetch') || error.message.includes('network');
+      log.error('Network error occurred', error, { url, method });
+      throw new ApiError(
+        'Connection failed',
+        0,
+        'Network Error',
+        isConnectionRefused
+          ? `Unable to connect to ${url}. The server may be down or there may be a network issue.`
+          : `Network error: ${error.message}`
+      );
+    }
 
-		// Handle other errors
-		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-		console.error('[API] Unexpected error:', error);
-		throw new ApiError(
-			'Request failed',
-			0,
-			'Unknown Error',
-			`An unexpected error occurred: ${errorMessage}`
-		);
-	}
+    // Handle other errors
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    log.error('Unexpected error', error, { url, method });
+    throw new ApiError(
+      'Request failed',
+      0,
+      'Unknown Error',
+      `An unexpected error occurred: ${errorMessage}`
+    );
+  }
 }
 
 export const api = {
-	// Auth
-	async login(credentials: LoginRequest): Promise<{ message: string; user: User }> {
-		return fetchApi('/api/auth/login', {
-			method: 'POST',
-			body: JSON.stringify(credentials)
-		});
-	},
+  // Auth
+  async login(credentials: LoginRequest): Promise<{ message: string; user: User }> {
+    return fetchApi('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials)
+    });
+  },
 
-	async logout(): Promise<void> {
-		await fetchApi('/api/auth/logout', { method: 'POST' });
-	},
+  async logout(): Promise<void> {
+    await fetchApi('/api/auth/logout', { method: 'POST' });
+  },
 
-	/**
-	 * Clear all session cookies including HttpOnly cookies.
-	 * Used to recover from "Request Header Or Cookie Too Large" errors.
-	 */
-	async clearSession(): Promise<{ message: string; details: string }> {
-		return fetchApi('/api/auth/clear-session', { method: 'POST' });
-	},
+  /**
+   * Clear all session cookies including HttpOnly cookies.
+   * Used to recover from "Request Header Or Cookie Too Large" errors.
+   */
+  async clearSession(): Promise<{ message: string; details: string }> {
+    return fetchApi('/api/auth/clear-session', { method: 'POST' });
+  },
 
-	async getCurrentUser(): Promise<User> {
-		return fetchApi('/api/auth/me');
-	},
+  async getCurrentUser(): Promise<User> {
+    return fetchApi('/api/auth/me');
+  },
 
-	// Tasks
-	async getTasks(): Promise<Task[]> {
-		return fetchApi('/api/tasks');
-	},
+  // Tasks
+  async getTasks(): Promise<Task[]> {
+    return fetchApi('/api/tasks');
+  },
 
-	async getAssignedTasks(): Promise<Task[]> {
-		return fetchApi('/api/tasks/assigned');
-	},
+  async getAssignedTasks(): Promise<Task[]> {
+    return fetchApi('/api/tasks/assigned');
+  },
 
-	async getClaimableTasks(): Promise<Task[]> {
-		return fetchApi('/api/tasks/claimable');
-	},
+  async getClaimableTasks(): Promise<Task[]> {
+    return fetchApi('/api/tasks/claimable');
+  },
 
-	async getTaskDetails(taskId: string): Promise<TaskDetails> {
-		return fetchApi(`/api/tasks/${taskId}`);
-	},
+  async getTaskDetails(taskId: string): Promise<TaskDetails> {
+    return fetchApi(`/api/tasks/${taskId}`);
+  },
 
-	async claimTask(taskId: string): Promise<void> {
-		await fetchApi(`/api/tasks/${taskId}/claim`, { method: 'POST' });
-	},
+  async claimTask(taskId: string): Promise<void> {
+    await fetchApi(`/api/tasks/${taskId}/claim`, { method: 'POST' });
+  },
 
-	async completeTask(taskId: string, variables: Record<string, unknown>): Promise<void> {
-		await fetchApi(`/api/tasks/${taskId}/complete`, {
-			method: 'POST',
-			body: JSON.stringify({ variables })
-		});
-	},
+  async completeTask(taskId: string, variables: Record<string, unknown>): Promise<void> {
+    await fetchApi(`/api/tasks/${taskId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ variables })
+    });
+  },
 
-	// Processes
-	async getProcesses(): Promise<ProcessDefinition[]> {
-		return fetchApi('/api/processes');
-	},
+  // Processes
+  async getProcesses(): Promise<ProcessDefinition[]> {
+    return fetchApi('/api/processes');
+  },
 
-	async startProcess(processKey: string, variables: Record<string, unknown>): Promise<{ message: string; processInstance: ProcessInstance }> {
-		return fetchApi(`/api/processes/${processKey}/start`, {
-			method: 'POST',
-			body: JSON.stringify({ variables })
-		});
-	},
+  async startProcess(
+    processKey: string,
+    variables: Record<string, unknown>
+  ): Promise<{ message: string; processInstance: ProcessInstance }> {
+    return fetchApi(`/api/processes/${processKey}/start`, {
+      method: 'POST',
+      body: JSON.stringify({ variables })
+    });
+  },
 
-	async getProcessInstance(processInstanceId: string): Promise<ProcessInstance> {
-		return fetchApi(`/api/processes/instance/${processInstanceId}`);
-	},
+  async getProcessInstance(processInstanceId: string): Promise<ProcessInstance> {
+    return fetchApi(`/api/processes/instance/${processInstanceId}`);
+  },
 
-	async getMyProcesses(): Promise<ProcessInstance[]> {
-		return fetchApi('/api/processes/my-processes');
-	},
+  async getMyProcesses(): Promise<ProcessInstance[]> {
+    return fetchApi('/api/processes/my-processes');
+  },
 
-	async getUsers(): Promise<User[]> {
-		return fetchApi('/api/processes/users');
-	}
+  async getUsers(): Promise<User[]> {
+    return fetchApi('/api/processes/users');
+  }
 };

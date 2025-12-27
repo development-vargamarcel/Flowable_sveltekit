@@ -52,12 +52,14 @@
 
 					// If ready returns 503 (backend starting), wait and retry
 					if (readyResponse.status === 503) {
+						// eslint-disable-next-line no-console
 						console.log(`Backend not ready yet, attempt ${i + 1}/${retries}...`);
 						await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
 						continue;
 					}
 				}
 			} catch (e) {
+				// eslint-disable-next-line no-console
 				console.log(`Health check failed, attempt ${i + 1}/${retries}:`, e);
 				await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
 			}
@@ -97,6 +99,7 @@
 					clearedCount++;
 				}
 			}
+			// eslint-disable-next-line no-console
 			console.log(`Cleared ${clearedCount} JavaScript-accessible cookies`);
 
 			// Try to clear HttpOnly cookies (like JSESSIONID) using multiple strategies
@@ -116,6 +119,7 @@
 
 				if (fallbackResponse.ok) {
 					const result = await fallbackResponse.json();
+					// eslint-disable-next-line no-console
 					console.log('Fallback session clear succeeded:', result);
 					serverCleared = true;
 					clearDetails = result.details || 'Session cleared via nginx fallback';
@@ -128,6 +132,7 @@
 				// Strategy 2: Try the normal backend endpoint
 				try {
 					const result = await api.clearSession();
+					// eslint-disable-next-line no-console
 					console.log('Backend session cleared:', result);
 					serverCleared = true;
 					clearDetails = result.details;
@@ -135,6 +140,7 @@
 					console.warn('Backend clear-session also failed:', backendError);
 
 					// Strategy 3: Redirect to the static clear-cookies page
+					// eslint-disable-next-line no-console
 					console.log('Redirecting to /clear-cookies page as last resort');
 					window.location.href = '/clear-cookies';
 					return;
@@ -161,6 +167,7 @@
 		} catch (e) {
 			console.error('Error clearing cookies:', e);
 			// As a last resort, redirect to clear-cookies page
+			// eslint-disable-next-line no-console
 			console.log('Redirecting to /clear-cookies page after error');
 			window.location.href = '/clear-cookies';
 		} finally {

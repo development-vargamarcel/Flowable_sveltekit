@@ -25,7 +25,12 @@
 		loading = true;
 		error = '';
 		try {
-			taskDetails = await api.getTaskDetails($page.params.id);
+			const taskId = $page.params.id;
+			if (!taskId) {
+				error = 'Task ID is required';
+				return;
+			}
+			taskDetails = await api.getTaskDetails(taskId);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load task';
 		} finally {
@@ -235,8 +240,8 @@
 			{:else}
 				<form onsubmit={(e) => { e.preventDefault(); handleComplete(); }} class="space-y-4">
 					{#if formConfig.showDecision}
-						<div>
-							<label class="label">Your Decision *</label>
+						<fieldset>
+							<legend class="label">Your Decision *</legend>
 							<div class="space-y-2">
 								{#each formConfig.decisions as opt}
 									<label class="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 {decision === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}">
@@ -251,7 +256,7 @@
 									</label>
 								{/each}
 							</div>
-						</div>
+						</fieldset>
 					{/if}
 
 					<div>

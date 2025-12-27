@@ -11,7 +11,7 @@
 	let error = $state('');
 	let activeTab = $state<'all' | 'assigned' | 'claimable'>('all');
 
-	let filteredTasks = $derived(() => {
+	const filteredTasks = $derived(() => {
 		switch (activeTab) {
 			case 'assigned':
 				return allTasks.filter(t => t.assignee === authStore.user?.username);

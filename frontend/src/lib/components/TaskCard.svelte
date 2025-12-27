@@ -6,7 +6,7 @@
 		onclick?: () => void;
 	}
 
-	let { task, onclick }: Props = $props();
+	const { task, onclick }: Props = $props();
 
 	const displays = $derived(getVariableDisplay(task.variables));
 

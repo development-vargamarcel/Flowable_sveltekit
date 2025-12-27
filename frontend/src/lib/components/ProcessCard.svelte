@@ -7,7 +7,7 @@
 		href: string;
 	}
 
-	let { title, description, icon, color, href }: Props = $props();
+	const { title, description, icon, color, href }: Props = $props();
 
 	function getColorClasses(color: string): string {
 		switch (color) {

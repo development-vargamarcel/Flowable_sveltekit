@@ -8,9 +8,9 @@
 		emptyMessage?: string;
 	}
 
-	let { tasks, onTaskClick, emptyMessage = 'No tasks found' }: Props = $props();
+	const { tasks, onTaskClick, emptyMessage = 'No tasks found' }: Props = $props();
 
-	let sortedTasks = $derived(
+	const sortedTasks = $derived(
 		[...tasks].sort((a, b) => {
 			// Sort by priority (high first), then by creation time (newest first)
 			if (b.priority !== a.priority) {

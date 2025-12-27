@@ -5,7 +5,7 @@
 		onClose: () => void;
 	}
 
-	let { message, type = 'info', onClose }: Props = $props();
+	const { message, type = 'info', onClose }: Props = $props();
 
 	function getTypeClasses(type: string): string {
 		switch (type) {
@@ -41,8 +41,8 @@
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={getIcon(type)} />
 		</svg>
 		<span class="font-medium">{message}</span>
-		<button onclick={onClose} class="ml-2 hover:opacity-70">
-			<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+		<button onclick={onClose} class="ml-2 hover:opacity-70" aria-label="Close notification">
+			<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 			</svg>
 		</button>

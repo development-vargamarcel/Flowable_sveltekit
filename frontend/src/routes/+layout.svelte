@@ -7,7 +7,7 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 
-	let { children } = $props();
+	const { children } = $props();
 
 	// Public routes that don't require authentication
 	const publicRoutes = ['/login'];
