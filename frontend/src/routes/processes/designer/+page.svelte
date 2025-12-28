@@ -91,6 +91,45 @@
 
   // Form Builder State - Enhanced with grid support
   let showFormBuilder = $state(false);
+  let showGridBuilder = $state(false);
+
+  // Grid (table) definitions - for adding multiple data grids to forms
+  let formGrids = $state<Array<{
+    id: string;
+    name: string;
+    label: string;
+    description: string;
+    minRows: number;
+    maxRows: number;
+    columns: Array<{
+      id: string;
+      name: string;
+      label: string;
+      type: 'text' | 'number' | 'date' | 'select' | 'textarea';
+      required: boolean;
+      placeholder: string;
+      options: string[];
+      min?: number;
+      max?: number;
+      step?: number;
+      validation: {
+        minLength?: number;
+        maxLength?: number;
+        min?: number;
+        max?: number;
+        pattern?: string;
+        patternMessage?: string;
+      };
+    }>;
+    gridColumn: number;
+    gridRow: number;
+    gridWidth: number;
+    cssClass: string;
+  }>>([]);
+
+  let expandedGridIndex = $state<number | null>(null);
+  let expandedGridColumnIndex = $state<number | null>(null);
+
   let formFields = $state<Array<{
     id: string;
     name: string;
@@ -493,6 +532,44 @@
       console.error('Error parsing form fields:', err);
       formFields = [];
     }
+
+    // Load form grids (data tables)
+    try {
+      const formGridsJson = businessObject.get('flowable:formGrids');
+      if (formGridsJson && typeof formGridsJson === 'string') {
+        const parsed = JSON.parse(formGridsJson);
+        formGrids = parsed.map((grid: any, index: number) => ({
+          id: grid.id || `grid_${Date.now()}_${index}`,
+          name: grid.name || '',
+          label: grid.label || '',
+          description: grid.description || '',
+          minRows: grid.minRows || 0,
+          maxRows: grid.maxRows || 0,
+          columns: Array.isArray(grid.columns) ? grid.columns.map((col: any, colIndex: number) => ({
+            id: col.id || `col_${Date.now()}_${colIndex}`,
+            name: col.name || '',
+            label: col.label || '',
+            type: col.type || 'text',
+            required: Boolean(col.required),
+            placeholder: col.placeholder || '',
+            options: Array.isArray(col.options) ? col.options : [],
+            min: col.min,
+            max: col.max,
+            step: col.step,
+            validation: col.validation || {}
+          })) : [],
+          gridColumn: grid.gridColumn || 1,
+          gridRow: grid.gridRow || index + 1,
+          gridWidth: grid.gridWidth || formGridColumns,
+          cssClass: grid.cssClass || ''
+        }));
+      } else {
+        formGrids = [];
+      }
+    } catch (err) {
+      console.error('Error parsing form grids:', err);
+      formGrids = [];
+    }
   }
 
   function resetElementProperties() {
@@ -527,6 +604,7 @@
       completionCondition: ''
     };
     formFields = [];
+    formGrids = [];
     scriptCode = '';
   }
 
@@ -675,6 +753,29 @@
         }
       }
 
+      // Extract from form grids (data tables)
+      const formGridsJson = bo.get && bo.get('flowable:formGrids');
+      if (formGridsJson) {
+        try {
+          const grids = JSON.parse(formGridsJson);
+          grids.forEach((grid: any) => {
+            if (grid.name) {
+              variables.add(grid.name);
+              // Also add column names prefixed with grid name
+              if (Array.isArray(grid.columns)) {
+                grid.columns.forEach((col: any) => {
+                  if (col.name) {
+                    variables.add(`${grid.name}_${col.name}`);
+                  }
+                });
+              }
+            }
+          });
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+
       // Extract from scripts
       const script = bo.script;
       if (script) {
@@ -757,6 +858,201 @@
     field.options = field.options.filter((_, i) => i !== optionIndex);
     formFields = [...formFields];
   }
+
+  // ====== Grid (Data Table) Management Functions ======
+
+  function addGrid() {
+    const newGrid = {
+      id: `grid_${Date.now()}`,
+      name: '',
+      label: '',
+      description: '',
+      minRows: 0,
+      maxRows: 0,
+      columns: [],
+      gridColumn: 1,
+      gridRow: formGrids.length + formFields.length + 1,
+      gridWidth: formGridColumns,
+      cssClass: ''
+    };
+    formGrids = [...formGrids, newGrid];
+    expandedGridIndex = formGrids.length - 1;
+  }
+
+  function removeGrid(index: number) {
+    formGrids = formGrids.filter((_, i) => i !== index);
+    if (expandedGridIndex === index) {
+      expandedGridIndex = null;
+    }
+  }
+
+  function duplicateGrid(index: number) {
+    const grid = formGrids[index];
+    const newGrid = {
+      ...JSON.parse(JSON.stringify(grid)),
+      id: `grid_${Date.now()}`,
+      name: grid.name ? `${grid.name}_copy` : '',
+      gridRow: formGrids.length + formFields.length + 1
+    };
+    formGrids = [...formGrids, newGrid];
+  }
+
+  function moveGrid(index: number, direction: 'up' | 'down') {
+    if (direction === 'up' && index > 0) {
+      const newGrids = [...formGrids];
+      [newGrids[index - 1], newGrids[index]] = [newGrids[index], newGrids[index - 1]];
+      formGrids = newGrids;
+    } else if (direction === 'down' && index < formGrids.length - 1) {
+      const newGrids = [...formGrids];
+      [newGrids[index], newGrids[index + 1]] = [newGrids[index + 1], newGrids[index]];
+      formGrids = newGrids;
+    }
+  }
+
+  function addGridColumn(gridIndex: number) {
+    const grid = formGrids[gridIndex];
+    const newColumn = {
+      id: `col_${Date.now()}`,
+      name: '',
+      label: '',
+      type: 'text' as const,
+      required: false,
+      placeholder: '',
+      options: [],
+      validation: {}
+    };
+    grid.columns = [...grid.columns, newColumn];
+    formGrids = [...formGrids];
+    expandedGridColumnIndex = grid.columns.length - 1;
+  }
+
+  function removeGridColumn(gridIndex: number, columnIndex: number) {
+    const grid = formGrids[gridIndex];
+    grid.columns = grid.columns.filter((_, i) => i !== columnIndex);
+    formGrids = [...formGrids];
+    if (expandedGridColumnIndex === columnIndex) {
+      expandedGridColumnIndex = null;
+    }
+  }
+
+  function moveGridColumn(gridIndex: number, columnIndex: number, direction: 'up' | 'down') {
+    const grid = formGrids[gridIndex];
+    if (direction === 'up' && columnIndex > 0) {
+      [grid.columns[columnIndex - 1], grid.columns[columnIndex]] = [grid.columns[columnIndex], grid.columns[columnIndex - 1]];
+      formGrids = [...formGrids];
+    } else if (direction === 'down' && columnIndex < grid.columns.length - 1) {
+      [grid.columns[columnIndex], grid.columns[columnIndex + 1]] = [grid.columns[columnIndex + 1], grid.columns[columnIndex]];
+      formGrids = [...formGrids];
+    }
+  }
+
+  function addGridColumnOption(gridIndex: number, columnIndex: number) {
+    const grid = formGrids[gridIndex];
+    const column = grid.columns[columnIndex];
+    column.options = [...column.options, ''];
+    formGrids = [...formGrids];
+  }
+
+  function removeGridColumnOption(gridIndex: number, columnIndex: number, optionIndex: number) {
+    const grid = formGrids[gridIndex];
+    const column = grid.columns[columnIndex];
+    column.options = column.options.filter((_, i) => i !== optionIndex);
+    formGrids = [...formGrids];
+  }
+
+  function validateFormGrids(): string[] {
+    const errors: string[] = [];
+    const names = new Set<string>();
+
+    formGrids.forEach((grid, gridIndex) => {
+      if (!grid.name) {
+        errors.push(`Grid ${gridIndex + 1}: Name is required`);
+      } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(grid.name)) {
+        errors.push(`Grid ${gridIndex + 1}: Name must be a valid identifier`);
+      } else if (names.has(grid.name)) {
+        errors.push(`Grid ${gridIndex + 1}: Duplicate name '${grid.name}'`);
+      } else {
+        names.add(grid.name);
+      }
+
+      if (!grid.label) {
+        errors.push(`Grid ${gridIndex + 1}: Label is required`);
+      }
+
+      if (grid.columns.length === 0) {
+        errors.push(`Grid ${gridIndex + 1}: At least one column is required`);
+      }
+
+      const columnNames = new Set<string>();
+      grid.columns.forEach((column, colIndex) => {
+        if (!column.name) {
+          errors.push(`Grid ${gridIndex + 1}, Column ${colIndex + 1}: Name is required`);
+        } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column.name)) {
+          errors.push(`Grid ${gridIndex + 1}, Column ${colIndex + 1}: Name must be a valid identifier`);
+        } else if (columnNames.has(column.name)) {
+          errors.push(`Grid ${gridIndex + 1}, Column ${colIndex + 1}: Duplicate column name '${column.name}'`);
+        } else {
+          columnNames.add(column.name);
+        }
+
+        if (!column.label) {
+          errors.push(`Grid ${gridIndex + 1}, Column ${colIndex + 1}: Label is required`);
+        }
+
+        if (column.type === 'select' && column.options.length === 0) {
+          errors.push(`Grid ${gridIndex + 1}, Column ${colIndex + 1}: Options are required for select type`);
+        }
+      });
+    });
+
+    return errors;
+  }
+
+  function saveFormGrids() {
+    if (!modeler || !selectedElement) return;
+
+    // Validate grids
+    const errors = validateFormGrids();
+    if (errors.length > 0) {
+      error = `Grid validation errors: ${errors.join(', ')}`;
+      setTimeout(() => (error = ''), 5000);
+      return;
+    }
+
+    const modeling = modeler.get('modeling');
+    const formGridsJson = JSON.stringify(formGrids);
+
+    // Store form grids as a custom attribute
+    modeling.updateProperties(selectedElement, {
+      'flowable:formGrids': formGridsJson
+    });
+
+    // Update process variables with new grid names and column names
+    formGrids.forEach(grid => {
+      if (grid.name && !processVariables.includes(grid.name)) {
+        processVariables = [...processVariables, grid.name];
+      }
+      grid.columns.forEach(column => {
+        const fullName = `${grid.name}_${column.name}`;
+        if (column.name && !processVariables.includes(fullName)) {
+          processVariables = [...processVariables, fullName];
+        }
+      });
+    });
+
+    success = 'Data grids saved successfully';
+    setTimeout(() => (success = ''), 3000);
+    showGridBuilder = false;
+  }
+
+  // Grid column type options
+  const gridColumnTypeOptions = [
+    { value: 'text', label: 'Text' },
+    { value: 'number', label: 'Number' },
+    { value: 'date', label: 'Date' },
+    { value: 'select', label: 'Dropdown' },
+    { value: 'textarea', label: 'Text Area' }
+  ];
 
   function saveFormFields() {
     if (!modeler || !selectedElement) return;
@@ -1455,12 +1751,27 @@
                       />
                     </div>
 
-                    <button
-                      onclick={() => showFormBuilder = true}
-                      class="w-full rounded bg-indigo-600 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
-                    >
-                      Configure Form Fields ({formFields.length})
-                    </button>
+                    <div class="space-y-2">
+                      <button
+                        onclick={() => showFormBuilder = true}
+                        class="w-full rounded bg-indigo-600 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                      >
+                        Configure Form Fields ({formFields.length})
+                      </button>
+
+                      <button
+                        onclick={() => showGridBuilder = true}
+                        class="w-full rounded bg-emerald-600 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        Configure Data Grids ({formGrids.length})
+                      </button>
+                    </div>
+
+                    {#if formFields.length > 0 || formGrids.length > 0}
+                      <div class="mt-2 rounded bg-gray-100 p-2 text-xs text-gray-600">
+                        <span class="font-medium">Form elements:</span> {formFields.length} field{formFields.length !== 1 ? 's' : ''}, {formGrids.length} grid{formGrids.length !== 1 ? 's' : ''}
+                      </div>
+                    {/if}
                   </div>
 
                   <!-- Multi-Instance Configuration -->
@@ -2220,6 +2531,480 @@
               class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               Save Form Fields
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Grid Builder Modal - For adding multiple data grids -->
+{#if showGridBuilder}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="border-b border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Data Grid Builder</h3>
+            <p class="mt-1 text-sm text-gray-500">Define data grids (tables) for collecting structured data</p>
+          </div>
+          <button onclick={() => showGridBuilder = false} class="text-gray-400 hover:text-gray-600" aria-label="Close grid builder">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="max-h-[60vh] overflow-y-auto p-4">
+        {#if formGrids.length === 0}
+          <div class="rounded-lg bg-gray-50 p-8 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+            <p class="mt-2 text-gray-600">No data grids defined yet</p>
+            <p class="mt-1 text-sm text-gray-500">Data grids allow users to enter multiple rows of structured data</p>
+            <button
+              onclick={addGrid}
+              class="mt-4 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              Add First Grid
+            </button>
+          </div>
+        {:else}
+          <div class="space-y-4">
+            {#each formGrids as grid, gridIndex}
+              <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <!-- Grid Header -->
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center justify-between rounded-t-lg bg-emerald-50 p-3 text-left"
+                  onclick={() => expandedGridIndex = expandedGridIndex === gridIndex ? null : gridIndex}
+                  aria-expanded={expandedGridIndex === gridIndex}
+                >
+                  <div class="flex items-center gap-3">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-medium text-emerald-700">
+                      {gridIndex + 1}
+                    </span>
+                    <div>
+                      <span class="font-medium text-gray-900">{grid.label || grid.name || 'Untitled Grid'}</span>
+                      <span class="ml-2 text-xs text-gray-500">({grid.columns.length} column{grid.columns.length !== 1 ? 's' : ''})</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span
+                      role="button"
+                      tabindex="0"
+                      onclick={(e) => { e.stopPropagation(); moveGrid(gridIndex, 'up'); }}
+                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); moveGrid(gridIndex, 'up'); } }}
+                      class="rounded p-1 text-gray-400 hover:bg-emerald-100 hover:text-gray-600 {gridIndex === 0 ? 'opacity-50' : ''}"
+                      aria-label="Move grid up"
+                      aria-disabled={gridIndex === 0}
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                      </svg>
+                    </span>
+                    <span
+                      role="button"
+                      tabindex="0"
+                      onclick={(e) => { e.stopPropagation(); moveGrid(gridIndex, 'down'); }}
+                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); moveGrid(gridIndex, 'down'); } }}
+                      class="rounded p-1 text-gray-400 hover:bg-emerald-100 hover:text-gray-600 {gridIndex === formGrids.length - 1 ? 'opacity-50' : ''}"
+                      aria-label="Move grid down"
+                      aria-disabled={gridIndex === formGrids.length - 1}
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </span>
+                    <span
+                      role="button"
+                      tabindex="0"
+                      onclick={(e) => { e.stopPropagation(); duplicateGrid(gridIndex); }}
+                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); duplicateGrid(gridIndex); } }}
+                      class="rounded p-1 text-gray-400 hover:bg-emerald-100 hover:text-gray-600"
+                      aria-label="Duplicate grid"
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                      </svg>
+                    </span>
+                    <span
+                      role="button"
+                      tabindex="0"
+                      onclick={(e) => { e.stopPropagation(); removeGrid(gridIndex); }}
+                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); removeGrid(gridIndex); } }}
+                      class="rounded p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
+                      aria-label="Delete grid"
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    </span>
+                    <svg class="ml-2 h-4 w-4 text-gray-400 transition-transform {expandedGridIndex === gridIndex ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </div>
+                </button>
+
+                <!-- Grid Configuration (Expanded) -->
+                {#if expandedGridIndex === gridIndex}
+                  <div class="border-t border-gray-200 p-4">
+                    <!-- Grid Basic Settings -->
+                    <div class="grid gap-4 md:grid-cols-4">
+                      <div>
+                        <label for="grid-{gridIndex}-name" class="mb-1 block text-xs font-medium text-gray-700">Variable Name <span class="text-red-500">*</span></label>
+                        <input
+                          id="grid-{gridIndex}-name"
+                          type="text"
+                          bind:value={grid.name}
+                          placeholder="gridName"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label for="grid-{gridIndex}-label" class="mb-1 block text-xs font-medium text-gray-700">Label <span class="text-red-500">*</span></label>
+                        <input
+                          id="grid-{gridIndex}-label"
+                          type="text"
+                          bind:value={grid.label}
+                          placeholder="Display Label"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label for="grid-{gridIndex}-minrows" class="mb-1 block text-xs font-medium text-gray-700">Min Rows</label>
+                        <input
+                          id="grid-{gridIndex}-minrows"
+                          type="number"
+                          bind:value={grid.minRows}
+                          min="0"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label for="grid-{gridIndex}-maxrows" class="mb-1 block text-xs font-medium text-gray-700">Max Rows</label>
+                        <input
+                          id="grid-{gridIndex}-maxrows"
+                          type="number"
+                          bind:value={grid.maxRows}
+                          min="0"
+                          placeholder="0 = unlimited"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="mt-3">
+                      <label for="grid-{gridIndex}-desc" class="mb-1 block text-xs font-medium text-gray-700">Description</label>
+                      <input
+                        id="grid-{gridIndex}-desc"
+                        type="text"
+                        bind:value={grid.description}
+                        placeholder="Optional description"
+                        class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <!-- Grid Layout -->
+                    <div class="mt-3 grid gap-4 md:grid-cols-3">
+                      <div>
+                        <label for="grid-{gridIndex}-column" class="mb-1 block text-xs text-gray-600">Column</label>
+                        <select
+                          id="grid-{gridIndex}-column"
+                          bind:value={grid.gridColumn}
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                        >
+                          {#each Array(formGridColumns) as _, i}
+                            <option value={i + 1}>Column {i + 1}</option>
+                          {/each}
+                        </select>
+                      </div>
+                      <div>
+                        <label for="grid-{gridIndex}-width" class="mb-1 block text-xs text-gray-600">Width (columns)</label>
+                        <select
+                          id="grid-{gridIndex}-width"
+                          bind:value={grid.gridWidth}
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                        >
+                          {#each Array(formGridColumns) as _, i}
+                            <option value={i + 1}>{i + 1}</option>
+                          {/each}
+                        </select>
+                      </div>
+                      <div>
+                        <label for="grid-{gridIndex}-cssclass" class="mb-1 block text-xs text-gray-600">CSS Class</label>
+                        <input
+                          id="grid-{gridIndex}-cssclass"
+                          type="text"
+                          bind:value={grid.cssClass}
+                          placeholder="custom-class"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Grid Columns -->
+                    <div class="mt-4">
+                      <div class="mb-2 flex items-center justify-between">
+                        <h5 class="text-sm font-medium text-gray-700">Grid Columns</h5>
+                        <button
+                          onclick={() => addGridColumn(gridIndex)}
+                          class="rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
+                        >
+                          + Add Column
+                        </button>
+                      </div>
+
+                      {#if grid.columns.length === 0}
+                        <div class="rounded bg-gray-50 p-4 text-center text-sm text-gray-500">
+                          No columns defined. Add columns to define the grid structure.
+                        </div>
+                      {:else}
+                        <div class="space-y-2">
+                          {#each grid.columns as column, colIndex}
+                            <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                              <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                  <span class="text-xs font-medium text-gray-500">Col {colIndex + 1}:</span>
+                                  <span class="text-sm font-medium">{column.label || column.name || 'Untitled'}</span>
+                                  <span class="text-xs text-gray-400">({column.type})</span>
+                                  {#if column.required}
+                                    <span class="text-xs text-red-500">*</span>
+                                  {/if}
+                                </div>
+                                <div class="flex items-center gap-1">
+                                  <button
+                                    onclick={() => moveGridColumn(gridIndex, colIndex, 'up')}
+                                    class="rounded p-1 text-gray-400 hover:bg-gray-200"
+                                    disabled={colIndex === 0}
+                                    aria-label="Move column up"
+                                  >
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onclick={() => moveGridColumn(gridIndex, colIndex, 'down')}
+                                    class="rounded p-1 text-gray-400 hover:bg-gray-200"
+                                    disabled={colIndex === grid.columns.length - 1}
+                                    aria-label="Move column down"
+                                  >
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onclick={() => expandedGridColumnIndex = expandedGridColumnIndex === colIndex ? null : colIndex}
+                                    class="rounded p-1 text-blue-400 hover:bg-blue-100"
+                                    aria-label="Edit column"
+                                  >
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onclick={() => removeGridColumn(gridIndex, colIndex)}
+                                    class="rounded p-1 text-red-400 hover:bg-red-100"
+                                    aria-label="Remove column"
+                                  >
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+
+                              <!-- Column Details (Expanded) -->
+                              {#if expandedGridColumnIndex === colIndex}
+                                <div class="mt-3 grid gap-3 border-t border-gray-200 pt-3 md:grid-cols-4">
+                                  <div>
+                                    <label for="grid-{gridIndex}-col-{colIndex}-name" class="mb-1 block text-xs text-gray-600">Name <span class="text-red-500">*</span></label>
+                                    <input
+                                      id="grid-{gridIndex}-col-{colIndex}-name"
+                                      type="text"
+                                      bind:value={column.name}
+                                      placeholder="columnName"
+                                      class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label for="grid-{gridIndex}-col-{colIndex}-label" class="mb-1 block text-xs text-gray-600">Label <span class="text-red-500">*</span></label>
+                                    <input
+                                      id="grid-{gridIndex}-col-{colIndex}-label"
+                                      type="text"
+                                      bind:value={column.label}
+                                      placeholder="Column Label"
+                                      class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label for="grid-{gridIndex}-col-{colIndex}-type" class="mb-1 block text-xs text-gray-600">Type</label>
+                                    <select
+                                      id="grid-{gridIndex}-col-{colIndex}-type"
+                                      bind:value={column.type}
+                                      class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                    >
+                                      {#each gridColumnTypeOptions as typeOpt}
+                                        <option value={typeOpt.value}>{typeOpt.label}</option>
+                                      {/each}
+                                    </select>
+                                  </div>
+                                  <div class="flex items-end">
+                                    <label class="flex items-center text-xs text-gray-700">
+                                      <input
+                                        type="checkbox"
+                                        bind:checked={column.required}
+                                        class="mr-1.5 rounded border-gray-300"
+                                      />
+                                      Required
+                                    </label>
+                                  </div>
+
+                                  <div class="md:col-span-2">
+                                    <label for="grid-{gridIndex}-col-{colIndex}-placeholder" class="mb-1 block text-xs text-gray-600">Placeholder</label>
+                                    <input
+                                      id="grid-{gridIndex}-col-{colIndex}-placeholder"
+                                      type="text"
+                                      bind:value={column.placeholder}
+                                      placeholder="Placeholder text"
+                                      class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                    />
+                                  </div>
+
+                                  {#if column.type === 'number'}
+                                    <div>
+                                      <label for="grid-{gridIndex}-col-{colIndex}-min" class="mb-1 block text-xs text-gray-600">Min</label>
+                                      <input
+                                        id="grid-{gridIndex}-col-{colIndex}-min"
+                                        type="number"
+                                        bind:value={column.min}
+                                        class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label for="grid-{gridIndex}-col-{colIndex}-max" class="mb-1 block text-xs text-gray-600">Max</label>
+                                      <input
+                                        id="grid-{gridIndex}-col-{colIndex}-max"
+                                        type="number"
+                                        bind:value={column.max}
+                                        class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                      />
+                                    </div>
+                                  {/if}
+
+                                  {#if column.type === 'select'}
+                                    <div class="md:col-span-4" role="group" aria-labelledby="grid-{gridIndex}-col-{colIndex}-options-label">
+                                      <span class="mb-1 block text-xs text-gray-600" id="grid-{gridIndex}-col-{colIndex}-options-label">Options</span>
+                                      <div class="space-y-1">
+                                        {#each column.options as _option, optIndex}
+                                          <div class="flex gap-1">
+                                            <input
+                                              type="text"
+                                              bind:value={column.options[optIndex]}
+                                              placeholder="Option value"
+                                              class="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                                              aria-label="Option {optIndex + 1} value"
+                                            />
+                                            <button
+                                              onclick={() => removeGridColumnOption(gridIndex, colIndex, optIndex)}
+                                              class="rounded bg-red-100 px-2 py-1 text-red-600 hover:bg-red-200"
+                                              aria-label="Remove option {optIndex + 1}"
+                                            >
+                                              <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                              </svg>
+                                            </button>
+                                          </div>
+                                        {/each}
+                                        <button
+                                          onclick={() => addGridColumnOption(gridIndex, colIndex)}
+                                          class="rounded border border-dashed border-gray-300 px-2 py-1 text-xs text-gray-600 hover:border-emerald-500 hover:text-emerald-600"
+                                        >
+                                          + Add Option
+                                        </button>
+                                      </div>
+                                    </div>
+                                  {/if}
+
+                                  <!-- Validation -->
+                                  {#if column.type === 'text' || column.type === 'textarea'}
+                                    <div>
+                                      <label for="grid-{gridIndex}-col-{colIndex}-minlen" class="mb-1 block text-xs text-gray-600">Min Length</label>
+                                      <input
+                                        id="grid-{gridIndex}-col-{colIndex}-minlen"
+                                        type="number"
+                                        bind:value={column.validation.minLength}
+                                        min="0"
+                                        class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label for="grid-{gridIndex}-col-{colIndex}-maxlen" class="mb-1 block text-xs text-gray-600">Max Length</label>
+                                      <input
+                                        id="grid-{gridIndex}-col-{colIndex}-maxlen"
+                                        type="number"
+                                        bind:value={column.validation.maxLength}
+                                        min="0"
+                                        class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                      />
+                                    </div>
+                                  {/if}
+
+                                  <div class="md:col-span-2">
+                                    <label for="grid-{gridIndex}-col-{colIndex}-pattern" class="mb-1 block text-xs text-gray-600">Pattern (Regex)</label>
+                                    <input
+                                      id="grid-{gridIndex}-col-{colIndex}-pattern"
+                                      type="text"
+                                      bind:value={column.validation.pattern}
+                                      placeholder="^[A-Za-z]+$"
+                                      class="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+
+            <button
+              onclick={addGrid}
+              class="w-full rounded-md border-2 border-dashed border-gray-300 py-4 text-sm text-gray-600 hover:border-emerald-500 hover:text-emerald-600"
+            >
+              + Add Another Grid
+            </button>
+          </div>
+        {/if}
+      </div>
+
+      <div class="border-t border-gray-200 bg-gray-50 p-4">
+        <div class="flex justify-between">
+          <div class="text-sm text-gray-500">
+            {formGrids.length} grid{formGrids.length !== 1 ? 's' : ''} configured
+            {#if formGrids.length > 0}
+              ({formGrids.reduce((sum, g) => sum + g.columns.length, 0)} total columns)
+            {/if}
+          </div>
+          <div class="flex gap-3">
+            <button
+              onclick={() => showGridBuilder = false}
+              class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onclick={saveFormGrids}
+              class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              Save Data Grids
             </button>
           </div>
         </div>
