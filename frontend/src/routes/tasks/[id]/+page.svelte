@@ -256,39 +256,41 @@
 							<div class="col-span-2 py-2 border-b border-gray-100">
 								<dt class="text-sm text-gray-500 mb-3">{formatLabel(key)}</dt>
 								<dd>
-									{@const items = parseLineItems(value as string)}
-									{#if items.length > 0}
-										<div class="overflow-x-auto">
-											<table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
-												<thead class="bg-gray-50">
-													<tr>
-														{#each Object.keys(items[0]) as column}
-															<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-																{formatLabel(column)}
-															</th>
-														{/each}
-													</tr>
-												</thead>
-												<tbody class="bg-white divide-y divide-gray-200">
-													{#each items as item}
+									<svelte:fragment>
+										{@const items = parseLineItems(value as string)}
+										{#if items.length > 0}
+											<div class="overflow-x-auto">
+												<table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+													<thead class="bg-gray-50">
 														<tr>
-															{#each Object.entries(item) as [col, val]}
-																<td class="px-4 py-3 text-sm text-gray-900">
-																	{#if col.toLowerCase().includes('amount')}
-																		{formatCurrency(val)}
-																	{:else}
-																		{val || '-'}
-																	{/if}
-																</td>
+															{#each Object.keys(items[0]) as column}
+																<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+																	{formatLabel(column)}
+																</th>
 															{/each}
 														</tr>
-													{/each}
-												</tbody>
-											</table>
-										</div>
-									{:else}
-										<p class="text-gray-500 text-sm">No items</p>
-									{/if}
+													</thead>
+													<tbody class="bg-white divide-y divide-gray-200">
+														{#each items as item}
+															<tr>
+																{#each Object.entries(item) as [col, val]}
+																	<td class="px-4 py-3 text-sm text-gray-900">
+																		{#if col.toLowerCase().includes('amount')}
+																			{formatCurrency(val)}
+																		{:else}
+																			{val || '-'}
+																		{/if}
+																	</td>
+																{/each}
+															</tr>
+														{/each}
+													</tbody>
+												</table>
+											</div>
+										{:else}
+											<p class="text-gray-500 text-sm">No items</p>
+										{/if}
+									</svelte:fragment>
 								</dd>
 							</div>
 						{:else}
