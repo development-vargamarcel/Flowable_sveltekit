@@ -2,17 +2,20 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
 	import Toast from '$lib/components/Toast.svelte';
+	import GridForm, { type GridColumn } from '$lib/components/GridForm.svelte';
+	import { rules } from '$lib/utils/validation';
 
-	let amount = $state<number | null>(null);
 	let department = $state('');
-	let description = $state('');
 	let vendor = $state('');
 	let justification = $state('');
 	let urgency = $state('normal');
+	let lineItems = $state<Record<string, unknown>[]>([]);
 
 	let loading = $state(false);
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 	let errors = $state<Record<string, string>>({});
+
+	let gridFormRef: GridForm;
 
 	const departments = [
 		'Engineering',
@@ -25,23 +28,72 @@
 		'IT'
 	];
 
+	const lineItemColumns: GridColumn[] = [
+		{
+			name: 'item',
+			label: 'Item/Service',
+			type: 'text',
+			placeholder: 'Enter item name',
+			validation: [
+				rules.required('Item name is required'),
+				rules.minLength(3, 'Item name must be at least 3 characters')
+			]
+		},
+		{
+			name: 'description',
+			label: 'Description',
+			type: 'textarea',
+			placeholder: 'Brief description',
+			validation: [rules.minLength(5, 'Description must be at least 5 characters')]
+		},
+		{
+			name: 'quantity',
+			label: 'Quantity',
+			type: 'number',
+			min: 1,
+			step: 1,
+			placeholder: '1',
+			validation: [
+				rules.required('Quantity is required'),
+				rules.positive('Quantity must be greater than 0')
+			]
+		},
+		{
+			name: 'unitPrice',
+			label: 'Unit Price ($)',
+			type: 'number',
+			min: 0.01,
+			step: 0.01,
+			placeholder: '0.00',
+			validation: [
+				rules.required('Unit price is required'),
+				rules.positive('Unit price must be greater than 0')
+			]
+		}
+	];
+
+	const totalAmount = $derived(() => {
+		return lineItems.reduce((sum, item) => {
+			const quantity = Number(item.quantity) || 0;
+			const unitPrice = Number(item.unitPrice) || 0;
+			return sum + quantity * unitPrice;
+		}, 0);
+	});
+
 	function validate(): boolean {
 		const newErrors: Record<string, string> = {};
 
-		if (!amount || amount <= 0) {
-			newErrors.amount = 'Amount must be greater than 0';
-		}
 		if (!department) {
 			newErrors.department = 'Department is required';
 		}
-		if (!description || description.length < 10) {
-			newErrors.description = 'Description must be at least 10 characters';
-		}
-		if (!vendor) {
-			newErrors.vendor = 'Vendor is required';
+		if (!vendor || vendor.length < 2) {
+			newErrors.vendor = 'Vendor name is required (minimum 2 characters)';
 		}
 		if (!justification || justification.length < 20) {
 			newErrors.justification = 'Justification must be at least 20 characters';
+		}
+		if (lineItems.length === 0) {
+			newErrors.lineItems = 'At least one line item is required';
 		}
 
 		errors = newErrors;
@@ -63,17 +115,39 @@
 	}
 
 	async function handleSubmit() {
-		if (!validate()) return;
+		if (!validate()) {
+			toast = { message: 'Please fix the errors below', type: 'error' };
+			return;
+		}
+
+		// Validate grid data
+		if (gridFormRef && gridFormRef.hasEditingRows()) {
+			toast = { message: 'Please save or cancel all editing rows', type: 'error' };
+			return;
+		}
+
+		if (gridFormRef && !gridFormRef.validateAll()) {
+			toast = { message: 'Please fix errors in line items', type: 'error' };
+			return;
+		}
 
 		loading = true;
 		try {
+			const amount = totalAmount();
+
 			await api.startProcess('purchase-request', {
 				amount,
 				department,
-				description,
 				vendor,
 				justification,
-				urgency
+				urgency,
+				lineItems: lineItems.map((item) => ({
+					item: item.item,
+					description: item.description || '',
+					quantity: item.quantity,
+					unitPrice: item.unitPrice,
+					total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+				}))
 			});
 
 			toast = { message: 'Purchase request submitted successfully!', type: 'success' };
@@ -86,6 +160,10 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	function handleLineItemsChange(data: Record<string, unknown>[]) {
+		lineItems = data;
 	}
 </script>
 
@@ -107,34 +185,11 @@
 	</div>
 
 	<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
+		<!-- Vendor and Department -->
 		<div class="card">
 			<h2 class="text-lg font-semibold text-gray-800 mb-4">Purchase Details</h2>
 
 			<div class="grid gap-6">
-				<!-- Amount -->
-				<div>
-					<label for="amount" class="block text-sm font-medium text-gray-700">
-						Amount ($) *
-					</label>
-					<input
-						type="number"
-						id="amount"
-						bind:value={amount}
-						min="0"
-						step="0.01"
-						class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-						placeholder="0.00"
-					/>
-					{#if errors.amount}
-						<p class="mt-1 text-sm text-red-600">{errors.amount}</p>
-					{/if}
-					{#if amount && amount > 0}
-						<p class="mt-2 text-sm text-indigo-600 bg-indigo-50 px-3 py-2 rounded">
-							{getApprovalPathInfo(amount)}
-						</p>
-					{/if}
-				</div>
-
 				<!-- Department -->
 				<div>
 					<label for="department" class="block text-sm font-medium text-gray-700">
@@ -174,7 +229,7 @@
 
 				<!-- Urgency -->
 				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-2">Urgency</label>
+					<span class="block text-sm font-medium text-gray-700 mb-2">Urgency</span>
 					<div class="flex gap-4">
 						{#each ['low', 'normal', 'high', 'critical'] as level}
 							<label class="flex items-center">
@@ -188,23 +243,6 @@
 							</label>
 						{/each}
 					</div>
-				</div>
-
-				<!-- Description -->
-				<div>
-					<label for="description" class="block text-sm font-medium text-gray-700">
-						Description *
-					</label>
-					<textarea
-						id="description"
-						bind:value={description}
-						rows="3"
-						class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-none"
-						placeholder="Describe what you're purchasing..."
-					></textarea>
-					{#if errors.description}
-						<p class="mt-1 text-sm text-red-600">{errors.description}</p>
-					{/if}
 				</div>
 
 				<!-- Justification -->
@@ -224,6 +262,38 @@
 					{/if}
 				</div>
 			</div>
+		</div>
+
+		<!-- Line Items Grid -->
+		<div class="card">
+			<GridForm
+				bind:this={gridFormRef}
+				columns={lineItemColumns}
+				label="Line Items"
+				description="Add items or services to be purchased. You can add, edit, and remove rows as needed."
+				minRows={0}
+				onDataChange={handleLineItemsChange}
+			/>
+			{#if errors.lineItems}
+				<p class="mt-2 text-sm text-red-600">{errors.lineItems}</p>
+			{/if}
+
+			<!-- Total Amount Display -->
+			{#if lineItems.length > 0}
+				<div class="mt-6 pt-4 border-t border-gray-200">
+					<div class="flex justify-between items-center">
+						<span class="text-lg font-semibold text-gray-900">Total Amount:</span>
+						<span class="text-2xl font-bold text-blue-600">
+							${totalAmount().toFixed(2)}
+						</span>
+					</div>
+					{#if totalAmount() > 0}
+						<p class="mt-2 text-sm text-indigo-600 bg-indigo-50 px-3 py-2 rounded">
+							{getApprovalPathInfo(totalAmount())}
+						</p>
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 		<!-- Approval Path Info -->
