@@ -52,24 +52,25 @@
         </dependency>
 
         <!-- GraalVM JavaScript Engine (required for Java 17+ since Nashorn was removed in Java 15) -->
-        <!-- Core polyglot API -->
+        <!-- Using GraalVM 22.3.3 which is fully available in Maven Central -->
+        <!-- GraalVM SDK -->
         <dependency>
-            <groupId>org.graalvm.polyglot</groupId>
-            <artifactId>polyglot</artifactId>
-            <version>23.0.0</version>
+            <groupId>org.graalvm.sdk</groupId>
+            <artifactId>graal-sdk</artifactId>
+            <version>22.3.3</version>
         </dependency>
-        <!-- JavaScript language implementation (Community edition) -->
+        <!-- GraalVM JavaScript implementation -->
         <dependency>
-            <groupId>org.graalvm.polyglot</groupId>
-            <artifactId>js-community</artifactId>
-            <version>23.0.0</version>
-            <type>pom</type>
+            <groupId>org.graalvm.js</groupId>
+            <artifactId>js</artifactId>
+            <version>22.3.3</version>
+            <scope>runtime</scope>
         </dependency>
         <!-- JSR-223 ScriptEngine bridge for GraalVM JS -->
         <dependency>
             <groupId>org.graalvm.js</groupId>
             <artifactId>js-scriptengine</artifactId>
-            <version>23.0.0</version>
+            <version>22.3.3</version>
         </dependency>
 
         <!-- Session Management -->
