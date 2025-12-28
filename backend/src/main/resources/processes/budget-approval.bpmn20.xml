@@ -82,12 +82,13 @@
             <script>
                 <![CDATA[
                 var history = JSON.parse(execution.getVariable('approvalHistory') || '[]');
+                var decision = execution.getVariable('decision') || 'approved';
                 history.push({
                     stage: 'DEPARTMENT_REVIEW',
-                    decision: execution.getVariable('departmentDecision'),
-                    approver: execution.getVariable('departmentApprover'),
+                    decision: decision,
+                    approver: execution.getVariable('completedBy'),
                     timestamp: new Date().toISOString(),
-                    comments: execution.getVariable('departmentComments')
+                    comments: execution.getVariable('approvalComments')
                 });
                 execution.setVariable('approvalHistory', JSON.stringify(history));
                 ]]>
@@ -101,19 +102,19 @@
 
         <sequenceFlow id="flowDeptApproved" sourceRef="checkDepartmentDecision" targetRef="parallelReviewGateway">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${departmentDecision == 'approved'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowDeptRejected" sourceRef="checkDepartmentDecision" targetRef="endRejected">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${departmentDecision == 'rejected'}]]>
+                <![CDATA[${decision == 'rejected'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowDeptModify" sourceRef="checkDepartmentDecision" targetRef="modifyBudget">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${departmentDecision == 'modify'}]]>
+                <![CDATA[${decision == 'request_changes'}]]>
             </conditionExpression>
         </sequenceFlow>
 
@@ -178,13 +179,13 @@
 
         <sequenceFlow id="flowDirectorApprove" sourceRef="checkDirectorIntervention" targetRef="parallelReviewGateway">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${directorDecision == 'force_approve'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowDirectorReject" sourceRef="checkDirectorIntervention" targetRef="endRejected">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${directorDecision == 'reject'}]]>
+                <![CDATA[${decision == 'rejected'}]]>
             </conditionExpression>
         </sequenceFlow>
 
@@ -219,13 +220,13 @@
 
         <sequenceFlow id="flowFinanceValid" sourceRef="checkFinanceValidation" targetRef="financeApproved">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${financeDecision == 'validated'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowFinanceIssues" sourceRef="checkFinanceValidation" targetRef="addressFinanceIssues">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${financeDecision == 'issues_found'}]]>
+                <![CDATA[${decision == 'request_changes'}]]>
             </conditionExpression>
         </sequenceFlow>
 
@@ -292,19 +293,19 @@
 
         <sequenceFlow id="flowLegalApproved" sourceRef="checkLegalDecision" targetRef="legalComplete">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${legalDecision == 'approved'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowLegalRevisions" sourceRef="checkLegalDecision" targetRef="addressLegalConcerns">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${legalDecision == 'revisions_required'}]]>
+                <![CDATA[${decision == 'request_changes'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowLegalRejected" sourceRef="checkLegalDecision" targetRef="endRejected">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${legalDecision == 'rejected'}]]>
+                <![CDATA[${decision == 'rejected'}]]>
             </conditionExpression>
         </sequenceFlow>
 
@@ -413,19 +414,19 @@
 
         <sequenceFlow id="flowBoardApproved" sourceRef="checkBoardDecision" targetRef="finalApproval">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${boardDecision == 'approved'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowBoardConditional" sourceRef="checkBoardDecision" targetRef="addressBoardConditions">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${boardDecision == 'conditional'}]]>
+                <![CDATA[${decision == 'request_changes'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowBoardRejected" sourceRef="checkBoardDecision" targetRef="endRejected">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${boardDecision == 'rejected'}]]>
+                <![CDATA[${decision == 'rejected'}]]>
             </conditionExpression>
         </sequenceFlow>
 

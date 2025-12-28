@@ -457,19 +457,19 @@
 
         <sequenceFlow id="flowRemediationComplete" sourceRef="checkRemediationStatus" targetRef="checkExternalAudit">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${remediationStatus == 'complete'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowRemediationPartial" sourceRef="checkRemediationStatus" targetRef="checkRemediationCycles">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${remediationStatus == 'partial'}]]>
+                <![CDATA[${decision == 'request_changes'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowRemediationFailed" sourceRef="checkRemediationStatus" targetRef="escalateToExecutive">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${remediationStatus == 'failed'}]]>
+                <![CDATA[${decision == 'rejected'}]]>
             </conditionExpression>
         </sequenceFlow>
 
@@ -509,19 +509,19 @@
 
         <sequenceFlow id="flowAcceptRisk" sourceRef="checkExecutiveDecision" targetRef="documentRiskAcceptance">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${executiveDecision == 'accept_risk'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowForceRemediation" sourceRef="checkExecutiveDecision" targetRef="executeRemediation">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${executiveDecision == 'force_remediation'}]]>
+                <![CDATA[${decision == 'request_changes'}]]>
             </conditionExpression>
         </sequenceFlow>
 
         <sequenceFlow id="flowExternalHelp" sourceRef="checkExecutiveDecision" targetRef="engageExternalConsultant">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${executiveDecision == 'external_help'}]]>
+                <![CDATA[${decision == 'escalate'}]]>
             </conditionExpression>
         </sequenceFlow>
 
