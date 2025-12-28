@@ -35,12 +35,28 @@
 
         <!-- User Task: Claim Task (for unassigned tasks) -->
         <userTask id="claimTask" name="Claim Task"
-                  flowable:candidateGroups="users,supervisors,executives"
+                  flowable:candidateGroups="users,supervisors,managers,directors,executives"
                   flowable:formKey="claim-task-form">
             <documentation>Task available for claiming: ${title}</documentation>
         </userTask>
 
-        <sequenceFlow id="flow2" sourceRef="claimTask" targetRef="workOnTask"/>
+        <sequenceFlow id="flow2" sourceRef="claimTask" targetRef="recordTaskClaimer"/>
+
+        <!-- Script Task: Record who claimed the task -->
+        <scriptTask id="recordTaskClaimer" name="Record Task Claimer"
+                    scriptFormat="javascript" flowable:autoStoreVariables="true">
+            <script>
+                <![CDATA[
+                // The person who completed claimTask becomes the assignee for workOnTask
+                var claimer = execution.getVariable('completedBy');
+                if (claimer) {
+                    execution.setVariable('assignee', claimer);
+                }
+                ]]>
+            </script>
+        </scriptTask>
+
+        <sequenceFlow id="flow2b" sourceRef="recordTaskClaimer" targetRef="workOnTask"/>
 
         <!-- User Task: Work on Task -->
         <userTask id="workOnTask" name="Complete Task"

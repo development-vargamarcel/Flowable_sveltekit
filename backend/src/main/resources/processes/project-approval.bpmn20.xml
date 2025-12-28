@@ -441,7 +441,7 @@
 
         <sequenceFlow id="flowExecSendBack" sourceRef="checkExecFinalDecision" targetRef="resetForReview">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${decision == 'send_back'}]]>
+                <![CDATA[${decision == 'request_changes'}]]>
             </conditionExpression>
         </sequenceFlow>
 

@@ -71,7 +71,7 @@
 
         <sequenceFlow id="flowRecommend" sourceRef="checkReviewDecision" targetRef="executiveApproval">
             <conditionExpression xsi:type="tFormalExpression">
-                <![CDATA[${decision == 'recommend'}]]>
+                <![CDATA[${decision == 'approved'}]]>
             </conditionExpression>
         </sequenceFlow>
 
