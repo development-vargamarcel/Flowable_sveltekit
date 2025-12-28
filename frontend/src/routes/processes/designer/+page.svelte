@@ -1307,9 +1307,11 @@
       // Skip collapsed subprocesses for internal validation
       if (isCollapsedSubProcess(element)) continue;
 
-      // Get connections
-      const incoming = bo?.incoming || [];
-      const outgoing = bo?.outgoing || [];
+      // Get connections from diagram element (not business object)
+      // element.incoming/outgoing contains actual visual connections in the diagram
+      // bo.incoming/outgoing may be out of sync with visual state
+      const incoming = element.incoming || [];
+      const outgoing = element.outgoing || [];
 
       // Connection validation for flow elements
       const requiresIncoming = !noIncomingRequired.has(type);
@@ -1379,12 +1381,14 @@
 
       // Check exclusive gateways for conditions (warning, not error)
       if (type === 'bpmn:ExclusiveGateway') {
-        const gatewayOutgoing = bo?.outgoing || [];
+        // Use visual outgoing connections from element
+        const gatewayOutgoing = element.outgoing || [];
         if (gatewayOutgoing.length > 1) {
           const hasDefault = bo?.default;
-          const flowsWithConditions = gatewayOutgoing.filter((flow: any) =>
-            flow.conditionExpression || flow === hasDefault
-          );
+          const flowsWithConditions = gatewayOutgoing.filter((conn: any) => {
+            const flowBo = conn.businessObject;
+            return flowBo?.conditionExpression || flowBo === hasDefault;
+          });
           if (flowsWithConditions.length !== gatewayOutgoing.length) {
             warnings.push(`Exclusive Gateway "${bo?.name || bo?.id}" has flows without conditions`);
           }
@@ -1393,12 +1397,14 @@
 
       // Check inclusive gateways for conditions (warning, not error)
       if (type === 'bpmn:InclusiveGateway') {
-        const gatewayOutgoing = bo?.outgoing || [];
+        // Use visual outgoing connections from element
+        const gatewayOutgoing = element.outgoing || [];
         if (gatewayOutgoing.length > 1) {
           const hasDefault = bo?.default;
-          const flowsWithConditions = gatewayOutgoing.filter((flow: any) =>
-            flow.conditionExpression || flow === hasDefault
-          );
+          const flowsWithConditions = gatewayOutgoing.filter((conn: any) => {
+            const flowBo = conn.businessObject;
+            return flowBo?.conditionExpression || flowBo === hasDefault;
+          });
           if (flowsWithConditions.length !== gatewayOutgoing.length) {
             warnings.push(`Inclusive Gateway "${bo?.name || bo?.id}" has flows without conditions`);
           }
