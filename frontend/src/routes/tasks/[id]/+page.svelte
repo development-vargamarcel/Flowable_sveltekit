@@ -162,6 +162,32 @@
 			.replace(/^./, str => str.toUpperCase())
 			.trim();
 	}
+
+	function isLineItems(key: string, value: unknown): boolean {
+		if (typeof value !== 'string') return false;
+		if (!key.toLowerCase().includes('lineitem')) return false;
+		try {
+			const parsed = JSON.parse(value);
+			return Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object';
+		} catch {
+			return false;
+		}
+	}
+
+	function parseLineItems(value: string): Array<Record<string, unknown>> {
+		try {
+			return JSON.parse(value);
+		} catch {
+			return [];
+		}
+	}
+
+	function formatCurrency(value: unknown): string {
+		if (typeof value === 'number') {
+			return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+		}
+		return String(value);
+	}
 </script>
 
 <svelte:head>
@@ -225,10 +251,52 @@
 			<div class="grid grid-cols-2 gap-4">
 				{#each Object.entries(taskDetails.variables) as [key, value]}
 					{#if !['decision', 'comments', 'completedBy', 'completedAt', 'initiator', 'startedBy', 'startedAt'].includes(key)}
-						<div class="py-2 border-b border-gray-100">
-							<dt class="text-sm text-gray-500">{formatLabel(key)}</dt>
-							<dd class="text-gray-900 font-medium">{formatValue(key, value)}</dd>
-						</div>
+						{#if isLineItems(key, value)}
+							<!-- Line Items Grid Display -->
+							<div class="col-span-2 py-2 border-b border-gray-100">
+								<dt class="text-sm text-gray-500 mb-3">{formatLabel(key)}</dt>
+								<dd>
+									{@const items = parseLineItems(value as string)}
+									{#if items.length > 0}
+										<div class="overflow-x-auto">
+											<table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+												<thead class="bg-gray-50">
+													<tr>
+														{#each Object.keys(items[0]) as column}
+															<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+																{formatLabel(column)}
+															</th>
+														{/each}
+													</tr>
+												</thead>
+												<tbody class="bg-white divide-y divide-gray-200">
+													{#each items as item}
+														<tr>
+															{#each Object.entries(item) as [col, val]}
+																<td class="px-4 py-3 text-sm text-gray-900">
+																	{#if col.toLowerCase().includes('amount')}
+																		{formatCurrency(val)}
+																	{:else}
+																		{val || '-'}
+																	{/if}
+																</td>
+															{/each}
+														</tr>
+													{/each}
+												</tbody>
+											</table>
+										</div>
+									{:else}
+										<p class="text-gray-500 text-sm">No items</p>
+									{/if}
+								</dd>
+							</div>
+						{:else}
+							<div class="py-2 border-b border-gray-100">
+								<dt class="text-sm text-gray-500">{formatLabel(key)}</dt>
+								<dd class="text-gray-900 font-medium">{formatValue(key, value)}</dd>
+							</div>
+						{/if}
 					{/if}
 				{/each}
 			</div>
