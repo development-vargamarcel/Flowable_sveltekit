@@ -218,8 +218,8 @@
 				</div>
 
 				<!-- Project Type -->
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-2">Project Type *</label>
+				<div role="group" aria-labelledby="project-type-label">
+					<span id="project-type-label" class="block text-sm font-medium text-gray-700 mb-2">Project Type *</span>
 					<div class="grid grid-cols-1 gap-2">
 						{#each projectTypes as type}
 							<label
