@@ -131,7 +131,7 @@ startsecs=0
 priority=10
 
 [program:backend]
-command=java -XX:+UseContainerSupport -XX:MaxRAMPercentage=40.0 -XX:InitialRAMPercentage=25.0 -XX:MaxMetaspaceSize=96m -XX:CompressedClassSpaceSize=32m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -XX:+AlwaysPreTouch -Xss256k -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8081 -jar /app/app.jar
+command=java -XX:+UseContainerSupport -Xms32m -Xmx128m -XX:MaxMetaspaceSize=64m -XX:CompressedClassSpaceSize=24m -XX:ReservedCodeCacheSize=24m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss256k -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8081 -jar /app/app.jar
 directory=/app
 autostart=true
 autorestart=true
