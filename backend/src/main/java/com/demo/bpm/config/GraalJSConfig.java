@@ -8,7 +8,6 @@ import org.springframework.core.annotation.Order;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
 import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
 import java.util.List;
 
 /**
@@ -33,83 +32,118 @@ public class GraalJSConfig {
     public void verifyAndConfigureGraalJS() {
         log.info("Verifying GraalVM JavaScript engine availability...");
 
-        // Use thread context classloader to ensure proper resolution in Spring Boot
-        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-        ScriptEngineManager manager = new ScriptEngineManager(contextClassLoader);
+        try {
+            // Use thread context classloader to ensure proper resolution in Spring Boot
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            ScriptEngineManager manager = new ScriptEngineManager(contextClassLoader);
 
-        // Log all available script engines
-        logAvailableEngines(manager);
+            // Log all available script engines
+            logAvailableEngines(manager);
 
-        // Try to find JavaScript engine with multiple name attempts
-        ScriptEngine engine = findJavaScriptEngine(manager);
+            // Try to find JavaScript engine with multiple name attempts
+            ScriptEngine engine = findJavaScriptEngine(manager);
 
-        if (engine != null) {
-            log.info("GraalVM JavaScript engine successfully loaded!");
-            log.info("  Engine Name: {}", engine.getFactory().getEngineName());
-            log.info("  Engine Version: {}", engine.getFactory().getEngineVersion());
-            log.info("  Language: {} v{}",
-                engine.getFactory().getLanguageName(),
-                engine.getFactory().getLanguageVersion());
+            if (engine != null) {
+                log.info("GraalVM JavaScript engine successfully loaded!");
+                try {
+                    log.info("  Engine Name: {}", engine.getFactory().getEngineName());
+                    log.info("  Engine Version: {}", engine.getFactory().getEngineVersion());
+                    log.info("  Language: {} v{}",
+                        engine.getFactory().getLanguageName(),
+                        engine.getFactory().getLanguageVersion());
+                } catch (Exception e) {
+                    log.warn("Could not retrieve engine details: {}", e.getMessage());
+                }
 
-            // Test the engine with a simple script
-            testEngineWithScript(engine);
-        } else {
-            log.error("========================================");
-            log.error("CRITICAL: JavaScript engine not found!");
-            log.error("BPMN script tasks will fail at runtime.");
-            log.error("========================================");
-            log.error("Troubleshooting steps:");
-            log.error("1. Ensure org.graalvm.polyglot:polyglot is in dependencies");
-            log.error("2. Ensure org.graalvm.polyglot:js-community is in dependencies");
-            log.error("3. Ensure org.graalvm.js:js-scriptengine is in dependencies");
-            log.error("4. Check that all dependencies use the same version (23.0.0)");
+                // Test the engine with a simple script
+                testEngineWithScript(engine);
+            } else {
+                log.warn("========================================");
+                log.warn("JavaScript engine not found!");
+                log.warn("BPMN script tasks may fail at runtime.");
+                log.warn("========================================");
+                log.warn("Troubleshooting steps:");
+                log.warn("1. Ensure org.graalvm.js:js is in dependencies");
+                log.warn("2. Ensure org.graalvm.js:js-scriptengine is in dependencies");
+                log.warn("3. Ensure org.graalvm.sdk:graal-sdk is in dependencies");
+                log.warn("4. Check that all dependencies use the same version (22.3.3)");
+            }
+        } catch (Exception e) {
+            // Don't fail application startup - JavaScript engine may still work at runtime
+            log.warn("Error during JavaScript engine verification (app will continue): {}", e.getMessage());
+            log.debug("Full stack trace:", e);
         }
     }
 
     private void logAvailableEngines(ScriptEngineManager manager) {
-        List<ScriptEngineFactory> factories = manager.getEngineFactories();
-        if (factories.isEmpty()) {
-            log.warn("No script engines found in ScriptEngineManager!");
-        } else {
-            log.info("Available script engines ({}):", factories.size());
-            for (ScriptEngineFactory factory : factories) {
-                log.info("  - {} v{} [names: {}, extensions: {}]",
-                    factory.getEngineName(),
-                    factory.getEngineVersion(),
-                    factory.getNames(),
-                    factory.getExtensions());
+        try {
+            List<ScriptEngineFactory> factories = manager.getEngineFactories();
+            if (factories.isEmpty()) {
+                log.warn("No script engines found in ScriptEngineManager!");
+            } else {
+                log.info("Available script engines ({}):", factories.size());
+                for (ScriptEngineFactory factory : factories) {
+                    try {
+                        log.info("  - {} v{} [names: {}, extensions: {}]",
+                            factory.getEngineName(),
+                            factory.getEngineVersion(),
+                            factory.getNames(),
+                            factory.getExtensions());
+                    } catch (Exception e) {
+                        log.info("  - (engine details unavailable: {})", e.getMessage());
+                    }
+                }
             }
+        } catch (Exception e) {
+            log.warn("Could not enumerate script engines: {}", e.getMessage());
         }
     }
 
     private ScriptEngine findJavaScriptEngine(ScriptEngineManager manager) {
+        // Try by name
         for (String name : JS_ENGINE_NAMES) {
-            ScriptEngine engine = manager.getEngineByName(name);
-            if (engine != null) {
-                log.info("Found JavaScript engine using name: '{}'", name);
+            try {
+                ScriptEngine engine = manager.getEngineByName(name);
+                if (engine != null) {
+                    log.info("Found JavaScript engine using name: '{}'", name);
 
-                // Ensure 'javascript' name is registered if it wasn't
-                if (!"javascript".equals(name)) {
-                    log.info("Registering engine under 'javascript' name");
-                    manager.registerEngineName("javascript", engine.getFactory());
+                    // Ensure 'javascript' name is registered if it wasn't
+                    if (!"javascript".equals(name)) {
+                        try {
+                            log.info("Registering engine under 'javascript' name");
+                            manager.registerEngineName("javascript", engine.getFactory());
+                        } catch (Exception e) {
+                            log.debug("Could not register engine under 'javascript' name: {}", e.getMessage());
+                        }
+                    }
+
+                    return engine;
                 }
-
-                return engine;
+            } catch (Exception e) {
+                log.debug("Error trying engine name '{}': {}", name, e.getMessage());
             }
         }
 
         // Try by MIME type
-        ScriptEngine engine = manager.getEngineByMimeType("application/javascript");
-        if (engine != null) {
-            log.info("Found JavaScript engine using MIME type");
-            return engine;
+        try {
+            ScriptEngine engine = manager.getEngineByMimeType("application/javascript");
+            if (engine != null) {
+                log.info("Found JavaScript engine using MIME type");
+                return engine;
+            }
+        } catch (Exception e) {
+            log.debug("Error trying MIME type lookup: {}", e.getMessage());
         }
 
         // Try by extension
-        engine = manager.getEngineByExtension("js");
-        if (engine != null) {
-            log.info("Found JavaScript engine using extension");
-            return engine;
+        try {
+            ScriptEngine engine = manager.getEngineByExtension("js");
+            if (engine != null) {
+                log.info("Found JavaScript engine using extension");
+                return engine;
+            }
+        } catch (Exception e) {
+            log.debug("Error trying extension lookup: {}", e.getMessage());
         }
 
         return null;
@@ -127,9 +161,9 @@ public class GraalJSConfig {
             log.info("JavaScript engine Java interop test: {}", retrieved);
 
             log.info("JavaScript engine is fully operational!");
-        } catch (ScriptException e) {
-            log.error("JavaScript engine test failed: {}", e.getMessage());
-            log.error("Script tasks may not work correctly", e);
+        } catch (Exception e) {
+            log.warn("JavaScript engine test failed: {}", e.getMessage());
+            log.debug("Script tasks may not work correctly", e);
         }
     }
 }
