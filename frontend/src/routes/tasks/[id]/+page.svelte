@@ -256,9 +256,8 @@
 							<div class="col-span-2 py-2 border-b border-gray-100">
 								<dt class="text-sm text-gray-500 mb-3">{formatLabel(key)}</dt>
 								<dd>
-									<svelte:fragment>
-										{@const items = parseLineItems(value as string)}
-										{#if items.length > 0}
+									{@const items = parseLineItems(value as string)}
+									{#if items.length > 0}
 											<div class="overflow-x-auto">
 												<table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
 													<thead class="bg-gray-50">
@@ -287,10 +286,9 @@
 													</tbody>
 												</table>
 											</div>
-										{:else}
-											<p class="text-gray-500 text-sm">No items</p>
-										{/if}
-									</svelte:fragment>
+									{:else}
+										<p class="text-gray-500 text-sm">No items</p>
+									{/if}
 								</dd>
 							</div>
 						{:else}
