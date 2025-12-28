@@ -2,31 +2,32 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
 	import Toast from '$lib/components/Toast.svelte';
-	import { rules, validateField } from '$lib/utils/validation';
+	import {
+		rules,
+		validateField,
+		validateAllFormFields,
+		getInputClasses,
+		type ValidationRule
+	} from '$lib/utils/form-helpers';
 
+	// Form values
 	let amount = $state<number | null>(null);
 	let category = $state('');
 	let description = $state('');
+
+	// Form state
 	let submitting = $state(false);
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 	const touched = $state<Record<string, boolean>>({});
 	const fieldErrors = $state<Record<string, string | null>>({});
 
-	const categories = [
-		'Travel',
-		'Office Supplies',
-		'Meals',
-		'Equipment',
-		'Software',
-		'Training',
-		'Other'
-	];
-
+	// Constants
+	const categories = ['Travel', 'Office Supplies', 'Meals', 'Equipment', 'Software', 'Training', 'Other'];
 	const MAX_AMOUNT = 100000;
 	const MAX_DESCRIPTION_LENGTH = 1000;
 
 	// Validation rules
-	const validationRules = {
+	const validationRules: Record<string, ValidationRule[]> = {
 		amount: [
 			rules.required('Please enter an amount'),
 			rules.positive('Amount must be greater than zero'),
@@ -42,27 +43,12 @@
 
 	function validateFieldOnBlur(field: string, value: unknown) {
 		touched[field] = true;
-		const fieldRules = validationRules[field as keyof typeof validationRules];
-		if (fieldRules) {
-			fieldErrors[field] = validateField(value, fieldRules);
-		}
+		fieldErrors[field] = validateField(value, validationRules[field] || []);
 	}
 
 	function validateAllFields(): boolean {
-		const fields = { amount, category, description };
-		let isValid = true;
-
-		for (const [field, value] of Object.entries(fields)) {
-			touched[field] = true;
-			const fieldRules = validationRules[field as keyof typeof validationRules];
-			if (fieldRules) {
-				const error = validateField(value, fieldRules);
-				fieldErrors[field] = error;
-				if (error) isValid = false;
-			}
-		}
-
-		return isValid;
+		const values = { amount, category, description };
+		return validateAllFormFields(values, validationRules, touched, fieldErrors);
 	}
 
 	async function handleSubmit(event: Event) {
@@ -85,10 +71,7 @@
 			toast = { message: 'Expense submitted successfully!', type: 'success' };
 			setTimeout(() => goto('/'), 1500);
 		} catch (err) {
-			toast = {
-				message: err instanceof Error ? err.message : 'Failed to submit expense',
-				type: 'error'
-			};
+			toast = { message: err instanceof Error ? err.message : 'Failed to submit expense', type: 'error' };
 		} finally {
 			submitting = false;
 		}
@@ -104,26 +87,16 @@
 {/if}
 
 <div class="max-w-2xl mx-auto px-4 py-8">
-	<a
-		href="/processes"
-		class="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
-	>
+	<a href="/processes" class="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6">
 		<svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M15 19l-7-7 7-7"
-			/>
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
 		</svg>
 		Back to Processes
 	</a>
 
 	<div class="card">
 		<div class="flex items-center space-x-4 mb-6">
-			<div
-				class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center text-white text-2xl"
-			>
+			<div class="w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center text-white text-2xl">
 				$
 			</div>
 			<div>
@@ -150,7 +123,7 @@
 					max={MAX_AMOUNT}
 					bind:value={amount}
 					onblur={() => validateFieldOnBlur('amount', amount)}
-					class="input {touched.amount && fieldErrors.amount ? 'border-red-500 focus:ring-red-500' : ''}"
+					class="input {getInputClasses(touched.amount, fieldErrors.amount)}"
 					placeholder="0.00"
 					aria-describedby={fieldErrors.amount ? 'amount-error' : undefined}
 					aria-invalid={touched.amount && !!fieldErrors.amount}
@@ -166,7 +139,7 @@
 					id="category"
 					bind:value={category}
 					onblur={() => validateFieldOnBlur('category', category)}
-					class="input {touched.category && fieldErrors.category ? 'border-red-500 focus:ring-red-500' : ''}"
+					class="input {getInputClasses(touched.category, fieldErrors.category)}"
 					aria-describedby={fieldErrors.category ? 'category-error' : undefined}
 					aria-invalid={touched.category && !!fieldErrors.category}
 				>
@@ -188,7 +161,7 @@
 					onblur={() => validateFieldOnBlur('description', description)}
 					rows="3"
 					maxlength={MAX_DESCRIPTION_LENGTH}
-					class="input {touched.description && fieldErrors.description ? 'border-red-500 focus:ring-red-500' : ''}"
+					class="input {getInputClasses(touched.description, fieldErrors.description)}"
 					placeholder="Describe the expense (minimum 10 characters)..."
 					aria-describedby={fieldErrors.description ? 'description-error' : 'description-hint'}
 					aria-invalid={touched.description && !!fieldErrors.description}
@@ -197,13 +170,9 @@
 					{#if touched.description && fieldErrors.description}
 						<p id="description-error" class="text-sm text-red-600">{fieldErrors.description}</p>
 					{:else}
-						<p id="description-hint" class="text-sm text-gray-500">
-							Minimum 10 characters required
-						</p>
+						<p id="description-hint" class="text-sm text-gray-500">Minimum 10 characters required</p>
 					{/if}
-					<span class="text-sm text-gray-400">
-						{description.length}/{MAX_DESCRIPTION_LENGTH}
-					</span>
+					<span class="text-sm text-gray-400">{description.length}/{MAX_DESCRIPTION_LENGTH}</span>
 				</div>
 			</div>
 

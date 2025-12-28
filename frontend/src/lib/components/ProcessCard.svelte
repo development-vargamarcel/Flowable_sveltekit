@@ -1,55 +1,23 @@
 <script lang="ts">
+	import { getProcessCardHoverClasses, getIconBgClass, type ColorName } from '$lib/utils/theme';
+
 	interface Props {
 		title: string;
 		description: string;
 		icon: string;
-		color: string;
+		color: ColorName;
 		href: string;
 	}
 
 	const { title, description, icon, color, href }: Props = $props();
-
-	function getColorClasses(color: string): string {
-		switch (color) {
-			case 'green':
-				return 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100';
-			case 'blue':
-				return 'bg-sky-50 border-sky-200 hover:bg-sky-100';
-			case 'amber':
-				return 'bg-amber-50 border-amber-200 hover:bg-amber-100';
-			case 'purple':
-				return 'bg-purple-50 border-purple-200 hover:bg-purple-100';
-			case 'indigo':
-				return 'bg-indigo-50 border-indigo-200 hover:bg-indigo-100';
-			default:
-				return 'bg-gray-50 border-gray-200 hover:bg-gray-100';
-		}
-	}
-
-	function getIconColorClasses(color: string): string {
-		switch (color) {
-			case 'green':
-				return 'bg-emerald-500';
-			case 'blue':
-				return 'bg-sky-500';
-			case 'amber':
-				return 'bg-amber-500';
-			case 'purple':
-				return 'bg-purple-500';
-			case 'indigo':
-				return 'bg-indigo-500';
-			default:
-				return 'bg-gray-500';
-		}
-	}
 </script>
 
 <a
 	{href}
-	class="block card border-2 transition-all {getColorClasses(color)}"
+	class="block card border-2 transition-all {getProcessCardHoverClasses(color)}"
 >
 	<div class="flex items-start space-x-4">
-		<div class="w-12 h-12 rounded-lg flex items-center justify-center text-white text-2xl {getIconColorClasses(color)}">
+		<div class="w-12 h-12 rounded-lg flex items-center justify-center text-white text-2xl {getIconBgClass(color)}">
 			{icon}
 		</div>
 		<div class="flex-1">
