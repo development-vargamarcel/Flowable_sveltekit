@@ -71,12 +71,6 @@
             <artifactId>truffle-api</artifactId>
             <version>23.1.1</version>
         </dependency>
-        <!-- GraalVM JavaScript implementation -->
-        <dependency>
-            <groupId>org.graalvm.js</groupId>
-            <artifactId>js</artifactId>
-            <version>23.1.1</version>
-        </dependency>
         <!-- JSR-223 ScriptEngine bridge for GraalVM JS (CRITICAL for javax.script support) -->
         <dependency>
             <groupId>org.graalvm.js</groupId>
