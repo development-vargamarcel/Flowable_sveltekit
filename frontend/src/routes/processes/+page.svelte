@@ -12,6 +12,25 @@
 		<p class="text-gray-600 mt-1">Select a workflow to begin</p>
 	</div>
 
+	<h2 class="text-lg font-semibold text-gray-800 mb-4">Process Management</h2>
+	<div class="grid gap-4 mb-8">
+		<ProcessCard
+			title="Process Designer"
+			description="Create and deploy custom BPMN processes using the visual process builder"
+			icon="🎨"
+			color="purple"
+			href="/processes/designer"
+		/>
+
+		<ProcessCard
+			title="Manage Processes"
+			description="View, edit, and manage all deployed process definitions"
+			icon="⚙️"
+			color="indigo"
+			href="/processes/manage"
+		/>
+	</div>
+
 	<h2 class="text-lg font-semibold text-gray-800 mb-4">Advanced Multi-Step Workflows</h2>
 	<div class="grid gap-4 mb-8">
 		<ProcessCard

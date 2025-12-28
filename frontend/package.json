@@ -56,5 +56,8 @@
     "*.{json,md,css,html}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "bpmn-js": "^18.9.1"
   }
 }

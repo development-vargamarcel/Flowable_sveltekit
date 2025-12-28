@@ -126,4 +126,63 @@ public class ProcessService {
                 .version(definition.getVersion())
                 .build();
     }
+
+    @Transactional
+    public ProcessDTO deployProcess(String processName, String bpmnXml) {
+        try {
+            String deploymentName = processName + "-" + System.currentTimeMillis();
+
+            org.flowable.engine.repository.Deployment deployment = repositoryService
+                    .createDeployment()
+                    .name(deploymentName)
+                    .addString(processName + ".bpmn20.xml", bpmnXml)
+                    .deploy();
+
+            log.info("Deployed process definition: {}", deploymentName);
+
+            // Get the deployed process definition
+            ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
+                    .deploymentId(deployment.getId())
+                    .singleResult();
+
+            return convertToDTO(definition);
+        } catch (Exception e) {
+            log.error("Error deploying process: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to deploy process: " + e.getMessage(), e);
+        }
+    }
+
+    public void deleteProcessDefinition(String processDefinitionId, boolean cascade) {
+        try {
+            repositoryService.deleteDeployment(
+                    repositoryService.createProcessDefinitionQuery()
+                            .processDefinitionId(processDefinitionId)
+                            .singleResult()
+                            .getDeploymentId(),
+                    cascade
+            );
+            log.info("Deleted process definition: {}", processDefinitionId);
+        } catch (Exception e) {
+            log.error("Error deleting process: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to delete process: " + e.getMessage(), e);
+        }
+    }
+
+    public String getProcessDefinitionBpmn(String processDefinitionId) {
+        try {
+            ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
+                    .processDefinitionId(processDefinitionId)
+                    .singleResult();
+
+            if (definition == null) {
+                throw new RuntimeException("Process definition not found: " + processDefinitionId);
+            }
+
+            java.io.InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId);
+            return new String(bpmnStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.error("Error retrieving BPMN for process: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to retrieve process BPMN: " + e.getMessage(), e);
+        }
+    }
 }

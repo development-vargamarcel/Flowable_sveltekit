@@ -526,5 +526,26 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ comments })
     });
+  },
+
+  // Process Management
+  async deployProcess(
+    processName: string,
+    bpmnXml: string
+  ): Promise<{ message: string; process: ProcessDefinition }> {
+    return fetchApi('/api/processes/deploy', {
+      method: 'POST',
+      body: JSON.stringify({ processName, bpmnXml })
+    });
+  },
+
+  async getProcessBpmn(processDefinitionId: string): Promise<{ bpmn: string }> {
+    return fetchApi(`/api/processes/${processDefinitionId}/bpmn`);
+  },
+
+  async deleteProcess(processDefinitionId: string, cascade: boolean = false): Promise<{ message: string }> {
+    return fetchApi(`/api/processes/${processDefinitionId}?cascade=${cascade}`, {
+      method: 'DELETE'
+    });
   }
 };

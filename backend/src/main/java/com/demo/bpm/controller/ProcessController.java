@@ -84,4 +84,68 @@ public class ProcessController {
     public ResponseEntity<?> getUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
+
+    @PostMapping("/deploy")
+    public ResponseEntity<?> deployProcess(@RequestBody Map<String, String> request) {
+        try {
+            String processName = request.get("processName");
+            String bpmnXml = request.get("bpmnXml");
+
+            if (processName == null || processName.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Process name is required"
+                ));
+            }
+
+            if (bpmnXml == null || bpmnXml.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "BPMN XML is required"
+                ));
+            }
+
+            ProcessDTO deployedProcess = processService.deployProcess(processName, bpmnXml);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Process deployed successfully",
+                    "process", deployedProcess
+            ));
+        } catch (Exception e) {
+            log.error("Error deploying process: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/{processDefinitionId}/bpmn")
+    public ResponseEntity<?> getProcessBpmn(@PathVariable String processDefinitionId) {
+        try {
+            String bpmnXml = processService.getProcessDefinitionBpmn(processDefinitionId);
+            return ResponseEntity.ok(Map.of(
+                    "bpmn", bpmnXml
+            ));
+        } catch (Exception e) {
+            log.error("Error retrieving BPMN: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/{processDefinitionId}")
+    public ResponseEntity<?> deleteProcess(
+            @PathVariable String processDefinitionId,
+            @RequestParam(defaultValue = "false") boolean cascade) {
+        try {
+            processService.deleteProcessDefinition(processDefinitionId, cascade);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Process definition deleted successfully"
+            ));
+        } catch (Exception e) {
+            log.error("Error deleting process: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
 }
