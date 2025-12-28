@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.repository.Deployment;
+import org.flowable.engine.repository.DeploymentBuilder;
 import org.flowable.engine.repository.ProcessDefinition;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
@@ -47,7 +48,7 @@ public class ProcessDeploymentConfig {
             log.info("Found {} BPMN process file(s) to deploy", resources.length);
 
             // Create a single deployment for all processes
-            Deployment deployment = repositoryService.createDeployment()
+            DeploymentBuilder deployment = repositoryService.createDeployment()
                     .name("Application Processes - " + System.currentTimeMillis())
                     .enableDuplicateFiltering()
                     .category("application");
