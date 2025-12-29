@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import { validateField, type ValidationRule } from '$lib/utils/validation';
 	import * as Table from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
@@ -67,18 +66,13 @@
 		}
 	});
 
-	// Notify parent of data changes - only after user has made changes
-	// This prevents the grid from overwriting parent data before it's loaded
-	// Use untrack for onDataChange to prevent infinite loop when parent re-renders
-	// and creates a new function reference for the callback
-	$effect(() => {
-		if (userHasMadeChanges) {
-			const callback = untrack(() => onDataChange);
-			if (callback) {
-				callback(rows.map((row) => row.data));
-			}
+	// Helper function to notify parent of data changes
+	// Called explicitly after user actions to avoid reactive loops
+	function notifyDataChange() {
+		if (onDataChange) {
+			onDataChange(rows.map((row) => row.data));
 		}
-	});
+	}
 
 	function addRow() {
 		if (maxRows && rows.length >= maxRows) {
@@ -97,6 +91,7 @@
 
 		rows = [...rows, newRow];
 		userHasMadeChanges = true;
+		notifyDataChange();
 	}
 
 	function editRow(rowId: string) {
@@ -134,6 +129,7 @@
 
 		rows = rows.map((r) => (r.id === rowId ? { ...r, isEditing: false, errors: {} } : r));
 		userHasMadeChanges = true;
+		notifyDataChange();
 	}
 
 	function cancelEdit(rowId: string) {
@@ -150,6 +146,7 @@
 		if (isEmpty) {
 			rows = rows.filter((r) => r.id !== rowId);
 			userHasMadeChanges = true;
+			notifyDataChange();
 		} else {
 			rows = rows.map((r) => (r.id === rowId ? { ...r, isEditing: false, errors: {} } : r));
 		}
@@ -162,6 +159,7 @@
 
 		rows = rows.filter((row) => row.id !== rowId);
 		userHasMadeChanges = true;
+		notifyDataChange();
 	}
 
 	function getRowValue(row: GridRow, columnName: string): string {
