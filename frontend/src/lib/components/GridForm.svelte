@@ -41,21 +41,29 @@
 	}: Props = $props();
 
 	let rows = $state<GridRow[]>([]);
+	let dataLoadedFromProps = $state(false);
+	let userHasMadeChanges = $state(false);
 
-	// Initialize rows from initialData once
+	// Initialize rows from initialData when data becomes available
+	// This handles both immediate and late-arriving data (e.g., when parent's formValues is populated asynchronously)
 	$effect(() => {
-		if (rows.length === 0 && initialData.length > 0) {
+		// Only load data from props once, when it first becomes available
+		// Also skip if user has already made changes (prevents infinite loop when parent echoes back our changes)
+		if (!dataLoadedFromProps && !userHasMadeChanges && initialData.length > 0) {
 			rows = initialData.map((data) => ({
 				id: crypto.randomUUID(),
 				data: { ...data },
 				isEditing: false,
 				errors: {}
 			}));
+			dataLoadedFromProps = true;
 		}
 	});
 
+	// Notify parent of data changes - only after user has made changes
+	// This prevents the grid from overwriting parent data before it's loaded
 	$effect(() => {
-		if (onDataChange) {
+		if (onDataChange && userHasMadeChanges) {
 			onDataChange(rows.map((row) => row.data));
 		}
 	});
@@ -76,6 +84,7 @@
 		};
 
 		rows = [...rows, newRow];
+		userHasMadeChanges = true;
 	}
 
 	function editRow(rowId: string) {
@@ -112,6 +121,7 @@
 		}
 
 		rows = rows.map((r) => (r.id === rowId ? { ...r, isEditing: false, errors: {} } : r));
+		userHasMadeChanges = true;
 	}
 
 	function cancelEdit(rowId: string) {
@@ -127,6 +137,7 @@
 
 		if (isEmpty) {
 			rows = rows.filter((r) => r.id !== rowId);
+			userHasMadeChanges = true;
 		} else {
 			rows = rows.map((r) => (r.id === rowId ? { ...r, isEditing: false, errors: {} } : r));
 		}
@@ -138,6 +149,7 @@
 		}
 
 		rows = rows.filter((row) => row.id !== rowId);
+		userHasMadeChanges = true;
 	}
 
 	function getRowValue(row: GridRow, columnName: string): string {
