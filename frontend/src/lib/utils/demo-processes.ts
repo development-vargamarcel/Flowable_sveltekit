@@ -701,7 +701,7 @@ execution.setVariable('hasHighPriceItem', hasHighPriceItem);
       <bpmn:outgoing>Flow_4</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:userTask id="standardProcessing" name="Standard Processing" flowable:candidateGroups="sales">
-      <bpmn:documentation>Process standard order (all items price <= 10)</bpmn:documentation>
+      <bpmn:documentation>Process standard order (all items price ≤ 10)</bpmn:documentation>
       <bpmn:incoming>Flow_standard</bpmn:incoming>
       <bpmn:outgoing>Flow_5</bpmn:outgoing>
     </bpmn:userTask>
@@ -717,7 +717,7 @@ execution.setVariable('hasHighPriceItem', hasHighPriceItem);
     <bpmn:sequenceFlow id="Flow_highValue" name="Price > 10" sourceRef="priceCheckGateway" targetRef="highValueProcessing">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">\${hasHighPriceItem == true}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_standard" name="All Prices <= 10" sourceRef="priceCheckGateway" targetRef="standardProcessing">
+    <bpmn:sequenceFlow id="Flow_standard" name="All Prices ≤ 10" sourceRef="priceCheckGateway" targetRef="standardProcessing">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">\${hasHighPriceItem == false}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_4" sourceRef="highValueProcessing" targetRef="endHighValue"/>
