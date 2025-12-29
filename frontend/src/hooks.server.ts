@@ -1,4 +1,22 @@
+import * as Sentry from '@sentry/sveltekit';
 import type { Handle } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
+
+// Initialize Sentry for server-side error tracking
+// Set PUBLIC_SENTRY_DSN environment variable to enable Sentry
+const sentryDsn = process.env.PUBLIC_SENTRY_DSN;
+
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+
+    // Performance Monitoring
+    tracesSampleRate: 1.0, // Capture 100% of transactions
+
+    // Environment configuration
+    environment: process.env.NODE_ENV || 'development'
+  });
+}
 
 // Backend URL for server-side API proxying
 // For Netlify deployment: Set BACKEND_URL in Netlify dashboard (e.g., https://your-app.railway.app)
@@ -72,7 +90,7 @@ function buildErrorResponse(
   });
 }
 
-export const handle: Handle = async ({ event, resolve }) => {
+const customHandle: Handle = async ({ event, resolve }) => {
   // Check if cookie header is too large and redirect to clear cookies page
   // This prevents the "Request headers too large" error
   const cookieHeader = event.request.headers.get('cookie') || '';
@@ -217,3 +235,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   return resolve(event);
 };
+
+// Combine Sentry's handle with our custom handle
+export const handle = sequence(Sentry.sentryHandle(), customHandle);
+
+// Export Sentry's handleError hook
+export const handleError = Sentry.handleErrorWithSentry();
