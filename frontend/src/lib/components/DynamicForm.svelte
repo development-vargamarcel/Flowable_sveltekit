@@ -26,12 +26,19 @@
 	// Local form values - initialized in $effect
 	let formValues = $state<Record<string, unknown>>({});
 	let fieldErrors = $state<Record<string, string>>({});
+	let formInitialized = $state(false);
+	let userHasMadeChanges = $state(false);
 
 	// Grid component references for validation
 	const gridRefs: Record<string, DynamicGrid> = {};
 
-	// Initialize form values from props and defaults
+	// Initialize form values from props and defaults - only once
+	// This prevents re-initialization from overwriting user changes
 	$effect(() => {
+		if (formInitialized || userHasMadeChanges) {
+			return;
+		}
+
 		const newValues = { ...values };
 
 		// Apply default values for fields that don't have a value
@@ -48,20 +55,25 @@
 		}
 
 		formValues = newValues;
+		formInitialized = true;
 	});
 
-	// Notify parent of value changes
+	// Notify parent of value changes - only after user has made changes
+	// This prevents the form from notifying parent during initialization
 	// Use untrack for onValuesChange to prevent infinite loop when parent re-renders
 	// and creates a new function reference for the callback
 	$effect(() => {
-		const callback = untrack(() => onValuesChange);
-		if (callback) {
-			callback(formValues);
+		if (userHasMadeChanges) {
+			const callback = untrack(() => onValuesChange);
+			if (callback) {
+				callback(formValues);
+			}
 		}
 	});
 
 	function handleFieldChange(fieldName: string, value: unknown) {
 		formValues = { ...formValues, [fieldName]: value };
+		userHasMadeChanges = true;
 		// Clear error when field is modified
 		if (fieldErrors[fieldName]) {
 			const { [fieldName]: _, ...rest } = fieldErrors;
@@ -71,6 +83,7 @@
 
 	function handleGridChange(gridName: string, data: Record<string, unknown>[]) {
 		formValues = { ...formValues, [gridName]: JSON.stringify(data) };
+		userHasMadeChanges = true;
 	}
 
 	function validateField(field: FormField, value: unknown): string | null {
@@ -171,6 +184,8 @@
 	export function reset() {
 		formValues = { ...values };
 		fieldErrors = {};
+		userHasMadeChanges = false;
+		formInitialized = false;
 	}
 
 	// Sort items by grid position for layout
