@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
+  import { processStore } from '$lib/stores/processes.svelte';
   import BpmnModeler from 'bpmn-js/lib/Modeler';
   import 'bpmn-js/dist/assets/diagram-js.css';
   import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
@@ -286,6 +287,71 @@
     );
   }
 
+  // Draft storage key for local storage
+  const DRAFT_STORAGE_KEY = 'bpmn-designer-draft';
+  let draftSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+  let _hasDraft = $state(false); // Prefixed: tracked for potential future UI usage
+
+  interface DraftData {
+    processName: string;
+    processDescription: string;
+    bpmnXml: string;
+    savedAt: number;
+  }
+
+  // Save draft to local storage (debounced)
+  function saveDraft() {
+    if (draftSaveTimeout) {
+      clearTimeout(draftSaveTimeout);
+    }
+
+    draftSaveTimeout = setTimeout(async () => {
+      if (!modeler || isEditMode) return; // Don't save drafts for edit mode
+
+      try {
+        const result = await modeler.saveXML({ format: true });
+        if (result.xml) {
+          const draft: DraftData = {
+            processName,
+            processDescription,
+            bpmnXml: result.xml,
+            savedAt: Date.now()
+          };
+          localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+          _hasDraft = true;
+        }
+      } catch (err) {
+        console.error('Failed to save draft:', err);
+      }
+    }, 2000); // Debounce: save 2 seconds after last change
+  }
+
+  // Load draft from local storage
+  function loadDraft(): DraftData | null {
+    try {
+      const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (stored) {
+        const draft = JSON.parse(stored) as DraftData;
+        // Only restore drafts less than 24 hours old
+        const MAX_DRAFT_AGE = 24 * 60 * 60 * 1000; // 24 hours
+        if (Date.now() - draft.savedAt < MAX_DRAFT_AGE) {
+          return draft;
+        }
+        // Draft too old, clear it
+        clearDraft();
+      }
+    } catch (err) {
+      console.error('Failed to load draft:', err);
+    }
+    return null;
+  }
+
+  // Clear draft from local storage
+  function clearDraft() {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    _hasDraft = false;
+  }
+
   onMount(async () => {
     // Check for edit mode from URL parameters
     const editParam = $page.url.searchParams.get('edit');
@@ -343,6 +409,13 @@
       }
     });
 
+    // Set up command stack change handler for auto-saving drafts
+    eventBus.on('commandStack.changed', () => {
+      if (!isEditMode) {
+        saveDraft();
+      }
+    });
+
     try {
       if (editParam || processDefId) {
         // Edit mode - load existing process with retry logic
@@ -381,8 +454,19 @@
         isLoading = false;
         loadRetryCount = 0;
       } else {
-        // New process mode
-        await modeler.importXML(defaultBpmn);
+        // New process mode - check for existing draft
+        const existingDraft = loadDraft();
+        if (existingDraft) {
+          _hasDraft = true;
+          processName = existingDraft.processName;
+          processDescription = existingDraft.processDescription;
+          await modeler.importXML(existingDraft.bpmnXml);
+          const savedDate = new Date(existingDraft.savedAt).toLocaleString();
+          success = `Draft restored from ${savedDate}`;
+          setTimeout(() => (success = ''), 4000);
+        } else {
+          await modeler.importXML(defaultBpmn);
+        }
       }
 
       const canvas = modeler.get('canvas');
@@ -397,7 +481,18 @@
       if (modeler) {
         modeler.destroy();
       }
+      // Clean up draft save timeout
+      if (draftSaveTimeout) {
+        clearTimeout(draftSaveTimeout);
+      }
     };
+  });
+
+  // Additional cleanup on component destroy
+  onDestroy(() => {
+    if (draftSaveTimeout) {
+      clearTimeout(draftSaveTimeout);
+    }
   });
 
   // Flag to prevent recursive updates
@@ -1487,10 +1582,22 @@
 
       success = response.message || 'Process deployed successfully!';
 
-      // Redirect to processes page after a short delay
+      // Update the process store with the new process and invalidate cache
+      // This ensures other components see the new process immediately
+      if (response.process) {
+        processStore.addDeployedProcess(response.process);
+      } else {
+        // If no process returned, just invalidate cache
+        processStore.invalidateDefinitions();
+      }
+
+      // Clear draft from local storage after successful deployment
+      clearDraft();
+
+      // Navigate to processes page after brief success message display
       setTimeout(() => {
-        goto('/processes');
-      }, 2000);
+        goto('/processes/manage');
+      }, 1500);
     } catch (err) {
       console.error('Deployment error:', err);
       error = err instanceof Error ? err.message : 'Failed to deploy process';

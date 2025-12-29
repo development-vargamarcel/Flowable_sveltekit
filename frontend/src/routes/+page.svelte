@@ -1,31 +1,48 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { processStore } from '$lib/stores/processes.svelte';
 	import TaskList from '$lib/components/TaskList.svelte';
 	import ProcessCard from '$lib/components/ProcessCard.svelte';
-	import type { Task, ProcessInstance } from '$lib/types';
+	import type { Task } from '$lib/types';
 
 	let tasks = $state<Task[]>([]);
-	let processes = $state<ProcessInstance[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 
+	// Subscribe to process changes for reactive updates
+	let unsubscribe: (() => void) | null = null;
+
+	// Use process instances from store
+	const processes = $derived(processStore.myInstances);
+
 	onMount(async () => {
+		// Subscribe to process changes from other components
+		unsubscribe = processStore.onProcessChange(() => {
+			// Force refresh when processes change elsewhere
+			loadData(true);
+		});
+
 		await loadData();
 	});
 
-	async function loadData() {
+	onDestroy(() => {
+		if (unsubscribe) {
+			unsubscribe();
+		}
+	});
+
+	async function loadData(forceRefresh = false) {
 		loading = true;
 		error = '';
 		try {
-			const [tasksData, processesData] = await Promise.all([
+			const [tasksData] = await Promise.all([
 				api.getTasks(),
-				api.getMyProcesses()
+				processStore.loadMyInstances(() => api.getMyProcesses(), forceRefresh)
 			]);
 			tasks = tasksData;
-			processes = processesData;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load data';
 		} finally {

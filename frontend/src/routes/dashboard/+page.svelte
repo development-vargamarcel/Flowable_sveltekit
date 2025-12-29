@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
-	import type { Dashboard, WorkflowHistory } from '$lib/types';
+	import { processStore } from '$lib/stores/processes.svelte';
+	import type { WorkflowHistory } from '$lib/types';
 	import ProcessTimeline from '$lib/components/ProcessTimeline.svelte';
 	import EscalationBadge from '$lib/components/EscalationBadge.svelte';
 
-	let dashboard = $state<Dashboard | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 	let activeTab = $state<'all' | 'active' | 'completed' | 'my-approvals'>('all');
@@ -14,15 +14,33 @@
 	let statusFilter = $state<string>('');
 	let typeFilter = $state<string>('');
 
+	// Subscribe to process changes for reactive updates
+	let unsubscribe: (() => void) | null = null;
+
+	// Use dashboard from store
+	const dashboard = $derived(processStore.dashboard);
+
 	onMount(async () => {
+		// Subscribe to process changes from other components
+		unsubscribe = processStore.onProcessChange(() => {
+			// Force refresh when processes change elsewhere
+			loadDashboard(true);
+		});
+
 		await loadDashboard();
 	});
 
-	async function loadDashboard() {
+	onDestroy(() => {
+		if (unsubscribe) {
+			unsubscribe();
+		}
+	});
+
+	async function loadDashboard(forceRefresh = false) {
 		loading = true;
 		error = '';
 		try {
-			dashboard = await api.getDashboard();
+			await processStore.loadDashboard(() => api.getDashboard(), forceRefresh);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load dashboard';
 		} finally {

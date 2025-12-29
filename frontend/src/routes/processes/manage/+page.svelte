@@ -1,24 +1,38 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
-  import type { ProcessDefinition } from '$lib/types';
-
-  let processes = $state<ProcessDefinition[]>([]);
+  import { processStore } from '$lib/stores/processes.svelte';
+  
   let isLoading = $state(true);
   let error = $state('');
   let success = $state('');
   let deleteConfirm = $state<string | null>(null);
 
+  // Subscribe to process changes for reactive updates
+  let unsubscribe: (() => void) | null = null;
+
   onMount(async () => {
+    // Subscribe to process changes from other components
+    unsubscribe = processStore.onProcessChange(() => {
+      // Force refresh when processes change elsewhere
+      loadProcesses(true);
+    });
+
     await loadProcesses();
   });
 
-  async function loadProcesses() {
+  onDestroy(() => {
+    if (unsubscribe) {
+      unsubscribe();
+    }
+  });
+
+  async function loadProcesses(forceRefresh = false) {
     isLoading = true;
     error = '';
     try {
-      processes = await api.getProcesses();
+      await processStore.loadDefinitions(() => api.getProcesses(), forceRefresh);
     } catch (err) {
       console.error('Error loading processes:', err);
       error = err instanceof Error ? err.message : 'Failed to load processes';
@@ -39,7 +53,10 @@
     try {
       await api.deleteProcess(processDefId, false);
       success = `Process "${processName}" deleted successfully`;
-      await loadProcesses();
+      // Update the store to remove the process and invalidate cache
+      processStore.removeProcess(processDefId);
+      // Force refresh to ensure we have latest data
+      await loadProcesses(true);
     } catch (err) {
       console.error('Error deleting process:', err);
       error = err instanceof Error ? err.message : 'Failed to delete process';
@@ -61,28 +78,8 @@
     deleteConfirm = null;
   }
 
-  // Group processes by key to show all versions
-  const groupedProcesses = $derived(() => {
-    const groups = new Map<string, ProcessDefinition[]>();
-
-    processes.forEach((process) => {
-      if (!groups.has(process.key)) {
-        groups.set(process.key, []);
-      }
-      groups.get(process.key)?.push(process);
-    });
-
-    // Sort versions within each group (highest version first)
-    groups.forEach((versions) => {
-      versions.sort((a, b) => (b.version || 0) - (a.version || 0));
-    });
-
-    return Array.from(groups.entries()).map(([key, versions]) => ({
-      key,
-      versions,
-      latest: versions[0]
-    }));
-  });
+  // Use the store's grouped definitions
+  const groupedProcesses = $derived(() => processStore.groupedDefinitions);
 </script>
 
 <svelte:head>
