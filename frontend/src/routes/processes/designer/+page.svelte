@@ -6,6 +6,7 @@
   import BpmnModeler from 'bpmn-js/lib/Modeler';
   import 'bpmn-js/dist/assets/diagram-js.css';
   import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
+  import { flowableModdle } from '$lib/utils/flowable-moddle';
 
   // Core modeler state
   let modelerContainer: HTMLDivElement;
@@ -297,7 +298,9 @@
         bindTo: document
       },
       additionalModules: [],
-      moddleExtensions: {}
+      moddleExtensions: {
+        flowable: flowableModdle
+      }
     });
 
     // Set up selection change handler for properties panel
