@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { validateField, type ValidationRule } from '$lib/utils/validation';
 
 	export interface GridColumn {
@@ -62,9 +63,14 @@
 
 	// Notify parent of data changes - only after user has made changes
 	// This prevents the grid from overwriting parent data before it's loaded
+	// Use untrack for onDataChange to prevent infinite loop when parent re-renders
+	// and creates a new function reference for the callback
 	$effect(() => {
-		if (onDataChange && userHasMadeChanges) {
-			onDataChange(rows.map((row) => row.data));
+		if (userHasMadeChanges) {
+			const callback = untrack(() => onDataChange);
+			if (callback) {
+				callback(rows.map((row) => row.data));
+			}
 		}
 	});
 
