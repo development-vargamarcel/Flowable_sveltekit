@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { validateField, type ValidationRule } from '$lib/utils/validation';
+	import * as Table from '$lib/components/ui/table';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import * as Select from '$lib/components/ui/select';
+	import { Plus } from 'lucide-svelte';
 
 	export interface GridColumn {
 		name: string;
@@ -164,6 +170,10 @@
 		return String(value);
 	}
 
+	function handleSelectChange(row: GridRow, columnName: string, value: string | undefined) {
+		row.data[columnName] = value ?? '';
+	}
+
 	export function getData(): Record<string, unknown>[] {
 		return rows.map((row) => row.data);
 	}
@@ -184,183 +194,167 @@
 	}
 </script>
 
-<div class="grid-form">
+<div class="w-full">
 	{#if label}
 		<div class="mb-4">
-			<h3 class="text-lg font-semibold text-gray-900">{label}</h3>
+			<h3 class="text-lg font-semibold">{label}</h3>
 			{#if description}
-				<p class="text-sm text-gray-600 mt-1">{description}</p>
+				<p class="text-sm text-muted-foreground mt-1">{description}</p>
 			{/if}
 		</div>
 	{/if}
 
-	<div class="overflow-x-auto">
-		<table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
-			<thead class="bg-gray-50">
-				<tr>
+	<div class="rounded-md border">
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
 					{#each columns as column}
-						<th
-							class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider"
-						>
+						<Table.Head>
 							{column.label}
 							{#if column.validation?.some((rule) => rule.message.includes('required'))}
-								<span class="text-red-500">*</span>
+								<span class="text-destructive">*</span>
 							{/if}
-						</th>
+						</Table.Head>
 					{/each}
-					<th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-						Actions
-					</th>
-				</tr>
-			</thead>
-			<tbody class="bg-white divide-y divide-gray-200">
+					<Table.Head class="text-right">Actions</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
 				{#if rows.length === 0}
-					<tr>
-						<td colspan={columns.length + 1} class="px-4 py-8 text-center text-gray-500">
+					<Table.Row>
+						<Table.Cell colspan={columns.length + 1} class="text-center py-8 text-muted-foreground">
 							No rows added yet. Click "Add Row" to get started.
-						</td>
-					</tr>
+						</Table.Cell>
+					</Table.Row>
 				{/if}
 
 				{#each rows as row (row.id)}
-					<tr class="hover:bg-gray-50">
+					<Table.Row>
 						{#each columns as column}
-							<td class="px-4 py-3">
+							<Table.Cell>
 								{#if row.isEditing}
-									<div>
+									<div class="space-y-1">
 										{#if column.type === 'select'}
-											<select
-												bind:value={row.data[column.name]}
-												class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 text-sm {row
-													.errors[column.name]
-													? 'border-red-500'
-													: 'border-gray-300'}"
+											<Select.Root
+												type="single"
+												value={String(row.data[column.name] ?? '')}
+												onValueChange={(v) => handleSelectChange(row, column.name, v)}
 											>
-												<option value="">Select...</option>
-												{#each column.options || [] as option}
-													<option value={option}>{option}</option>
-												{/each}
-											</select>
+												<Select.Trigger class={row.errors[column.name] ? 'border-destructive' : ''}>
+													<Select.Value placeholder="Select..." />
+												</Select.Trigger>
+												<Select.Content>
+													{#each column.options || [] as option}
+														<Select.Item value={option} label={option} />
+													{/each}
+												</Select.Content>
+											</Select.Root>
 										{:else if column.type === 'textarea'}
-											<textarea
-												bind:value={row.data[column.name]}
-												rows="2"
+											<Textarea
+												bind:value={
+													() => String(row.data[column.name] ?? ''),
+													(v) => (row.data[column.name] = v)
+												}
+												rows={2}
 												placeholder={column.placeholder}
-												class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 text-sm {row
-													.errors[column.name]
-													? 'border-red-500'
-													: 'border-gray-300'}"
-											></textarea>
+												class={row.errors[column.name] ? 'border-destructive' : ''}
+											/>
 										{:else if column.type === 'number'}
-											<input
+											<Input
 												type="number"
-												bind:value={row.data[column.name]}
+												value={row.data[column.name] !== null && row.data[column.name] !== undefined ? String(row.data[column.name]) : ''}
+												oninput={(e) => {
+													const val = e.currentTarget.value;
+													row.data[column.name] = val === '' ? null : Number(val);
+												}}
 												min={column.min}
 												max={column.max}
 												step={column.step}
 												placeholder={column.placeholder}
-												class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 text-sm {row
-													.errors[column.name]
-													? 'border-red-500'
-													: 'border-gray-300'}"
+												class={row.errors[column.name] ? 'border-destructive' : ''}
 											/>
 										{:else if column.type === 'date'}
-											<input
+											<Input
 												type="date"
-												bind:value={row.data[column.name]}
-												class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 text-sm {row
-													.errors[column.name]
-													? 'border-red-500'
-													: 'border-gray-300'}"
+												value={String(row.data[column.name] ?? '')}
+												oninput={(e) => (row.data[column.name] = e.currentTarget.value)}
+												class={row.errors[column.name] ? 'border-destructive' : ''}
 											/>
 										{:else}
-											<input
+											<Input
 												type="text"
-												bind:value={row.data[column.name]}
+												value={String(row.data[column.name] ?? '')}
+												oninput={(e) => (row.data[column.name] = e.currentTarget.value)}
 												placeholder={column.placeholder}
-												class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 text-sm {row
-													.errors[column.name]
-													? 'border-red-500'
-													: 'border-gray-300'}"
+												class={row.errors[column.name] ? 'border-destructive' : ''}
 											/>
 										{/if}
 										{#if row.errors[column.name]}
-											<p class="text-xs text-red-600 mt-1">{row.errors[column.name]}</p>
+											<p class="text-xs text-destructive">{row.errors[column.name]}</p>
 										{/if}
 									</div>
 								{:else}
-									<div class="text-sm text-gray-900">
+									<span class="text-sm">
 										{getRowValue(row, column.name) || '-'}
-									</div>
+									</span>
 								{/if}
-							</td>
+							</Table.Cell>
 						{/each}
-						<td class="px-4 py-3">
-							<div class="flex justify-end space-x-2">
+						<Table.Cell class="text-right">
+							<div class="flex justify-end gap-2">
 								{#if row.isEditing}
-									<button
-										type="button"
+									<Button
+										variant="ghost"
+										size="sm"
 										onclick={() => saveRow(row.id)}
-										class="text-green-600 hover:text-green-800 text-sm font-medium"
-										title="Save"
+										class="text-green-600 hover:text-green-700 hover:bg-green-50"
 									>
 										Save
-									</button>
-									<button
-										type="button"
+									</Button>
+									<Button
+										variant="ghost"
+										size="sm"
 										onclick={() => cancelEdit(row.id)}
-										class="text-gray-600 hover:text-gray-800 text-sm font-medium"
-										title="Cancel"
 									>
 										Cancel
-									</button>
+									</Button>
 								{:else}
-									<button
-										type="button"
+									<Button
+										variant="ghost"
+										size="sm"
 										onclick={() => editRow(row.id)}
-										class="text-blue-600 hover:text-blue-800 text-sm font-medium"
-										title="Edit"
 									>
 										Edit
-									</button>
-									<button
-										type="button"
+									</Button>
+									<Button
+										variant="ghost"
+										size="sm"
 										onclick={() => deleteRow(row.id)}
 										disabled={minRows > 0 && rows.length <= minRows}
-										class="text-red-600 hover:text-red-800 text-sm font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
-										title="Delete"
+										class="text-destructive hover:text-destructive hover:bg-destructive/10"
 									>
 										Delete
-									</button>
+									</Button>
 								{/if}
 							</div>
-						</td>
-					</tr>
+						</Table.Cell>
+					</Table.Row>
 				{/each}
-			</tbody>
-		</table>
+			</Table.Body>
+		</Table.Root>
 	</div>
 
 	<div class="mt-4">
-		<button
-			type="button"
+		<Button
+			variant="outline"
 			onclick={addRow}
 			disabled={maxRows !== undefined && rows.length >= maxRows}
-			class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
 		>
-			<svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-			</svg>
+			<Plus class="h-4 w-4 mr-2" />
 			Add Row
 			{#if maxRows}
-				<span class="ml-2 text-xs text-gray-500">({rows.length}/{maxRows})</span>
+				<span class="ml-2 text-xs text-muted-foreground">({rows.length}/{maxRows})</span>
 			{/if}
-		</button>
+		</Button>
 	</div>
 </div>
-
-<style>
-	.grid-form {
-		@apply w-full;
-	}
-</style>
