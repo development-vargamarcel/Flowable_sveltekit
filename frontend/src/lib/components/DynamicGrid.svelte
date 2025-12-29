@@ -32,18 +32,24 @@
 
 	let rows = $state<GridRow[]>([]);
 	let initialized = $state(false);
+	let dataLoadedFromProps = $state(false);
 
-	// Initialize rows from initialData once
+	// Initialize rows from initialData when data becomes available
+	// This handles both immediate and late-arriving data (e.g., when parent's formValues is populated asynchronously)
 	$effect(() => {
-		if (!initialized && initialData.length > 0) {
+		// Only load data from props once, when it first becomes available
+		if (!dataLoadedFromProps && initialData.length > 0) {
 			rows = initialData.map((data) => ({
 				id: crypto.randomUUID(),
 				data: { ...data },
 				isEditing: false,
 				errors: {}
 			}));
-			initialized = true;
-		} else if (!initialized) {
+			dataLoadedFromProps = true;
+		}
+
+		// Mark as initialized for callback purposes (separate from data loading)
+		if (!initialized) {
 			initialized = true;
 		}
 	});
