@@ -31,8 +31,8 @@
 	}: Props = $props();
 
 	let rows = $state<GridRow[]>([]);
-	let initialized = $state(false);
 	let dataLoadedFromProps = $state(false);
+	let userHasMadeChanges = $state(false);
 
 	// Initialize rows from initialData when data becomes available
 	// This handles both immediate and late-arriving data (e.g., when parent's formValues is populated asynchronously)
@@ -47,16 +47,12 @@
 			}));
 			dataLoadedFromProps = true;
 		}
-
-		// Mark as initialized for callback purposes (separate from data loading)
-		if (!initialized) {
-			initialized = true;
-		}
 	});
 
-	// Notify parent of data changes
+	// Notify parent of data changes - only after user has made changes
+	// This prevents the grid from overwriting parent data before it's loaded
 	$effect(() => {
-		if (onDataChange && initialized) {
+		if (onDataChange && userHasMadeChanges) {
 			onDataChange(rows.map((row) => row.data));
 		}
 	});
@@ -77,6 +73,7 @@
 		};
 
 		rows = [...rows, newRow];
+		userHasMadeChanges = true;
 	}
 
 	function editRow(rowId: string) {
@@ -165,6 +162,7 @@
 		}
 
 		rows = rows.map((r) => (r.id === rowId ? { ...r, isEditing: false, errors: {} } : r));
+		userHasMadeChanges = true;
 	}
 
 	function cancelEdit(rowId: string) {
@@ -180,6 +178,7 @@
 
 		if (isEmpty) {
 			rows = rows.filter((r) => r.id !== rowId);
+			userHasMadeChanges = true;
 		} else {
 			rows = rows.map((r) => (r.id === rowId ? { ...r, isEditing: false, errors: {} } : r));
 		}
@@ -191,6 +190,7 @@
 		}
 
 		rows = rows.filter((row) => row.id !== rowId);
+		userHasMadeChanges = true;
 	}
 
 	function getRowValue(row: GridRow, columnName: string): string {
