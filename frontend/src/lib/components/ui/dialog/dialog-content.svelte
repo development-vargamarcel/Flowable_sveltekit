@@ -2,7 +2,7 @@
   import { Dialog as DialogPrimitive } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import { cn } from '$lib/utils';
-  import { X } from 'lucide-svelte';
+  import { X } from '@lucide/svelte';
   import DialogOverlay from './dialog-overlay.svelte';
   import DialogPortal from './dialog-portal.svelte';
 

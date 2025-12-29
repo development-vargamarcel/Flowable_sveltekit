@@ -2,7 +2,7 @@
   import { Select as SelectPrimitive } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import { cn } from '$lib/utils';
-  import { ChevronDown } from 'lucide-svelte';
+  import { ChevronDown } from '@lucide/svelte';
 
   interface Props {
     class?: string;
