@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { FormField, FormGrid, GridConfig } from '$lib/types';
 	import DynamicGrid from './DynamicGrid.svelte';
 
@@ -50,9 +51,12 @@
 	});
 
 	// Notify parent of value changes
+	// Use untrack for onValuesChange to prevent infinite loop when parent re-renders
+	// and creates a new function reference for the callback
 	$effect(() => {
-		if (onValuesChange) {
-			onValuesChange(formValues);
+		const callback = untrack(() => onValuesChange);
+		if (callback) {
+			callback(formValues);
 		}
 	});
 
