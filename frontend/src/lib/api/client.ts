@@ -11,7 +11,8 @@ import type {
   Escalation,
   EscalationOptions,
   Approval,
-  HandoffRequest
+  HandoffRequest,
+  FormDefinition
 } from '$lib/types';
 import { createLogger } from '$lib/utils/logger';
 import { backendStatus } from '$lib/stores/backendStatus';
@@ -543,9 +544,34 @@ export const api = {
     return fetchApi(`/api/processes/${processDefinitionId}/bpmn`);
   },
 
-  async deleteProcess(processDefinitionId: string, cascade: boolean = false): Promise<{ message: string }> {
+  async deleteProcess(
+    processDefinitionId: string,
+    cascade: boolean = false
+  ): Promise<{ message: string }> {
     return fetchApi(`/api/processes/${processDefinitionId}?cascade=${cascade}`, {
       method: 'DELETE'
     });
+  },
+
+  // Form Definitions
+  async getTaskFormDefinition(taskId: string): Promise<FormDefinition> {
+    return fetchApi(`/api/tasks/${taskId}/form`);
+  },
+
+  async getStartFormDefinition(processDefinitionId: string): Promise<FormDefinition> {
+    return fetchApi(`/api/processes/${processDefinitionId}/start-form`);
+  },
+
+  async getAllFormDefinitions(
+    processDefinitionId: string
+  ): Promise<Record<string, FormDefinition>> {
+    return fetchApi(`/api/processes/${processDefinitionId}/forms`);
+  },
+
+  async getElementFormDefinition(
+    processDefinitionId: string,
+    elementId: string
+  ): Promise<FormDefinition> {
+    return fetchApi(`/api/processes/${processDefinitionId}/forms/${elementId}`);
   }
 };

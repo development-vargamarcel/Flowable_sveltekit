@@ -1,8 +1,10 @@
 package com.demo.bpm.controller;
 
+import com.demo.bpm.dto.FormDefinitionDTO;
 import com.demo.bpm.dto.ProcessDTO;
 import com.demo.bpm.dto.ProcessInstanceDTO;
 import com.demo.bpm.dto.StartProcessRequest;
+import com.demo.bpm.service.FormDefinitionService;
 import com.demo.bpm.service.ProcessService;
 import com.demo.bpm.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class ProcessController {
 
     private final ProcessService processService;
     private final UserService userService;
+    private final FormDefinitionService formDefinitionService;
 
     @GetMapping
     public ResponseEntity<List<ProcessDTO>> getAvailableProcesses() {
@@ -143,6 +146,48 @@ public class ProcessController {
             ));
         } catch (Exception e) {
             log.error("Error deleting process: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/{processDefinitionId}/start-form")
+    public ResponseEntity<?> getStartFormDefinition(@PathVariable String processDefinitionId) {
+        try {
+            FormDefinitionDTO formDefinition = formDefinitionService.getStartFormDefinition(processDefinitionId);
+            return ResponseEntity.ok(formDefinition);
+        } catch (Exception e) {
+            log.error("Error retrieving start form definition: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/{processDefinitionId}/forms")
+    public ResponseEntity<?> getAllFormDefinitions(@PathVariable String processDefinitionId) {
+        try {
+            var formDefinitions = formDefinitionService.getAllFormDefinitions(processDefinitionId);
+            return ResponseEntity.ok(formDefinitions);
+        } catch (Exception e) {
+            log.error("Error retrieving form definitions: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/{processDefinitionId}/forms/{elementId}")
+    public ResponseEntity<?> getFormDefinitionForElement(
+            @PathVariable String processDefinitionId,
+            @PathVariable String elementId) {
+        try {
+            FormDefinitionDTO formDefinition = formDefinitionService.getFormDefinitionForElement(
+                    processDefinitionId, elementId);
+            return ResponseEntity.ok(formDefinition);
+        } catch (Exception e) {
+            log.error("Error retrieving form definition for element: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));

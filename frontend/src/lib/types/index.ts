@@ -174,3 +174,87 @@ export interface HandoffRequest {
   toUserId: string;
   reason: string;
 }
+
+// Form Definition Types
+export interface FormFieldValidation {
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: string;
+  patternMessage?: string;
+  customExpression?: string;
+  customMessage?: string;
+}
+
+export interface FormFieldOption {
+  value: string;
+  label: string;
+}
+
+export interface FormField {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  validation: FormFieldValidation | null;
+  options: FormFieldOption[] | null;
+  placeholder: string;
+  defaultValue: string;
+  defaultExpression: string;
+  tooltip: string;
+  readonly: boolean;
+  hidden: boolean;
+  hiddenExpression: string;
+  readonlyExpression: string;
+  requiredExpression: string;
+  gridColumn: number;
+  gridRow: number;
+  gridWidth: number;
+  cssClass: string;
+  onChange: string;
+  onBlur: string;
+}
+
+export interface GridColumn {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  placeholder: string;
+  options: string[] | null;
+  min?: number;
+  max?: number;
+  step?: number;
+  validation: FormFieldValidation | null;
+}
+
+export interface FormGrid {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  minRows: number;
+  maxRows: number;
+  columns: GridColumn[];
+  gridColumn: number;
+  gridRow: number;
+  gridWidth: number;
+  cssClass: string;
+}
+
+export interface GridConfig {
+  columns: number;
+  gap: number;
+}
+
+export interface FormDefinition {
+  elementId: string;
+  elementName: string;
+  elementType: string;
+  fields: FormField[];
+  grids: FormGrid[];
+  gridConfig: GridConfig;
+}

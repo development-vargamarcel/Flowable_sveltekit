@@ -5,17 +5,24 @@
 	import { api } from '$lib/api/client';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import Toast from '$lib/components/Toast.svelte';
-	import type { TaskDetails } from '$lib/types';
+	import DynamicForm from '$lib/components/DynamicForm.svelte';
+	import type { TaskDetails, FormDefinition } from '$lib/types';
 
 	let taskDetails = $state<TaskDetails | null>(null);
+	let formDefinition = $state<FormDefinition | null>(null);
 	let loading = $state(true);
+	let loadingForm = $state(false);
 	let submitting = $state(false);
 	let error = $state('');
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 
-	// Form data
+	// Form data for legacy forms
 	let decision = $state('');
 	let comments = $state('');
+
+	// Form data for dynamic forms
+	let dynamicFormValues = $state<Record<string, unknown>>({});
+	let dynamicFormRef = $state<DynamicForm | undefined>(undefined);
 
 	onMount(async () => {
 		await loadTask();
@@ -31,6 +38,17 @@
 				return;
 			}
 			taskDetails = await api.getTaskDetails(taskId);
+
+			// Try to load form definition for this task
+			loadingForm = true;
+			try {
+				formDefinition = await api.getTaskFormDefinition(taskId);
+			} catch {
+				// No custom form defined - will use legacy form
+				formDefinition = null;
+			} finally {
+				loadingForm = false;
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load task';
 		} finally {
@@ -55,37 +73,84 @@
 	async function handleComplete() {
 		if (!taskDetails) return;
 
-		// Validate decision for approval forms
 		const formKey = taskDetails.task.formKey;
-		if ((formKey?.includes('approval') || formKey?.includes('review')) && !decision) {
-			toast = { message: 'Please select a decision', type: 'error' };
-			return;
+
+		// Use dynamic form if available
+		if (hasDynamicForm) {
+			// Validate dynamic form
+			if (dynamicFormRef && !dynamicFormRef.validate()) {
+				toast = { message: 'Please fix the form errors before submitting', type: 'error' };
+				return;
+			}
+
+			submitting = true;
+			try {
+				const formValues = dynamicFormRef?.getValues() || dynamicFormValues;
+
+				// Add decision and comments if they exist in form values
+				const variables: Record<string, unknown> = { ...formValues };
+
+				// Ensure decision and comments are included
+				if (decision) {
+					variables.decision = decision;
+				}
+				if (comments) {
+					variables.comments = comments;
+				}
+
+				await api.completeTask(taskDetails.task.id, variables);
+				toast = { message: 'Task completed successfully', type: 'success' };
+
+				setTimeout(() => goto('/tasks'), 1500);
+			} catch (err) {
+				toast = { message: err instanceof Error ? err.message : 'Failed to complete task', type: 'error' };
+			} finally {
+				submitting = false;
+			}
+		} else {
+			// Legacy form handling
+			// Validate decision for approval forms
+			if ((formKey?.includes('approval') || formKey?.includes('review')) && !decision) {
+				toast = { message: 'Please select a decision', type: 'error' };
+				return;
+			}
+
+			submitting = true;
+			try {
+				const variables: Record<string, unknown> = {};
+
+				if (decision) {
+					variables.decision = decision;
+				}
+				if (comments) {
+					variables.comments = comments;
+				}
+
+				// For task assignment, update assignee
+				if (formKey === 'claim-task-form') {
+					variables.assignee = authStore.user?.username;
+				}
+
+				await api.completeTask(taskDetails.task.id, variables);
+				toast = { message: 'Task completed successfully', type: 'success' };
+
+				setTimeout(() => goto('/tasks'), 1500);
+			} catch (err) {
+				toast = { message: err instanceof Error ? err.message : 'Failed to complete task', type: 'error' };
+			} finally {
+				submitting = false;
+			}
 		}
+	}
 
-		submitting = true;
-		try {
-			const variables: Record<string, unknown> = {};
-
-			if (decision) {
-				variables.decision = decision;
-			}
-			if (comments) {
-				variables.comments = comments;
-			}
-
-			// For task assignment, update assignee
-			if (formKey === 'claim-task-form') {
-				variables.assignee = authStore.user?.username;
-			}
-
-			await api.completeTask(taskDetails.task.id, variables);
-			toast = { message: 'Task completed successfully', type: 'success' };
-
-			setTimeout(() => goto('/tasks'), 1500);
-		} catch (err) {
-			toast = { message: err instanceof Error ? err.message : 'Failed to complete task', type: 'error' };
-		} finally {
-			submitting = false;
+	function handleDynamicFormChange(values: Record<string, unknown>) {
+		dynamicFormValues = values;
+		// Extract decision and comments if present
+		if (values.decision !== undefined) {
+			decision = String(values.decision);
+		}
+		if (values.comments !== undefined) {
+			comments = String(values.comments);
 		}
 	}
 
@@ -163,9 +228,8 @@
 			.trim();
 	}
 
-	function isLineItems(key: string, value: unknown): boolean {
+	function isGridData(key: string, value: unknown): boolean {
 		if (typeof value !== 'string') return false;
-		if (!key.toLowerCase().includes('lineitem')) return false;
 		try {
 			const parsed = JSON.parse(value);
 			return Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object';
@@ -174,7 +238,7 @@
 		}
 	}
 
-	function parseLineItems(value: string): Array<Record<string, unknown>> {
+	function parseGridData(value: string): Array<Record<string, unknown>> {
 		try {
 			return JSON.parse(value);
 		} catch {
@@ -187,6 +251,22 @@
 			return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 		}
 		return String(value);
+	}
+
+	// Check if there's a dynamic form with fields/grids
+	const hasDynamicForm = $derived(
+		formDefinition &&
+		((formDefinition.fields && formDefinition.fields.length > 0) ||
+		(formDefinition.grids && formDefinition.grids.length > 0))
+	);
+
+	// Get excluded keys for the request details section
+	const excludedKeys = ['decision', 'comments', 'completedBy', 'completedAt', 'initiator', 'startedBy', 'startedAt'];
+
+	// Get variables to display (excluding system variables)
+	function getDisplayVariables(): Array<[string, unknown]> {
+		if (!taskDetails) return [];
+		return Object.entries(taskDetails.variables).filter(([key]) => !excludedKeys.includes(key));
 	}
 </script>
 
@@ -218,6 +298,7 @@
 	{:else if taskDetails}
 		{@const task = taskDetails.task}
 		{@const formConfig = getFormFields(task.formKey)}
+		{@const displayVariables = getDisplayVariables()}
 
 		<!-- Task Header -->
 		<div class="card mb-6">
@@ -245,15 +326,15 @@
 			{/if}
 		</div>
 
-		<!-- Process Variables -->
-		<div class="card mb-6">
-			<h2 class="text-lg font-semibold text-gray-900 mb-4">Request Details</h2>
-			<div class="grid grid-cols-2 gap-4">
-				{#each Object.entries(taskDetails.variables) as [key, value]}
-					{#if !['decision', 'comments', 'completedBy', 'completedAt', 'initiator', 'startedBy', 'startedAt'].includes(key)}
-						{#if isLineItems(key, value)}
-							{@const items = parseLineItems(value as string)}
-							<!-- Line Items Grid Display -->
+		<!-- Request Details (Process Variables) -->
+		{#if displayVariables.length > 0}
+			<div class="card mb-6">
+				<h2 class="text-lg font-semibold text-gray-900 mb-4">Request Details</h2>
+				<div class="grid grid-cols-2 gap-4">
+					{#each displayVariables as [key, value]}
+						{#if isGridData(key, value)}
+							{@const items = parseGridData(value as string)}
+							<!-- Grid Data Display -->
 							<div class="col-span-2 py-2 border-b border-gray-100">
 								<dt class="text-sm text-gray-500 mb-3">{formatLabel(key)}</dt>
 								<dd>
@@ -274,7 +355,7 @@
 														<tr>
 															{#each Object.entries(item) as [col, val]}
 																<td class="px-4 py-3 text-sm text-gray-900">
-																	{#if col.toLowerCase().includes('amount')}
+																	{#if col.toLowerCase().includes('amount') || col.toLowerCase().includes('price') || col.toLowerCase().includes('total') || col.toLowerCase().includes('cost')}
 																		{formatCurrency(val)}
 																	{:else}
 																		{val || '-'}
@@ -297,10 +378,10 @@
 								<dd class="text-gray-900 font-medium">{formatValue(key, value)}</dd>
 							</div>
 						{/if}
-					{/if}
-				{/each}
+					{/each}
+				</div>
 			</div>
-		</div>
+		{/if}
 
 		<!-- Action Form -->
 		<div class="card">
@@ -319,7 +400,27 @@
 				</div>
 			{:else}
 				<form onsubmit={(e) => { e.preventDefault(); handleComplete(); }} class="space-y-4">
-					{#if formConfig.showDecision}
+					<!-- Dynamic Form (if designer-defined fields exist) -->
+					{#if loadingForm}
+						<div class="py-4 text-center">
+							<div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+							<p class="mt-2 text-sm text-gray-600">Loading form...</p>
+						</div>
+					{:else if hasDynamicForm && formDefinition}
+						<div class="mb-6">
+							<DynamicForm
+								bind:this={dynamicFormRef}
+								fields={formDefinition.fields}
+								grids={formDefinition.grids}
+								gridConfig={formDefinition.gridConfig}
+								values={taskDetails.variables}
+								onValuesChange={handleDynamicFormChange}
+							/>
+						</div>
+					{/if}
+
+					<!-- Legacy Decision Form (fallback or supplement) -->
+					{#if formConfig.showDecision && !hasDynamicForm}
 						<fieldset>
 							<legend class="label">Your Decision *</legend>
 							<div class="space-y-2">
@@ -339,16 +440,19 @@
 						</fieldset>
 					{/if}
 
-					<div>
-						<label for="comments" class="label">Comments</label>
-						<textarea
-							id="comments"
-							bind:value={comments}
-							rows="3"
-							class="input"
-							placeholder="Add any comments..."
-						></textarea>
-					</div>
+					<!-- Comments (always show unless dynamic form has its own) -->
+					{#if !hasDynamicForm || !formDefinition?.fields.some(f => f.name === 'comments')}
+						<div>
+							<label for="comments" class="label">Comments</label>
+							<textarea
+								id="comments"
+								bind:value={comments}
+								rows="3"
+								class="input"
+								placeholder="Add any comments..."
+							></textarea>
+						</div>
+					{/if}
 
 					<div class="flex justify-end space-x-3 pt-4">
 						<a href="/tasks" class="btn btn-secondary">Cancel</a>
@@ -357,7 +461,17 @@
 							class="btn btn-success"
 							disabled={submitting}
 						>
-							{submitting ? 'Submitting...' : 'Complete Task'}
+							{#if submitting}
+								<span class="inline-flex items-center">
+									<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									Submitting...
+								</span>
+							{:else}
+								Complete Task
+							{/if}
 						</button>
 					</div>
 				</form>

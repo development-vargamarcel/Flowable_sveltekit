@@ -1,7 +1,9 @@
 package com.demo.bpm.controller;
 
 import com.demo.bpm.dto.CompleteTaskRequest;
+import com.demo.bpm.dto.FormDefinitionDTO;
 import com.demo.bpm.dto.TaskDTO;
+import com.demo.bpm.service.FormDefinitionService;
 import com.demo.bpm.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import java.util.Map;
 public class TaskController {
 
     private final TaskService taskService;
+    private final FormDefinitionService formDefinitionService;
 
     @GetMapping
     public ResponseEntity<List<TaskDTO>> getMyTasks(@AuthenticationPrincipal UserDetails userDetails) {
@@ -86,6 +89,19 @@ public class TaskController {
             ));
         } catch (Exception e) {
             log.error("Error completing task {}: {}", taskId, e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/{taskId}/form")
+    public ResponseEntity<?> getTaskFormDefinition(@PathVariable String taskId) {
+        try {
+            FormDefinitionDTO formDefinition = formDefinitionService.getFormDefinitionForTask(taskId);
+            return ResponseEntity.ok(formDefinition);
+        } catch (Exception e) {
+            log.error("Error retrieving task form definition: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));

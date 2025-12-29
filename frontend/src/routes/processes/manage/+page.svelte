@@ -292,12 +292,19 @@
               </div>
 
               <div class="ml-4 flex gap-2">
+                <a
+                  href="/processes/start/{latest.id}"
+                  class="rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                  title="Start a new process instance with form"
+                >
+                  Start
+                </a>
                 <button
                   onclick={() => openStartModal(key, latest.name || key)}
                   class="rounded-md bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-200"
-                  title="Start a new process instance"
+                  title="Start with raw JSON variables"
                 >
-                  Start Instance
+                  Start (JSON)
                 </button>
                 <button
                   onclick={() => handleEdit(latest.id, key)}
@@ -382,6 +389,7 @@
           <button
             onclick={closeStartModal}
             class="text-gray-400 hover:text-gray-600"
+            aria-label="Close modal"
           >
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
