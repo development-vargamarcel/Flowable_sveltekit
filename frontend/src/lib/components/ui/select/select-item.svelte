@@ -2,7 +2,7 @@
   import { Select as SelectPrimitive } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import { cn } from '$lib/utils';
-  import { Check } from 'lucide-svelte';
+  import { Check } from '@lucide/svelte';
 
   interface Props {
     value: string;
