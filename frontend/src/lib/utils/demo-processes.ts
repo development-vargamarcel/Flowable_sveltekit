@@ -677,10 +677,10 @@ export const demoProcesses: DemoProcess[] = [
 // Check if any product in the grid has price > 10
 var hasHighPriceItem = false;
 var products = execution.getVariable('products');
-if (products != null) {
-  for (var i = 0; i < products.size(); i++) {
-    var product = products.get(i);
-    var price = product.get('price');
+if (products != null && products.length > 0) {
+  for (var i = 0; i < products.length; i++) {
+    var product = products[i];
+    var price = product.price;
     if (price != null && price > 10) {
       hasHighPriceItem = true;
       break;
