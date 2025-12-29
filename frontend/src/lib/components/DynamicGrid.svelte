@@ -38,7 +38,8 @@
 	// This handles both immediate and late-arriving data (e.g., when parent's formValues is populated asynchronously)
 	$effect(() => {
 		// Only load data from props once, when it first becomes available
-		if (!dataLoadedFromProps && initialData.length > 0) {
+		// Also skip if user has already made changes (prevents infinite loop when parent echoes back our changes)
+		if (!dataLoadedFromProps && !userHasMadeChanges && initialData.length > 0) {
 			rows = initialData.map((data) => ({
 				id: crypto.randomUUID(),
 				data: { ...data },
