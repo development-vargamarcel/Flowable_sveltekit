@@ -644,11 +644,167 @@ export const demoProcesses: DemoProcess[] = [
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`
+  },
+  {
+    id: 'product-price-routing',
+    name: 'Product Price Routing',
+    description:
+      'Workflow with products grid - routes to different paths based on whether any product price exceeds threshold (>10)',
+    category: 'Finance',
+    bpmn: `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:flowable="http://flowable.org/bpmn"
+                  id="Definitions_1"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="product-price-routing" name="Product Price Routing" isExecutable="true">
+    <bpmn:documentation>Product workflow with grid-based conditional routing. Routes to High Value Processing if any product price exceeds 10, otherwise routes to Standard Processing.</bpmn:documentation>
+    <bpmn:startEvent id="startEvent" name="Start Order">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="enterProducts" name="Enter Products" flowable:candidateGroups="sales"
+                   flowable:formGrids='[{"id":"grid_products","name":"products","label":"Products","description":"Enter product details","minRows":1,"maxRows":20,"columns":[{"id":"col_name","name":"name","label":"Product Name","type":"text","required":true,"placeholder":"Enter product name","options":null,"validation":null},{"id":"col_price","name":"price","label":"Price","type":"number","required":true,"placeholder":"0.00","options":null,"min":0,"step":0.01,"validation":null},{"id":"col_quantity","name":"quantity","label":"Quantity","type":"number","required":true,"placeholder":"1","options":null,"min":1,"step":1,"validation":null}],"gridColumn":1,"gridRow":1,"gridWidth":12,"cssClass":""}]'>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:scriptTask id="evaluateProducts" name="Evaluate Product Prices" scriptFormat="javascript">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:script><![CDATA[
+// Check if any product in the grid has price > 10
+var hasHighPriceItem = false;
+var products = execution.getVariable('products');
+if (products != null) {
+  for (var i = 0; i < products.size(); i++) {
+    var product = products.get(i);
+    var price = product.get('price');
+    if (price != null && price > 10) {
+      hasHighPriceItem = true;
+      break;
+    }
+  }
+}
+execution.setVariable('hasHighPriceItem', hasHighPriceItem);
+      ]]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="priceCheckGateway" name="High Price Item?">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_highValue</bpmn:outgoing>
+      <bpmn:outgoing>Flow_standard</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="highValueProcessing" name="High Value Processing" flowable:candidateGroups="managers">
+      <bpmn:documentation>Process order with high-value items (price > 10) - requires manager approval</bpmn:documentation>
+      <bpmn:incoming>Flow_highValue</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="standardProcessing" name="Standard Processing" flowable:candidateGroups="sales">
+      <bpmn:documentation>Process standard order (all items price <= 10)</bpmn:documentation>
+      <bpmn:incoming>Flow_standard</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="endHighValue" name="High Value Completed">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="endStandard" name="Standard Completed">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="startEvent" targetRef="enterProducts"/>
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="enterProducts" targetRef="evaluateProducts"/>
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="evaluateProducts" targetRef="priceCheckGateway"/>
+    <bpmn:sequenceFlow id="Flow_highValue" name="Price > 10" sourceRef="priceCheckGateway" targetRef="highValueProcessing">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">\${hasHighPriceItem == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_standard" name="All Prices <= 10" sourceRef="priceCheckGateway" targetRef="standardProcessing">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">\${hasHighPriceItem == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="highValueProcessing" targetRef="endHighValue"/>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="standardProcessing" targetRef="endStandard"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="product-price-routing">
+      <bpmndi:BPMNShape id="startEvent_di" bpmnElement="startEvent">
+        <dc:Bounds x="100" y="192" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="88" y="235" width="60" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="enterProducts_di" bpmnElement="enterProducts">
+        <dc:Bounds x="200" y="170" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="evaluateProducts_di" bpmnElement="evaluateProducts">
+        <dc:Bounds x="370" y="170" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="priceCheckGateway_di" bpmnElement="priceCheckGateway" isMarkerVisible="true">
+        <dc:Bounds x="545" y="185" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="527" y="242" width="86" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="highValueProcessing_di" bpmnElement="highValueProcessing">
+        <dc:Bounds x="680" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="standardProcessing_di" bpmnElement="standardProcessing">
+        <dc:Bounds x="680" y="260" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="endHighValue_di" bpmnElement="endHighValue">
+        <dc:Bounds x="862" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="841" y="145" width="78" height="27"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="endStandard_di" bpmnElement="endStandard">
+        <dc:Bounds x="862" y="282" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="841" y="325" width="78" height="27"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="136" y="210"/>
+        <di:waypoint x="200" y="210"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="300" y="210"/>
+        <di:waypoint x="370" y="210"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="470" y="210"/>
+        <di:waypoint x="545" y="210"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_highValue_di" bpmnElement="Flow_highValue">
+        <di:waypoint x="570" y="185"/>
+        <di:waypoint x="570" y="120"/>
+        <di:waypoint x="680" y="120"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="585" y="103" width="50" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_standard_di" bpmnElement="Flow_standard">
+        <di:waypoint x="570" y="235"/>
+        <di:waypoint x="570" y="300"/>
+        <di:waypoint x="680" y="300"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="578" y="283" width="78" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="780" y="120"/>
+        <di:waypoint x="862" y="120"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="780" y="300"/>
+        <di:waypoint x="862" y="300"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`
   }
 ];
 
 export function getDemoProcessById(id: string): DemoProcess | undefined {
-  return demoProcesses.find(p => p.id === id);
+  return demoProcesses.find((p) => p.id === id);
 }
 
 export function getDemoProcessesByCategory(): Map<string, DemoProcess[]> {
