@@ -3,11 +3,20 @@
   import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
   import { processStore } from '$lib/stores/processes.svelte';
-  
+
   let isLoading = $state(true);
   let error = $state('');
   let success = $state('');
   let deleteConfirm = $state<string | null>(null);
+
+  // Start Instance Modal State
+  let showStartModal = $state(false);
+  let startProcessKey = $state('');
+  let startProcessName = $state('');
+  let isStarting = $state(false);
+  let businessKey = $state('');
+  let variablesJson = $state('{}');
+  let variablesError = $state('');
 
   // Subscribe to process changes for reactive updates
   let unsubscribe: (() => void) | null = null;
@@ -76,6 +85,60 @@
 
   function cancelDelete() {
     deleteConfirm = null;
+  }
+
+  function openStartModal(processKey: string, processName: string) {
+    startProcessKey = processKey;
+    startProcessName = processName;
+    businessKey = '';
+    variablesJson = '{\n  \n}';
+    variablesError = '';
+    showStartModal = true;
+  }
+
+  function closeStartModal() {
+    showStartModal = false;
+    startProcessKey = '';
+    startProcessName = '';
+    variablesError = '';
+  }
+
+  async function handleStartInstance() {
+    variablesError = '';
+
+    // Parse variables JSON
+    let variables: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(variablesJson);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        variablesError = 'Variables must be a JSON object';
+        return;
+      }
+      variables = parsed;
+    } catch (e) {
+      variablesError = 'Invalid JSON format';
+      return;
+    }
+
+    // Add business key to variables if provided
+    if (businessKey.trim()) {
+      variables.businessKey = businessKey.trim();
+    }
+
+    isStarting = true;
+    error = '';
+    success = '';
+
+    try {
+      const result = await api.startProcess(startProcessKey, variables);
+      success = `Process instance started successfully! Instance ID: ${result.processInstance?.id || 'unknown'}`;
+      closeStartModal();
+    } catch (err) {
+      console.error('Error starting process:', err);
+      error = err instanceof Error ? err.message : 'Failed to start process instance';
+    } finally {
+      isStarting = false;
+    }
   }
 
   // Use the store's grouped definitions
@@ -230,6 +293,13 @@
 
               <div class="ml-4 flex gap-2">
                 <button
+                  onclick={() => openStartModal(key, latest.name || key)}
+                  class="rounded-md bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-200"
+                  title="Start a new process instance"
+                >
+                  Start Instance
+                </button>
+                <button
                   onclick={() => handleEdit(latest.id, key)}
                   class="rounded-md bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-200"
                   title="View in designer"
@@ -281,6 +351,12 @@
         <li class="flex items-start">
           <span class="mr-2">•</span>
           <span
+            >Click "Start Instance" to create a new running instance of a process with custom variables.</span
+          >
+        </li>
+        <li class="flex items-start">
+          <span class="mr-2">•</span>
+          <span
             >Deleting a process will remove all versions and may affect running process instances.</span
           >
         </li>
@@ -288,13 +364,98 @@
           <span class="mr-2">•</span>
           <span>Use the Process Designer to create new processes or modify existing ones.</span>
         </li>
-        <li class="flex items-start">
-          <span class="mr-2">•</span>
-          <span
-            >Process definitions are BPMN 2.0 compliant and can be exported/imported as XML files.</span
-          >
-        </li>
       </ul>
     </div>
   </div>
 </div>
+
+<!-- Start Instance Modal -->
+{#if showStartModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
+      <div class="border-b border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-xl font-semibold text-gray-900">Start Process Instance</h3>
+            <p class="mt-1 text-sm text-gray-500">Starting: <strong>{startProcessName}</strong></p>
+          </div>
+          <button
+            onclick={closeStartModal}
+            class="text-gray-400 hover:text-gray-600"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <div class="space-y-4">
+          <!-- Business Key -->
+          <div>
+            <label for="businessKey" class="mb-1 block text-sm font-medium text-gray-700">
+              Business Key <span class="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="businessKey"
+              bind:value={businessKey}
+              class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="e.g., ORDER-001, REQ-2024-001"
+            />
+            <p class="mt-1 text-xs text-gray-500">A unique identifier for this process instance</p>
+          </div>
+
+          <!-- Variables -->
+          <div>
+            <label for="variables" class="mb-1 block text-sm font-medium text-gray-700">
+              Process Variables <span class="text-gray-400">(JSON)</span>
+            </label>
+            <textarea
+              id="variables"
+              bind:value={variablesJson}
+              rows="6"
+              class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder='{"amount": 100, "description": "Test"}'
+            ></textarea>
+            {#if variablesError}
+              <p class="mt-1 text-xs text-red-600">{variablesError}</p>
+            {:else}
+              <p class="mt-1 text-xs text-gray-500">Enter process variables as a JSON object</p>
+            {/if}
+          </div>
+
+          <!-- Example Variables -->
+          <div class="rounded-md bg-gray-50 p-3">
+            <p class="text-xs font-medium text-gray-700">Example Variables:</p>
+            <pre class="mt-1 text-xs text-gray-600">{`{
+  "amount": 500,
+  "description": "Equipment purchase",
+  "priority": "high"
+}`}</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-gray-200 bg-gray-50 p-4">
+        <div class="flex justify-end gap-3">
+          <button
+            onclick={closeStartModal}
+            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            disabled={isStarting}
+          >
+            Cancel
+          </button>
+          <button
+            onclick={handleStartInstance}
+            disabled={isStarting}
+            class="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
+          >
+            {isStarting ? 'Starting...' : 'Start Instance'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}

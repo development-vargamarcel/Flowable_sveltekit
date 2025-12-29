@@ -8,6 +8,7 @@
   import 'bpmn-js/dist/assets/diagram-js.css';
   import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
   import { flowableModdle } from '$lib/utils/flowable-moddle';
+  import { demoProcesses, getDemoProcessesByCategory, type DemoProcess } from '$lib/utils/demo-processes';
 
   // Core modeler state
   let modelerContainer: HTMLDivElement;
@@ -27,6 +28,11 @@
   let editProcessKey = $state('');
   let loadRetryCount = $state(0);
   const MAX_LOAD_RETRIES = 3;
+
+  // Template selection modal state
+  let showTemplateModal = $state(false);
+  let selectedTemplate = $state<DemoProcess | null>(null);
+  const groupedTemplates = getDemoProcessesByCategory();
 
   // Properties Panel State
   let selectedElement = $state<any>(null);
@@ -352,6 +358,29 @@
     _hasDraft = false;
   }
 
+  // Load selected template into the modeler
+  async function loadTemplate(template: DemoProcess) {
+    if (!modeler) return;
+
+    try {
+      await modeler.importXML(template.bpmn);
+      processName = template.id;
+      processDescription = template.description;
+      const canvas = modeler.get('canvas');
+      canvas.zoom('fit-viewport');
+      showTemplateModal = false;
+      selectedTemplate = null;
+      success = `Loaded template: ${template.name}`;
+      setTimeout(() => (success = ''), 3000);
+
+      // Extract process variables from the loaded diagram
+      extractProcessVariables();
+    } catch (err) {
+      console.error('Error loading template:', err);
+      error = 'Failed to load template. Please try again.';
+    }
+  }
+
   onMount(async () => {
     // Check for edit mode from URL parameters
     const editParam = $page.url.searchParams.get('edit');
@@ -465,7 +494,9 @@
           success = `Draft restored from ${savedDate}`;
           setTimeout(() => (success = ''), 4000);
         } else {
+          // No draft - show template selection modal
           await modeler.importXML(defaultBpmn);
+          showTemplateModal = true;
         }
       }
 
@@ -1758,6 +1789,14 @@
             </p>
           </div>
           <div class="flex items-center gap-2">
+            {#if !isEditMode}
+              <button
+                onclick={() => showTemplateModal = true}
+                class="rounded-md bg-green-100 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-200"
+              >
+                Load Template
+              </button>
+            {/if}
             <button
               onclick={() => showPropertiesPanel = !showPropertiesPanel}
               class="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -3529,6 +3568,74 @@ execution.setVariable('total', total)` : `// JUEL Expression
             class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Template Selection Modal -->
+{#if showTemplateModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="border-b border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-xl font-semibold text-gray-900">Choose a Process Template</h3>
+            <p class="mt-1 text-sm text-gray-500">Select a template to get started quickly, or start from scratch</p>
+          </div>
+          <button
+            onclick={() => showTemplateModal = false}
+            class="text-gray-400 hover:text-gray-600"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="max-h-[calc(85vh-180px)] overflow-y-auto p-6">
+        {#each Array.from(groupedTemplates.entries()) as [category, templates]}
+          <div class="mb-6">
+            <h4 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">{category}</h4>
+            <div class="grid gap-4 md:grid-cols-2">
+              {#each templates as template}
+                <button
+                  onclick={() => { selectedTemplate = template; }}
+                  class="flex flex-col items-start rounded-lg border-2 p-4 text-left transition-colors {selectedTemplate?.id === template.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}"
+                >
+                  <div class="flex w-full items-center justify-between">
+                    <span class="font-medium text-gray-900">{template.name}</span>
+                    {#if selectedTemplate?.id === template.id}
+                      <svg class="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                      </svg>
+                    {/if}
+                  </div>
+                  <p class="mt-1 text-sm text-gray-600">{template.description}</p>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+
+      <div class="border-t border-gray-200 bg-gray-50 p-4">
+        <div class="flex justify-end gap-3">
+          <button
+            onclick={() => showTemplateModal = false}
+            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Skip (Start Blank)
+          </button>
+          <button
+            onclick={() => selectedTemplate && loadTemplate(selectedTemplate)}
+            disabled={!selectedTemplate}
+            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            Use Template
           </button>
         </div>
       </div>
