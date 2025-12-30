@@ -80,6 +80,18 @@ public class TaskService {
         return flowableTaskService.getVariables(taskId);
     }
 
+    public String getProcessDefinitionIdForTask(String taskId) {
+        Task task = flowableTaskService.createTaskQuery()
+                .taskId(taskId)
+                .singleResult();
+
+        if (task == null) {
+            throw new RuntimeException("Task not found: " + taskId);
+        }
+
+        return task.getProcessDefinitionId();
+    }
+
     @Transactional
     public void claimTask(String taskId, String userId) {
         Task task = flowableTaskService.createTaskQuery()

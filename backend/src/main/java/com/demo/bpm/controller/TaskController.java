@@ -98,8 +98,21 @@ public class TaskController {
     @GetMapping("/{taskId}/form")
     public ResponseEntity<?> getTaskFormDefinition(@PathVariable String taskId) {
         try {
-            FormDefinitionDTO formDefinition = formDefinitionService.getFormDefinitionForTask(taskId);
-            return ResponseEntity.ok(formDefinition);
+            // Get task-specific form definition
+            FormDefinitionDTO taskFormDefinition = formDefinitionService.getFormDefinitionForTask(taskId);
+
+            // Get the process definition ID from the task
+            String processDefinitionId = taskService.getProcessDefinitionIdForTask(taskId);
+
+            // Get process-level form config (field library + condition rules)
+            com.demo.bpm.dto.ProcessFormConfigDTO processConfig =
+                formDefinitionService.getProcessFormConfig(processDefinitionId);
+
+            // Return both task form and process config
+            return ResponseEntity.ok(Map.of(
+                    "taskForm", taskFormDefinition,
+                    "processConfig", processConfig
+            ));
         } catch (Exception e) {
             log.error("Error retrieving task form definition: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
