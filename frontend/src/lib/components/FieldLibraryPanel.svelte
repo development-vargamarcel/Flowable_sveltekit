@@ -313,7 +313,6 @@
 	}
 
 	function handleDeleteColumn(gridIndex: number, columnId: string) {
-		const grid = library.grids[gridIndex];
 		onChange({
 			...library,
 			grids: library.grids.map((g, i) =>
@@ -544,8 +543,16 @@
 						<div class="border rounded-lg">
 							<div
 								class="flex items-center justify-between p-3 bg-gray-50 rounded-t-lg cursor-pointer"
+								role="button"
+								tabindex="0"
 								onclick={() =>
 									(expandedGridIndex = expandedGridIndex === gridIndex ? null : gridIndex)}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										expandedGridIndex = expandedGridIndex === gridIndex ? null : gridIndex;
+									}
+								}}
 							>
 								<div class="flex items-center gap-3">
 									<svg
@@ -572,7 +579,7 @@
 								<div class="flex items-center gap-2">
 									<button
 										type="button"
-										onclick|stopPropagation={() => handleEditGrid(grid)}
+										onclick={(e) => { e.stopPropagation(); handleEditGrid(grid); }}
 										class="p-2 text-gray-400 hover:text-blue-600 rounded"
 										title="Edit Grid"
 									>
@@ -587,7 +594,7 @@
 									</button>
 									<button
 										type="button"
-										onclick|stopPropagation={() => handleDeleteGrid(grid.id)}
+										onclick={(e) => { e.stopPropagation(); handleDeleteGrid(grid.id); }}
 										class="p-2 text-gray-400 hover:text-red-600 rounded"
 										title="Delete Grid"
 									>
@@ -640,6 +647,7 @@
 															type="button"
 															onclick={() => handleEditColumn(gridIndex, column)}
 															class="p-1 text-gray-400 hover:text-blue-600"
+															title="Edit Column"
 														>
 															<svg
 																class="w-4 h-4"
@@ -659,6 +667,7 @@
 															type="button"
 															onclick={() => handleDeleteColumn(gridIndex, column.id)}
 															class="p-1 text-gray-400 hover:text-red-600"
+															title="Delete Column"
 														>
 															<svg
 																class="w-4 h-4"
@@ -750,9 +759,9 @@
 
 		{#if fieldForm.type === 'select' || fieldForm.type === 'multiselect' || fieldForm.type === 'radio'}
 			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+				<span class="block text-sm font-medium text-gray-700 mb-2">Options</span>
 				<div class="space-y-2">
-					{#each fieldForm.options as option, index}
+					{#each fieldForm.options as _option, index}
 						<div class="flex items-center gap-2">
 							<input
 								type="text"
@@ -770,6 +779,7 @@
 								type="button"
 								onclick={() => removeFieldOption(index)}
 								class="p-2 text-red-500 hover:bg-red-50 rounded"
+								title="Remove Option"
 							>
 								<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path
@@ -987,9 +997,9 @@
 
 		{#if columnForm.type === 'select'}
 			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-2">Options</label>
+				<span class="block text-sm font-medium text-gray-700 mb-2">Options</span>
 				<div class="space-y-2">
-					{#each columnForm.options as option, index}
+					{#each columnForm.options as _option, index}
 						<div class="flex items-center gap-2">
 							<input
 								type="text"
@@ -1001,6 +1011,7 @@
 								type="button"
 								onclick={() => removeColumnOption(index)}
 								class="p-2 text-red-500 hover:bg-red-50 rounded"
+								title="Remove Option"
 							>
 								<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path
