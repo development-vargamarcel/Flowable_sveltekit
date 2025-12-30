@@ -12,7 +12,8 @@ import type {
   EscalationOptions,
   Approval,
   HandoffRequest,
-  FormDefinition
+  FormDefinition,
+  TaskFormWithConfig
 } from '$lib/types';
 import { createLogger } from '$lib/utils/logger';
 import { backendStatus } from '$lib/stores/backendStatus';
@@ -554,7 +555,7 @@ export const api = {
   },
 
   // Form Definitions
-  async getTaskFormDefinition(taskId: string): Promise<FormDefinition> {
+  async getTaskFormDefinition(taskId: string): Promise<TaskFormWithConfig> {
     return fetchApi(`/api/tasks/${taskId}/form`);
   },
 

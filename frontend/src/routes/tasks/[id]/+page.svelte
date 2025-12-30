@@ -6,10 +6,11 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import DynamicForm from '$lib/components/DynamicForm.svelte';
-	import type { TaskDetails, FormDefinition } from '$lib/types';
+	import type { TaskDetails, FormDefinition, TaskFormWithConfig, FormField, FormGrid, FieldConditionRule, GridConfig } from '$lib/types';
 
 	let taskDetails = $state<TaskDetails | null>(null);
 	let formDefinition = $state<FormDefinition | null>(null);
+	let processConfig = $state<TaskFormWithConfig['processConfig'] | null>(null);
 	let loading = $state(true);
 	let loadingForm = $state(false);
 	let submitting = $state(false);
@@ -42,10 +43,13 @@
 			// Try to load form definition for this task
 			loadingForm = true;
 			try {
-				formDefinition = await api.getTaskFormDefinition(taskId);
+				const formData = await api.getTaskFormDefinition(taskId);
+				formDefinition = formData.taskForm;
+				processConfig = formData.processConfig;
 			} catch {
 				// No custom form defined - will use legacy form
 				formDefinition = null;
+				processConfig = null;
 			} finally {
 				loadingForm = false;
 			}
@@ -253,11 +257,33 @@
 		return String(value);
 	}
 
+	// Merge field library fields/grids with task-specific fields/grids
+	const mergedFields = $derived.by<FormField[]>(() => {
+		const taskFields = formDefinition?.fields || [];
+		const libraryFields = processConfig?.fieldLibrary?.fields || [];
+
+		// Field library fields are added to ALL tasks if conditions allow
+		// Combine library fields + task-specific fields
+		return [...libraryFields, ...taskFields];
+	});
+
+	const mergedGrids = $derived.by<FormGrid[]>(() => {
+		const taskGrids = formDefinition?.grids || [];
+		const libraryGrids = processConfig?.fieldLibrary?.grids || [];
+
+		// Field library grids are added to ALL tasks if conditions allow
+		// Combine library grids + task-specific grids
+		return [...libraryGrids, ...taskGrids];
+	});
+
+	const mergedGridConfig = $derived.by<GridConfig>(() => {
+		// Use task-specific grid config if available, otherwise use process default
+		return formDefinition?.gridConfig || processConfig?.defaultGridConfig || { columns: 2, gap: 16 };
+	});
+
 	// Check if there's a dynamic form with fields/grids
 	const hasDynamicForm = $derived(
-		formDefinition &&
-		((formDefinition.fields && formDefinition.fields.length > 0) ||
-		(formDefinition.grids && formDefinition.grids.length > 0))
+		(mergedFields.length > 0 || mergedGrids.length > 0)
 	);
 
 	// Get excluded keys for the request details section
@@ -406,15 +432,23 @@
 							<div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
 							<p class="mt-2 text-sm text-gray-600">Loading form...</p>
 						</div>
-					{:else if hasDynamicForm && formDefinition}
+					{:else if hasDynamicForm}
 						<div class="mb-6">
 							<DynamicForm
 								bind:this={dynamicFormRef}
-								fields={formDefinition.fields}
-								grids={formDefinition.grids}
-								gridConfig={formDefinition.gridConfig}
+								fields={mergedFields}
+								grids={mergedGrids}
+								gridConfig={mergedGridConfig}
 								values={taskDetails.variables}
 								onValuesChange={handleDynamicFormChange}
+								conditionRules={processConfig?.globalConditions || []}
+								processVariables={taskDetails.variables}
+								userContext={{
+									id: authStore.user?.id || '',
+									username: authStore.user?.username || '',
+									roles: authStore.user?.roles || [],
+									groups: authStore.user?.groups || []
+								}}
 							/>
 						</div>
 					{/if}

@@ -367,6 +367,19 @@ export interface ProcessFormDefinition {
 }
 
 /**
+ * Enhanced task form response that includes both task-specific and process-level configuration
+ */
+export interface TaskFormWithConfig {
+  taskForm: FormDefinition;
+  processConfig: {
+    processDefinitionId: string;
+    fieldLibrary: ProcessFieldLibrary;
+    globalConditions: FieldConditionRule[];
+    defaultGridConfig: GridConfig;
+  };
+}
+
+/**
  * Computed field state after evaluating all conditions
  */
 export interface ComputedFieldState {
