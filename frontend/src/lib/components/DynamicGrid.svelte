@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { GridColumn } from '$lib/types';
+	import type { GridColumn, ComputedFieldState } from '$lib/types';
 	import * as Table from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -22,6 +22,7 @@
 		maxRows?: number;
 		initialData?: Record<string, unknown>[];
 		readonly?: boolean;
+		columnStates?: Record<string, ComputedFieldState>;
 		onDataChange?: (data: Record<string, unknown>[]) => void;
 	}
 
@@ -33,8 +34,23 @@
 		maxRows = 0,
 		initialData = [],
 		readonly = false,
+		columnStates = {},
 		onDataChange
 	}: Props = $props();
+
+	// Helper to get column state (with fallback)
+	function getColumnState(columnName: string): ComputedFieldState {
+		return columnStates[columnName] || { isHidden: false, isReadonly: readonly, appliedRules: [] };
+	}
+
+	// Get visible columns (filter out hidden ones)
+	const visibleColumns = $derived(columns.filter(col => !getColumnState(col.name).isHidden));
+
+	// Check if a column is readonly (grid readonly OR column-specific readonly)
+	function isColumnReadonly(columnName: string): boolean {
+		if (readonly) return true;
+		return getColumnState(columnName).isReadonly;
+	}
 
 	let rows = $state<GridRow[]>([]);
 	let dataLoadedFromProps = $state(false);
@@ -148,7 +164,8 @@
 		const errors: Record<string, string | null> = {};
 		let isValid = true;
 
-		for (const col of columns) {
+		// Only validate visible columns
+		for (const col of visibleColumns) {
 			const error = validateColumn(col, row.data[col.name]);
 			if (error) {
 				errors[col.name] = error;
@@ -248,11 +265,14 @@
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
-					{#each columns as column}
+					{#each visibleColumns as column}
 						<Table.Head>
 							{column.label}
 							{#if column.required}
 								<span class="text-destructive">*</span>
+							{/if}
+							{#if isColumnReadonly(column.name) && !readonly}
+								<span class="text-muted-foreground text-xs ml-1">(read-only)</span>
 							{/if}
 						</Table.Head>
 					{/each}
@@ -264,7 +284,7 @@
 			<Table.Body>
 				{#if rows.length === 0}
 					<Table.Row>
-						<Table.Cell colspan={columns.length + (readonly ? 0 : 1)} class="text-center py-8 text-muted-foreground">
+						<Table.Cell colspan={visibleColumns.length + (readonly ? 0 : 1)} class="text-center py-8 text-muted-foreground">
 							No rows added yet. {#if !readonly}Click "Add Row" to get started.{/if}
 						</Table.Cell>
 					</Table.Row>
@@ -272,9 +292,10 @@
 
 				{#each rows as row (row.id)}
 					<Table.Row>
-						{#each columns as column}
+						{#each visibleColumns as column}
+							{@const colReadonly = isColumnReadonly(column.name)}
 							<Table.Cell>
-								{#if row.isEditing && !readonly}
+								{#if row.isEditing && !readonly && !colReadonly}
 									<div class="space-y-1">
 										{#if column.type === 'select'}
 											<Select.Root
@@ -336,7 +357,7 @@
 										{/if}
 									</div>
 								{:else}
-									<span class="text-sm">
+									<span class="text-sm {colReadonly ? 'text-muted-foreground' : ''}">
 										{getRowValue(row, column.name) || '-'}
 									</span>
 								{/if}

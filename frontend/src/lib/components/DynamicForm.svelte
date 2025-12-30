@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import type { FormField, FormGrid, GridConfig } from '$lib/types';
+	import type { FormField, FormGrid, GridConfig, FieldConditionRule, ComputedFieldState, ComputedGridState } from '$lib/types';
+	import type { UserContext, EvaluationContext } from '$lib/utils/expression-evaluator';
+	import { ConditionStateComputer } from '$lib/utils/condition-state-computer';
 	import DynamicGrid from './DynamicGrid.svelte';
 
 	interface Props {
@@ -11,6 +13,11 @@
 		errors?: Record<string, string>;
 		readonly?: boolean;
 		onValuesChange?: (values: Record<string, unknown>) => void;
+		// Condition evaluation props
+		conditionRules?: FieldConditionRule[];
+		taskConditionRules?: FieldConditionRule[];
+		processVariables?: Record<string, unknown>;
+		userContext?: UserContext;
 	}
 
 	const {
@@ -20,7 +27,11 @@
 		values = {},
 		errors = {},
 		readonly = false,
-		onValuesChange
+		onValuesChange,
+		conditionRules = [],
+		taskConditionRules = [],
+		processVariables = {},
+		userContext = { id: '', username: '', roles: [], groups: [] }
 	}: Props = $props();
 
 	// Local form values - initialized in $effect
@@ -31,6 +42,66 @@
 
 	// Grid component references for validation
 	const gridRefs: Record<string, DynamicGrid> = {};
+
+	// Computed field and grid states based on condition rules
+	let computedFieldStates = $state<Record<string, ComputedFieldState>>({});
+	let computedGridStates = $state<Record<string, ComputedGridState>>({});
+
+	// Create evaluation context that updates when form values change
+	function createEvaluationContext(): EvaluationContext {
+		return {
+			form: formValues,
+			process: processVariables,
+			user: userContext
+		};
+	}
+
+	// Compute field and grid states whenever form values, rules, or context change
+	$effect(() => {
+		const allRules = [...conditionRules, ...taskConditionRules];
+		if (allRules.length === 0) {
+			// No rules, use static field properties
+			computedFieldStates = {};
+			computedGridStates = {};
+			return;
+		}
+
+		const context = createEvaluationContext();
+		const stateComputer = new ConditionStateComputer(context, { formReadonly: readonly });
+		const result = stateComputer.computeFormState(fields, grids, conditionRules, taskConditionRules);
+
+		computedFieldStates = result.fields;
+		computedGridStates = result.grids;
+	});
+
+	// Helper to get computed field state (with fallback to static properties)
+	function getFieldState(field: FormField): ComputedFieldState {
+		const computed = computedFieldStates[field.name];
+		if (computed) {
+			return computed;
+		}
+		// Fallback to static properties
+		return {
+			isHidden: field.hidden,
+			isReadonly: field.readonly || readonly,
+			appliedRules: []
+		};
+	}
+
+	// Helper to get computed grid state (with fallback to static properties)
+	function getGridState(grid: FormGrid): ComputedGridState {
+		const computed = computedGridStates[grid.name];
+		if (computed) {
+			return computed;
+		}
+		// Fallback: grid is visible and inherits form readonly
+		return {
+			isHidden: false,
+			isReadonly: readonly,
+			columnStates: {},
+			appliedRules: []
+		};
+	}
 
 	// Initialize form values from props and defaults - only once
 	// This prevents re-initialization from overwriting user changes
@@ -144,9 +215,11 @@
 		let isValid = true;
 		const newErrors: Record<string, string> = {};
 
-		// Validate each visible field
+		// Validate each visible field (using computed states)
 		for (const field of fields) {
-			if (field.hidden) continue;
+			const fieldState = getFieldState(field);
+			// Skip validation for hidden fields
+			if (fieldState.isHidden) continue;
 
 			const value = formValues[field.name];
 			const error = validateField(field, value);
@@ -157,8 +230,12 @@
 			}
 		}
 
-		// Validate grids
+		// Validate visible grids
 		for (const grid of grids) {
+			const gridState = getGridState(grid);
+			// Skip validation for hidden grids
+			if (gridState.isHidden) continue;
+
 			const gridRef = gridRefs[grid.name];
 			if (gridRef && !gridRef.validate()) {
 				isValid = false;
@@ -188,18 +265,24 @@
 		formInitialized = false;
 	}
 
-	// Sort items by grid position for layout
+	// Sort items by grid position for layout, filtering out hidden items
 	function getSortedItems(): Array<{ type: 'field' | 'grid'; item: FormField | FormGrid }> {
 		const items: Array<{ type: 'field' | 'grid'; item: FormField | FormGrid; row: number; col: number }> = [];
 
 		for (const field of fields) {
-			if (!field.hidden) {
+			// Use computed state for hidden check
+			const fieldState = getFieldState(field);
+			if (!fieldState.isHidden) {
 				items.push({ type: 'field', item: field, row: field.gridRow, col: field.gridColumn });
 			}
 		}
 
 		for (const grid of grids) {
-			items.push({ type: 'grid', item: grid, row: grid.gridRow, col: grid.gridColumn });
+			// Use computed state for hidden check
+			const gridState = getGridState(grid);
+			if (!gridState.isHidden) {
+				items.push({ type: 'grid', item: grid, row: grid.gridRow, col: grid.gridColumn });
+			}
 		}
 
 		// Sort by row first, then column
@@ -264,7 +347,8 @@
 				{@const field = item as FormField}
 				{@const value = formValues[field.name]}
 				{@const error = fieldErrors[field.name] || errors[field.name]}
-				{@const isReadonly = readonly || field.readonly}
+				{@const fieldState = getFieldState(field)}
+				{@const isReadonly = fieldState.isReadonly}
 
 				<div
 					class="form-field {field.cssClass || ''}"
@@ -444,6 +528,7 @@
 				</div>
 			{:else}
 				{@const grid = item as FormGrid}
+				{@const gridState = getGridState(grid)}
 				<div
 					class="form-grid {grid.cssClass || ''}"
 					style="grid-column: span {grid.gridWidth};"
@@ -456,7 +541,8 @@
 						minRows={grid.minRows}
 						maxRows={grid.maxRows}
 						initialData={tryParseJson(formValues[grid.name])}
-						{readonly}
+						readonly={gridState.isReadonly}
+						columnStates={gridState.columnStates}
 						onDataChange={(data) => handleGridChange(grid.name, data)}
 					/>
 				</div>

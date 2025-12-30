@@ -9,6 +9,9 @@
   import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
   import { flowableModdle } from '$lib/utils/flowable-moddle';
   import { demoProcesses, getDemoProcessesByCategory, type DemoProcess } from '$lib/utils/demo-processes';
+  import type { ProcessFieldLibrary, FieldConditionRule, FormField, FormGrid } from '$lib/types';
+  import FieldLibraryPanel from '$lib/components/FieldLibraryPanel.svelte';
+  import ConditionRuleList from '$lib/components/ConditionRuleList.svelte';
 
   // Core modeler state
   let modelerContainer: HTMLDivElement;
@@ -176,6 +179,12 @@
   let formGridColumns = $state(2);
   let formGridGap = $state(16);
   let showGridConfig = $state(false);
+
+  // Process-Level Field Library and Condition Rules
+  let showFieldLibrary = $state(false);
+  let showConditionRules = $state(false);
+  let fieldLibrary = $state<ProcessFieldLibrary>({ fields: [], grids: [] });
+  let globalConditionRules = $state<FieldConditionRule[]>([]);
 
   // Script Editor State
   let showScriptEditor = $state(false);
@@ -502,6 +511,10 @@
 
       const canvas = modeler.get('canvas');
       canvas.zoom('fit-viewport');
+
+      // Load process-level field library and condition rules
+      loadProcessLevelData();
+
       modelerReady = true;
     } catch (err) {
       console.error('Error loading BPMN diagram:', err);
@@ -1222,6 +1235,156 @@
     showFormBuilder = false;
   }
 
+  // Save field library to process-level extension
+  function saveFieldLibrary() {
+    if (!modeler) return;
+
+    try {
+      const elementRegistry = modeler.get('elementRegistry');
+      const modeling = modeler.get('modeling');
+
+      // Find the process element
+      const processElement = elementRegistry.find((element: any) => element.type === 'bpmn:Process');
+      if (!processElement) {
+        error = 'Could not find process element';
+        return;
+      }
+
+      // Convert field library to storable format
+      const libraryData = {
+        fields: fieldLibrary.fields.map(f => ({
+          ...f,
+          options: f.options || [],
+          validation: f.validation || null
+        })),
+        grids: fieldLibrary.grids.map(g => ({
+          ...g,
+          columns: g.columns.map(c => ({
+            ...c,
+            options: c.options || [],
+            validation: c.validation || null
+          }))
+        }))
+      };
+
+      // Store as JSON attribute on process element
+      modeling.updateProperties(processElement, {
+        'flowable:fieldLibrary': JSON.stringify(libraryData)
+      });
+
+      // Update process variables
+      fieldLibrary.fields.forEach(field => {
+        if (field.name && !processVariables.includes(field.name)) {
+          processVariables = [...processVariables, field.name];
+        }
+      });
+      fieldLibrary.grids.forEach(grid => {
+        if (grid.name && !processVariables.includes(grid.name)) {
+          processVariables = [...processVariables, grid.name];
+        }
+      });
+
+      success = 'Field library saved successfully';
+      setTimeout(() => (success = ''), 3000);
+    } catch (err) {
+      console.error('Error saving field library:', err);
+      error = 'Failed to save field library';
+    }
+  }
+
+  // Save condition rules to process-level extension
+  function saveConditionRules() {
+    if (!modeler) return;
+
+    try {
+      const elementRegistry = modeler.get('elementRegistry');
+      const modeling = modeler.get('modeling');
+
+      // Find the process element
+      const processElement = elementRegistry.find((element: any) => element.type === 'bpmn:Process');
+      if (!processElement) {
+        error = 'Could not find process element';
+        return;
+      }
+
+      // Store as JSON attribute on process element
+      modeling.updateProperties(processElement, {
+        'flowable:conditionRules': JSON.stringify(globalConditionRules)
+      });
+
+      success = 'Condition rules saved successfully';
+      setTimeout(() => (success = ''), 3000);
+    } catch (err) {
+      console.error('Error saving condition rules:', err);
+      error = 'Failed to save condition rules';
+    }
+  }
+
+  // Load field library and condition rules from process element
+  function loadProcessLevelData() {
+    if (!modeler) return;
+
+    try {
+      const elementRegistry = modeler.get('elementRegistry');
+      const processElement = elementRegistry.find((element: any) => element.type === 'bpmn:Process');
+
+      if (!processElement) return;
+
+      const businessObject = processElement.businessObject;
+
+      // Load field library
+      const fieldLibraryJson = businessObject.get && businessObject.get('flowable:fieldLibrary');
+      if (fieldLibraryJson && typeof fieldLibraryJson === 'string') {
+        try {
+          const parsed = JSON.parse(fieldLibraryJson);
+          fieldLibrary = {
+            fields: (parsed.fields || []).map((f: any) => ({
+              ...f,
+              options: f.options || [],
+              validation: f.validation || null
+            })),
+            grids: (parsed.grids || []).map((g: any) => ({
+              ...g,
+              columns: (g.columns || []).map((c: any) => ({
+                ...c,
+                options: c.options || [],
+                validation: c.validation || null
+              }))
+            }))
+          };
+        } catch (e) {
+          console.error('Error parsing field library:', e);
+          fieldLibrary = { fields: [], grids: [] };
+        }
+      }
+
+      // Load condition rules
+      const conditionRulesJson = businessObject.get && businessObject.get('flowable:conditionRules');
+      if (conditionRulesJson && typeof conditionRulesJson === 'string') {
+        try {
+          globalConditionRules = JSON.parse(conditionRulesJson);
+        } catch (e) {
+          console.error('Error parsing condition rules:', e);
+          globalConditionRules = [];
+        }
+      }
+    } catch (err) {
+      console.error('Error loading process-level data:', err);
+    }
+  }
+
+  // Handle field library changes from the panel
+  function handleFieldLibraryChange(newLibrary: ProcessFieldLibrary) {
+    fieldLibrary = newLibrary;
+    saveFieldLibrary();
+  }
+
+  // Handle condition rules changes from the list
+  function handleConditionRulesChange(newRules: FieldConditionRule[]) {
+    globalConditionRules = newRules;
+    saveConditionRules();
+  }
+
   function validateFormFields(): string[] {
     const errors: string[] = [];
     const names = new Set<string>();
@@ -1802,6 +1965,18 @@
               class="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
             >
               {showPropertiesPanel ? 'Hide' : 'Show'} Properties
+            </button>
+            <button
+              onclick={() => showFieldLibrary = !showFieldLibrary}
+              class="rounded-md px-3 py-2 text-sm font-medium {showFieldLibrary ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}"
+            >
+              Field Library ({fieldLibrary.fields.length + fieldLibrary.grids.length})
+            </button>
+            <button
+              onclick={() => showConditionRules = !showConditionRules}
+              class="rounded-md px-3 py-2 text-sm font-medium {showConditionRules ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}"
+            >
+              Condition Rules ({globalConditionRules.length})
             </button>
           </div>
         </div>
@@ -2399,6 +2574,56 @@
                 </div>
               </div>
             {/if}
+          </div>
+        {/if}
+
+        <!-- Field Library Panel -->
+        {#if showFieldLibrary}
+          <div class="w-[500px] flex-shrink-0 overflow-y-auto border-l border-gray-200 bg-white">
+            <div class="p-4">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Process Field Library</h3>
+                <button
+                  onclick={() => showFieldLibrary = false}
+                  class="text-gray-400 hover:text-gray-600"
+                >
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <FieldLibraryPanel
+                library={fieldLibrary}
+                onChange={handleFieldLibraryChange}
+              />
+            </div>
+          </div>
+        {/if}
+
+        <!-- Condition Rules Panel -->
+        {#if showConditionRules}
+          <div class="w-[550px] flex-shrink-0 overflow-y-auto border-l border-gray-200 bg-white">
+            <div class="p-4">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Global Condition Rules</h3>
+                <button
+                  onclick={() => showConditionRules = false}
+                  class="text-gray-400 hover:text-gray-600"
+                >
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <ConditionRuleList
+                rules={globalConditionRules}
+                availableFields={fieldLibrary.fields}
+                availableGrids={fieldLibrary.grids}
+                onChange={handleConditionRulesChange}
+                title="Condition Rules"
+                description="Rules are evaluated in priority order. 'Least access wins' - the most restrictive rule takes effect."
+              />
+            </div>
           </div>
         {/if}
       </div>

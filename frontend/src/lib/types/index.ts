@@ -258,3 +258,150 @@ export interface FormDefinition {
   grids: FormGrid[];
   gridConfig: GridConfig;
 }
+
+// ============================================
+// Conditional Field Settings Types
+// ============================================
+
+/**
+ * Effect types for condition rules
+ * - hidden: Hide the field/grid/column
+ * - visible: Show the field/grid/column (can be overridden by hidden)
+ * - readonly: Make the field/grid/column read-only
+ * - editable: Make the field/grid/column editable (can be overridden by readonly)
+ */
+export type ConditionEffect = 'hidden' | 'visible' | 'readonly' | 'editable';
+
+/**
+ * Target type for condition rules
+ * - all: Apply to all fields and grids
+ * - field: Apply to specific fields
+ * - grid: Apply to specific grids
+ * - column: Apply to specific columns within grids
+ */
+export type ConditionTargetType = 'all' | 'field' | 'grid' | 'column';
+
+/**
+ * Target specification for a condition rule
+ */
+export interface ConditionTarget {
+  type: ConditionTargetType;
+  fieldNames?: string[];      // For type 'field': specific field names
+  gridNames?: string[];       // For type 'grid': specific grid names
+  columnTargets?: {           // For type 'column': grid name + column names
+    gridName: string;
+    columnNames: string[];
+  }[];
+}
+
+/**
+ * A condition rule that determines field/grid visibility and editability
+ */
+export interface FieldConditionRule {
+  id: string;
+  name: string;                 // Human-readable name
+  description?: string;         // Optional description
+  condition: string;            // Expression: "${amount > 1000}" or "amount > 1000"
+  effect: ConditionEffect;      // What happens when condition is true
+  target: ConditionTarget;      // What this rule affects
+  priority: number;             // Evaluation order (higher = first, but least access wins)
+  enabled: boolean;             // Whether the rule is active
+}
+
+/**
+ * Process-level field library - defines all fields/grids once per process
+ */
+export interface ProcessFieldLibrary {
+  fields: FormField[];          // All fields available in this process
+  grids: FormGrid[];            // All grids available in this process
+}
+
+/**
+ * Reference to a field from the library with optional task-specific overrides
+ */
+export interface TaskFieldReference {
+  fieldName: string;            // Reference to field.name in library
+  overrides?: Partial<FormField>; // Task-specific property overrides
+}
+
+/**
+ * Reference to a grid from the library with optional task-specific overrides
+ */
+export interface TaskGridReference {
+  gridName: string;             // Reference to grid.name in library
+  overrides?: Partial<FormGrid>; // Task-specific property overrides
+  columnOverrides?: {           // Per-column overrides
+    columnName: string;
+    overrides: Partial<GridColumn>;
+  }[];
+}
+
+/**
+ * Task-specific form configuration
+ */
+export interface TaskFormConfig {
+  taskId: string;               // BPMN task element ID
+  fieldRefs: TaskFieldReference[];
+  gridRefs: TaskGridReference[];
+  taskConditions?: FieldConditionRule[];  // Task-level conditions (in addition to global)
+  layout?: {
+    gridConfig?: GridConfig;
+    fieldPositions?: {          // Override positions for this task
+      fieldName: string;
+      gridColumn: number;
+      gridRow: number;
+      gridWidth: number;
+    }[];
+  };
+}
+
+/**
+ * Complete process form definition with field library and conditions
+ */
+export interface ProcessFormDefinition {
+  processDefinitionId: string;
+  fieldLibrary: ProcessFieldLibrary;
+  globalConditions: FieldConditionRule[];
+  tasks: TaskFormConfig[];
+  defaultGridConfig: GridConfig;
+}
+
+/**
+ * Computed field state after evaluating all conditions
+ */
+export interface ComputedFieldState {
+  isHidden: boolean;
+  isReadonly: boolean;
+  appliedRules: string[];       // IDs of rules that affected this field
+}
+
+/**
+ * Computed grid state after evaluating all conditions
+ */
+export interface ComputedGridState {
+  isHidden: boolean;
+  isReadonly: boolean;
+  columnStates: Record<string, ComputedFieldState>; // Column name -> state
+  appliedRules: string[];
+}
+
+/**
+ * Extended FormField with computed runtime state
+ */
+export interface RuntimeFormField extends FormField {
+  computedState?: ComputedFieldState;
+}
+
+/**
+ * Extended FormGrid with computed runtime state
+ */
+export interface RuntimeFormGrid extends FormGrid {
+  computedState?: ComputedGridState;
+}
+
+/**
+ * Extended GridColumn with computed runtime state
+ */
+export interface RuntimeGridColumn extends GridColumn {
+  computedState?: ComputedFieldState;
+}
