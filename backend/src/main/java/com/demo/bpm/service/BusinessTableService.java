@@ -74,10 +74,10 @@ public class BusinessTableService {
                 int columnIndex = mapping.getColumnIndex();
                 Object convertedValue = columnMappingService.convertValueForStorage(value, fieldType);
 
-                if (fieldType == FieldType.VARCHAR) {
-                    document.setVarchar(columnIndex, (String) convertedValue);
-                } else {
-                    document.setFloat(columnIndex, (Double) convertedValue);
+                switch (fieldType) {
+                    case VARCHAR -> document.setVarchar(columnIndex, (String) convertedValue);
+                    case FLOAT -> document.setFloat(columnIndex, (Double) convertedValue);
+                    case DATETIME -> document.setDatetime(columnIndex, (LocalDateTime) convertedValue);
                 }
             }
         }
@@ -304,10 +304,15 @@ public class BusinessTableService {
             int columnIndex = mapping.getColumnIndex();
             Object value;
 
-            if (mapping.getFieldType() == FieldType.VARCHAR) {
-                value = document.getVarchar(columnIndex);
-            } else {
-                value = document.getFloat(columnIndex);
+            switch (mapping.getFieldType()) {
+                case VARCHAR -> value = document.getVarchar(columnIndex);
+                case FLOAT -> value = document.getFloat(columnIndex);
+                case DATETIME -> {
+                    LocalDateTime dt = document.getDatetime(columnIndex);
+                    // Convert to ISO string for JSON serialization
+                    value = dt != null ? dt.toString() : null;
+                }
+                default -> value = null;
             }
 
             if (value != null) {
