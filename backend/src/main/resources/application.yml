@@ -31,10 +31,21 @@ spring:
     lazy-initialization: true
 
   datasource:
-    url: jdbc:h2:mem:flowabledb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:file:./data/flowabledb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password:
+
+  # JPA Configuration for business tables
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+  # Run schema.sql on startup
+  sql:
+    init:
+      mode: always
     # HikariCP connection pool settings - reduced for low memory environments
     hikari:
       minimum-idle: 1
