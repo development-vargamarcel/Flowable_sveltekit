@@ -153,7 +153,7 @@
 	}
 
 	function handleGridChange(gridName: string, data: Record<string, unknown>[]) {
-		formValues = { ...formValues, [gridName]: JSON.stringify(data) };
+		formValues = { ...formValues, [gridName]: data };
 		userHasMadeChanges = true;
 	}
 
@@ -252,7 +252,7 @@
 		for (const grid of grids) {
 			const gridRef = gridRefs[grid.name];
 			if (gridRef) {
-				result[grid.name] = JSON.stringify(gridRef.getData());
+				result[grid.name] = gridRef.getData();
 			}
 		}
 		return result;
