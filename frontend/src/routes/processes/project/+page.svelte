@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 
 	let projectName = $state('');
@@ -12,6 +13,8 @@
 	let description = $state('');
 
 	let loading = $state(false);
+	let savingDraft = $state(false);
+	let draftProcessInstanceId = $state<string | undefined>(undefined);
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 	let errors = $state<Record<string, string>>({});
 
@@ -85,6 +88,39 @@
 		}
 
 		return { reviews, executive };
+	}
+
+	async function handleSaveDraft() {
+		savingDraft = true;
+		try {
+			const variables = {
+				projectName,
+				budget,
+				timeline,
+				department,
+				projectType,
+				expectedROI,
+				description
+			};
+
+			const result = await api.saveDraft(
+				'project-approval',
+				'Project Approval',
+				variables,
+				authStore.user?.username || '',
+				draftProcessInstanceId
+			);
+
+			draftProcessInstanceId = result.processInstanceId;
+			toast = { message: 'Draft saved successfully!', type: 'success' };
+		} catch (err) {
+			toast = {
+				message: err instanceof Error ? err.message : 'Failed to save draft',
+				type: 'error'
+			};
+		} finally {
+			savingDraft = false;
+		}
 	}
 
 	async function handleSubmit() {
@@ -310,12 +346,22 @@
 			</div>
 		</div>
 
-		<button
-			type="submit"
-			disabled={loading}
-			class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-		>
-			{loading ? 'Submitting...' : 'Submit Project Proposal'}
-		</button>
+		<div class="flex gap-3">
+			<button
+				type="button"
+				onclick={handleSaveDraft}
+				disabled={savingDraft || loading}
+				class="flex-1 flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+			>
+				{savingDraft ? 'Saving...' : 'Save Draft'}
+			</button>
+			<button
+				type="submit"
+				disabled={loading || savingDraft}
+				class="flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+			>
+				{loading ? 'Submitting...' : 'Submit Project Proposal'}
+			</button>
+		</div>
 	</form>
 </div>

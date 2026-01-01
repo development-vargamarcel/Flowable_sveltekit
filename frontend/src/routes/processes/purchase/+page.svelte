@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import GridForm, { type GridColumn } from '$lib/components/GridForm.svelte';
 	import { rules } from '$lib/utils/validation';
@@ -12,6 +13,8 @@
 	let lineItems = $state<Record<string, unknown>[]>([]);
 
 	let loading = $state(false);
+	let savingDraft = $state(false);
+	let draftProcessInstanceId = $state<string | undefined>(undefined);
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 	let errors = $state<Record<string, string>>({});
 
@@ -111,6 +114,46 @@
 			return 'Supervisor + Manager + Director approval required';
 		} else {
 			return 'Full approval chain required (Supervisor → Manager → Director → Executive)';
+		}
+	}
+
+	async function handleSaveDraft() {
+		savingDraft = true;
+		try {
+			const amount = totalAmount();
+
+			const variables = {
+				amount,
+				department,
+				vendor,
+				justification,
+				urgency,
+				lineItems: lineItems.map((item) => ({
+					item: item.item,
+					description: item.description || '',
+					quantity: item.quantity,
+					unitPrice: item.unitPrice,
+					total: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+				}))
+			};
+
+			const result = await api.saveDraft(
+				'purchase-request',
+				'Purchase Request',
+				variables,
+				authStore.user?.username || '',
+				draftProcessInstanceId
+			);
+
+			draftProcessInstanceId = result.processInstanceId;
+			toast = { message: 'Draft saved successfully!', type: 'success' };
+		} catch (err) {
+			toast = {
+				message: err instanceof Error ? err.message : 'Failed to save draft',
+				type: 'error'
+			};
+		} finally {
+			savingDraft = false;
 		}
 	}
 
@@ -308,12 +351,22 @@
 			</div>
 		</div>
 
-		<button
-			type="submit"
-			disabled={loading}
-			class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-		>
-			{loading ? 'Submitting...' : 'Submit Purchase Request'}
-		</button>
+		<div class="flex gap-3">
+			<button
+				type="button"
+				onclick={handleSaveDraft}
+				disabled={savingDraft || loading}
+				class="flex-1 flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+			>
+				{savingDraft ? 'Saving...' : 'Save Draft'}
+			</button>
+			<button
+				type="submit"
+				disabled={loading || savingDraft}
+				class="flex-1 flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+			>
+				{loading ? 'Submitting...' : 'Submit Purchase Request'}
+			</button>
+		</div>
 	</form>
 </div>

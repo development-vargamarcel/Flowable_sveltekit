@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import {
 		rules,
@@ -20,6 +21,8 @@
 
 	// Form state
 	let submitting = $state(false);
+	let savingDraft = $state(false);
+	let draftProcessInstanceId = $state<string | undefined>(undefined);
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 	const touched = $state<Record<string, boolean>>({});
 	const fieldErrors = $state<Record<string, string | null>>({});
@@ -68,6 +71,34 @@
 	function validateAllFields(): boolean {
 		const values = { leaveType, startDate, endDate, reason };
 		return validateAllFormFields(values, validationRules, touched, fieldErrors);
+	}
+
+	async function handleSaveDraft() {
+		savingDraft = true;
+		try {
+			const variables = {
+				leaveType,
+				startDate,
+				endDate,
+				days,
+				reason: reason.trim()
+			};
+
+			const result = await api.saveDraft(
+				'leave-request',
+				'Leave Request',
+				variables,
+				authStore.user?.username || '',
+				draftProcessInstanceId
+			);
+
+			draftProcessInstanceId = result.processInstanceId;
+			toast = { message: 'Draft saved successfully!', type: 'success' };
+		} catch (err) {
+			toast = { message: err instanceof Error ? err.message : 'Failed to save draft', type: 'error' };
+		} finally {
+			savingDraft = false;
+		}
 	}
 
 	async function handleSubmit(event: Event) {
@@ -223,7 +254,15 @@
 
 			<div class="flex justify-end space-x-3 pt-4">
 				<a href="/processes" class="btn btn-secondary">Cancel</a>
-				<button type="submit" class="btn btn-success" disabled={submitting}>
+				<button
+					type="button"
+					onclick={handleSaveDraft}
+					class="btn btn-secondary"
+					disabled={savingDraft || submitting}
+				>
+					{savingDraft ? 'Saving...' : 'Save Draft'}
+				</button>
+				<button type="submit" class="btn btn-success" disabled={submitting || savingDraft}>
 					{submitting ? 'Submitting...' : 'Submit Request'}
 				</button>
 			</div>

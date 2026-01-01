@@ -596,5 +596,27 @@ export const api = {
     params.append('page', page.toString());
     params.append('size', size.toString());
     return fetchApi(`/api/database/tables/${tableName}/data?${params.toString()}`);
+  },
+
+  // Save Draft
+  async saveDraft(
+    processDefinitionKey: string,
+    processDefinitionName: string,
+    variables: Record<string, unknown>,
+    userId: string,
+    processInstanceId?: string,
+    businessKey?: string
+  ): Promise<{ message: string; processInstanceId: string }> {
+    return fetchApi('/api/business/save-draft', {
+      method: 'POST',
+      body: JSON.stringify({
+        processInstanceId,
+        businessKey,
+        processDefinitionKey,
+        processDefinitionName,
+        variables,
+        userId
+      })
+    });
   }
 };

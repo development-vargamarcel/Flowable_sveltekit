@@ -3,8 +3,10 @@ package com.demo.bpm.controller;
 import com.demo.bpm.dto.DocumentDTO;
 import com.demo.bpm.dto.GridRowDTO;
 import com.demo.bpm.dto.ProcessConfigDTO;
+import com.demo.bpm.dto.ProcessInstanceDTO;
 import com.demo.bpm.entity.ProcessConfig;
 import com.demo.bpm.service.BusinessTableService;
+import com.demo.bpm.service.ProcessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class BusinessTableController {
 
     private final BusinessTableService businessTableService;
+    private final ProcessService processService;
 
     // ==================== Document Endpoints ====================
 
@@ -68,6 +71,55 @@ public class BusinessTableController {
         return businessTableService.getDocumentByProcessInstanceId(request.getProcessInstanceId())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.internalServerError().build());
+    }
+
+    /**
+     * Save draft - creates a process instance if needed and saves all data (document + grids).
+     */
+    @PostMapping("/save-draft")
+    public ResponseEntity<?> saveDraft(@RequestBody SaveDraftRequest request) {
+        try {
+            String processInstanceId = request.getProcessInstanceId();
+
+            // If no process instance exists, create a draft process instance
+            if (processInstanceId == null || processInstanceId.trim().isEmpty()) {
+                String businessKey = request.getBusinessKey();
+                if (businessKey == null || businessKey.trim().isEmpty()) {
+                    businessKey = request.getProcessDefinitionKey().toUpperCase() + "-DRAFT-" + System.currentTimeMillis();
+                }
+
+                ProcessInstanceDTO processInstance = processService.startProcess(
+                        request.getProcessDefinitionKey(),
+                        businessKey,
+                        request.getVariables(),
+                        request.getUserId()
+                );
+
+                processInstanceId = processInstance.getId();
+            }
+
+            // Save all data (document + grids)
+            businessTableService.saveAllData(
+                    processInstanceId,
+                    request.getBusinessKey(),
+                    request.getProcessDefinitionKey(),
+                    request.getProcessDefinitionName(),
+                    request.getVariables(),
+                    request.getUserId()
+            );
+
+            log.info("Saved draft for process instance: {}", processInstanceId);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Draft saved successfully",
+                    "processInstanceId", processInstanceId
+            ));
+        } catch (Exception e) {
+            log.error("Error saving draft: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
     }
 
     // ==================== Grid Row Endpoints ====================
@@ -179,5 +231,15 @@ public class BusinessTableController {
     public static class UpdateProcessConfigRequest {
         private Boolean persistOnTaskComplete;
         private Boolean persistOnProcessComplete;
+    }
+
+    @lombok.Data
+    public static class SaveDraftRequest {
+        private String processInstanceId;
+        private String businessKey;
+        private String processDefinitionKey;
+        private String processDefinitionName;
+        private Map<String, Object> variables;
+        private String userId;
     }
 }
