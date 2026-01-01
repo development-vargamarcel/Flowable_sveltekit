@@ -541,17 +541,62 @@ backend/src/main/
 | **Process Linking** | Both `process_instance_id` and `business_key` |
 | **Grid Row Links** | FK to document + process_instance_id + grid_name |
 | **Database** | H2 (file-based for persistence) |
+| **When to Persist** | Configurable per process/task |
+| **H2 File Location** | `./data/flowabledb` (relative to backend) |
 
-## Remaining Questions
+## Configurable Persistence
 
-1. **When to Persist**: Should data be saved to business tables:
-   - A) On every task completion
-   - B) Only on process completion
-   - C) Configurable per process/task
+Since persistence timing is configurable per process/task, we need a way to specify when to save:
 
-2. **H2 File Location**: Where should the H2 database file be stored?
-   - A) `./data/flowabledb` (relative to backend)
-   - B) Configurable via environment variable (recommended for production)
+### Option 1: BPMN Extension Attribute
+
+Add custom attribute to task/process in BPMN XML:
+
+```xml
+<!-- Process-level default -->
+<process id="expense-approval" flowable:persistToBusinessTable="ON_TASK_COMPLETE">
+
+<!-- Task-level override -->
+<userTask id="reviewTask" flowable:persistToBusinessTable="SKIP">
+```
+
+**Values:**
+- `ON_TASK_COMPLETE` - Save after each task (default)
+- `ON_PROCESS_COMPLETE` - Save only when process ends
+- `SKIP` - Don't save for this task (inherits process setting)
+
+### Option 2: Task Listener Approach
+
+Register a task listener that checks configuration and persists:
+
+```java
+public class BusinessTableTaskListener implements TaskListener {
+    @Override
+    public void notify(DelegateTask task) {
+        String setting = getProcessAttribute(task, "persistToBusinessTable");
+        if ("ON_TASK_COMPLETE".equals(setting)) {
+            businessTableService.persist(task);
+        }
+    }
+}
+```
+
+### Recommended: Option 1 + Process-Level Config Table
+
+Store process-level configuration in a new table:
+
+```sql
+CREATE TABLE IF NOT EXISTS process_config (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    process_definition_key VARCHAR(255) NOT NULL UNIQUE,
+    persist_on_task_complete BOOLEAN DEFAULT TRUE,
+    persist_on_process_complete BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+This allows runtime configuration without redeploying BPMN files
 
 ---
 
