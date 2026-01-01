@@ -27,6 +27,7 @@ public class TaskService {
     private final RuntimeService runtimeService;
     private final RepositoryService repositoryService;
     private final HistoryService historyService;
+    private final BusinessTableService businessTableService;
 
     public List<TaskDTO> getAssignedTasks(String userId) {
         List<Task> tasks = flowableTaskService.createTaskQuery()
@@ -130,6 +131,20 @@ public class TaskService {
             flowableTaskService.claim(taskId, userId);
         }
 
+        // Get process info for business table persistence
+        String processInstanceId = task.getProcessInstanceId();
+        ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .singleResult();
+
+        ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery()
+                .processDefinitionId(task.getProcessDefinitionId())
+                .singleResult();
+
+        String processDefKey = processDefinition != null ? processDefinition.getKey() : null;
+        String processDefName = processDefinition != null ? processDefinition.getName() : null;
+        String businessKey = processInstance != null ? processInstance.getBusinessKey() : null;
+
         // Add completion metadata
         Map<String, Object> completeVars = new HashMap<>(variables != null ? variables : Map.of());
         completeVars.put("completedBy", userId);
@@ -137,6 +152,41 @@ public class TaskService {
 
         flowableTaskService.complete(taskId, completeVars);
         log.info("Task {} completed by {} with variables: {}", taskId, userId, variables);
+
+        // Persist to business tables if configured
+        if (processDefKey != null && businessTableService.shouldPersistOnTaskComplete(processDefKey)) {
+            try {
+                // Merge existing process variables with new ones for complete picture
+                Map<String, Object> allVariables = new HashMap<>();
+
+                // Get all process variables (includes previously set values)
+                try {
+                    Map<String, Object> processVars = runtimeService.getVariables(processInstanceId);
+                    allVariables.putAll(processVars);
+                } catch (Exception e) {
+                    // Process might have ended, that's ok
+                    log.debug("Could not get process variables, process may have ended: {}", e.getMessage());
+                }
+
+                // Overlay with submitted variables (latest values take precedence)
+                if (variables != null) {
+                    allVariables.putAll(variables);
+                }
+
+                businessTableService.saveAllData(
+                        processInstanceId,
+                        businessKey,
+                        processDefKey,
+                        processDefName,
+                        allVariables,
+                        userId
+                );
+                log.info("Business table data saved for process instance: {}", processInstanceId);
+            } catch (Exception e) {
+                log.error("Failed to save business table data for process {}: {}", processInstanceId, e.getMessage(), e);
+                // Don't fail the task completion if business table save fails
+            }
+        }
     }
 
     private TaskDTO convertToDTO(Task task) {
