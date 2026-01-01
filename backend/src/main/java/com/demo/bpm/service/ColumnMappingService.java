@@ -9,6 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAccessor;
 import java.util.*;
 
 /**
@@ -45,7 +49,7 @@ public class ColumnMappingService {
         int assignedColumn = findNearestAvailable(preferredColumn, usedColumns);
 
         // 5. Create and save mapping
-        String columnName = (fieldType == FieldType.VARCHAR ? "varchar_" : "float_") + assignedColumn;
+        String columnName = getColumnPrefix(fieldType) + assignedColumn;
 
         ColumnMapping mapping = ColumnMapping.builder()
                 .scopeType(ScopeType.DOCUMENT)
@@ -83,7 +87,7 @@ public class ColumnMappingService {
         int assignedColumn = findNearestAvailable(preferredColumn, usedColumns);
 
         // 5. Create and save mapping
-        String columnName = (fieldType == FieldType.VARCHAR ? "varchar_" : "float_") + assignedColumn;
+        String columnName = getColumnPrefix(fieldType) + assignedColumn;
 
         ColumnMapping mapping = ColumnMapping.builder()
                 .scopeType(ScopeType.GRID)
@@ -134,6 +138,13 @@ public class ColumnMappingService {
             return FieldType.VARCHAR; // Default to varchar for null
         }
 
+        // Check for datetime types
+        if (value instanceof LocalDateTime || value instanceof java.util.Date ||
+            value instanceof java.time.LocalDate || value instanceof java.time.ZonedDateTime ||
+            value instanceof java.time.Instant) {
+            return FieldType.DATETIME;
+        }
+
         if (value instanceof Number) {
             return FieldType.FLOAT;
         }
@@ -142,8 +153,12 @@ public class ColumnMappingService {
             return FieldType.FLOAT; // Store boolean as 0/1
         }
 
-        // Try to parse as number
+        // Try to parse as datetime string (ISO-8601 format)
         if (value instanceof String strValue) {
+            if (isDateTimeString(strValue)) {
+                return FieldType.DATETIME;
+            }
+            // Try to parse as number
             try {
                 Double.parseDouble(strValue);
                 // It's a valid number string, but we'll keep it as varchar
@@ -154,6 +169,41 @@ public class ColumnMappingService {
         }
 
         return FieldType.VARCHAR;
+    }
+
+    /**
+     * Check if a string looks like a datetime value (ISO-8601 format).
+     */
+    private boolean isDateTimeString(String value) {
+        if (value == null || value.length() < 10) {
+            return false;
+        }
+        // Common datetime patterns
+        try {
+            // Try ISO datetime format: 2024-01-15T10:30:00
+            if (value.contains("T") && value.length() >= 16) {
+                DateTimeFormatter.ISO_LOCAL_DATE_TIME.parse(value.substring(0, Math.min(value.length(), 23)));
+                return true;
+            }
+            // Try ISO date format: 2024-01-15
+            if (value.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                return true;
+            }
+        } catch (DateTimeParseException ignored) {
+            // Not a valid datetime
+        }
+        return false;
+    }
+
+    /**
+     * Get the column prefix for a field type.
+     */
+    private String getColumnPrefix(FieldType fieldType) {
+        return switch (fieldType) {
+            case VARCHAR -> "varchar_";
+            case FLOAT -> "float_";
+            case DATETIME -> "datetime_";
+        };
     }
 
     /**
@@ -212,6 +262,10 @@ public class ColumnMappingService {
             return null;
         }
 
+        if (fieldType == FieldType.DATETIME) {
+            return convertToLocalDateTime(value);
+        }
+
         if (fieldType == FieldType.FLOAT) {
             if (value instanceof Boolean boolValue) {
                 return boolValue ? 1.0 : 0.0;
@@ -234,11 +288,57 @@ public class ColumnMappingService {
     }
 
     /**
+     * Convert various datetime types to LocalDateTime.
+     */
+    private LocalDateTime convertToLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDateTime ldt) {
+            return ldt;
+        }
+        if (value instanceof java.time.LocalDate ld) {
+            return ld.atStartOfDay();
+        }
+        if (value instanceof java.time.ZonedDateTime zdt) {
+            return zdt.toLocalDateTime();
+        }
+        if (value instanceof java.time.Instant instant) {
+            return LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault());
+        }
+        if (value instanceof java.util.Date date) {
+            return LocalDateTime.ofInstant(date.toInstant(), java.time.ZoneId.systemDefault());
+        }
+        if (value instanceof String strValue) {
+            try {
+                // Try ISO datetime format: 2024-01-15T10:30:00
+                if (strValue.contains("T")) {
+                    return LocalDateTime.parse(strValue.substring(0, Math.min(strValue.length(), 23)));
+                }
+                // Try ISO date format: 2024-01-15
+                if (strValue.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                    return java.time.LocalDate.parse(strValue).atStartOfDay();
+                }
+            } catch (DateTimeParseException e) {
+                log.warn("Could not parse datetime string '{}', returning null", strValue);
+                return null;
+            }
+        }
+        log.warn("Unsupported datetime type: {}, returning null", value.getClass().getName());
+        return null;
+    }
+
+    /**
      * Convert a stored value back to its original type based on hints.
      */
     public Object convertValueFromStorage(Object storedValue, FieldType fieldType, String originalType) {
         if (storedValue == null) {
             return null;
+        }
+
+        if (fieldType == FieldType.DATETIME && storedValue instanceof LocalDateTime dateTimeValue) {
+            // Return as ISO string for JSON serialization
+            return dateTimeValue.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         }
 
         if (fieldType == FieldType.FLOAT && storedValue instanceof Double doubleValue) {

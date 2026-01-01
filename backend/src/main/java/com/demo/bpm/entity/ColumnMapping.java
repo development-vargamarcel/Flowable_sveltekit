@@ -59,7 +59,8 @@ public class ColumnMapping {
 
     public enum FieldType {
         VARCHAR,
-        FLOAT
+        FLOAT,
+        DATETIME
     }
 
     /**

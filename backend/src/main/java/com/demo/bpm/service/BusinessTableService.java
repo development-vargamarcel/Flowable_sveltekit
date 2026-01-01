@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -155,10 +156,10 @@ public class BusinessTableService {
                 int columnIndex = mapping.getColumnIndex();
                 Object convertedValue = columnMappingService.convertValueForStorage(value, fieldType);
 
-                if (fieldType == FieldType.VARCHAR) {
-                    gridRow.setVarchar(columnIndex, (String) convertedValue);
-                } else {
-                    gridRow.setFloat(columnIndex, (Double) convertedValue);
+                switch (fieldType) {
+                    case VARCHAR -> gridRow.setVarchar(columnIndex, (String) convertedValue);
+                    case FLOAT -> gridRow.setFloat(columnIndex, (Double) convertedValue);
+                    case DATETIME -> gridRow.setDatetime(columnIndex, (LocalDateTime) convertedValue);
                 }
             }
 
@@ -365,10 +366,15 @@ public class BusinessTableService {
             int columnIndex = mapping.getColumnIndex();
             Object value;
 
-            if (mapping.getFieldType() == FieldType.VARCHAR) {
-                value = row.getVarchar(columnIndex);
-            } else {
-                value = row.getFloat(columnIndex);
+            switch (mapping.getFieldType()) {
+                case VARCHAR -> value = row.getVarchar(columnIndex);
+                case FLOAT -> value = row.getFloat(columnIndex);
+                case DATETIME -> {
+                    LocalDateTime dt = row.getDatetime(columnIndex);
+                    // Convert to ISO string for JSON serialization
+                    value = dt != null ? dt.toString() : null;
+                }
+                default -> value = null;
             }
 
             if (value != null) {

@@ -213,6 +213,97 @@ public class GridRow {
     @Column(name = "float_30")
     private Double float30;
 
+    // 30 DATETIME columns
+    @Column(name = "datetime_1")
+    private LocalDateTime datetime1;
+
+    @Column(name = "datetime_2")
+    private LocalDateTime datetime2;
+
+    @Column(name = "datetime_3")
+    private LocalDateTime datetime3;
+
+    @Column(name = "datetime_4")
+    private LocalDateTime datetime4;
+
+    @Column(name = "datetime_5")
+    private LocalDateTime datetime5;
+
+    @Column(name = "datetime_6")
+    private LocalDateTime datetime6;
+
+    @Column(name = "datetime_7")
+    private LocalDateTime datetime7;
+
+    @Column(name = "datetime_8")
+    private LocalDateTime datetime8;
+
+    @Column(name = "datetime_9")
+    private LocalDateTime datetime9;
+
+    @Column(name = "datetime_10")
+    private LocalDateTime datetime10;
+
+    @Column(name = "datetime_11")
+    private LocalDateTime datetime11;
+
+    @Column(name = "datetime_12")
+    private LocalDateTime datetime12;
+
+    @Column(name = "datetime_13")
+    private LocalDateTime datetime13;
+
+    @Column(name = "datetime_14")
+    private LocalDateTime datetime14;
+
+    @Column(name = "datetime_15")
+    private LocalDateTime datetime15;
+
+    @Column(name = "datetime_16")
+    private LocalDateTime datetime16;
+
+    @Column(name = "datetime_17")
+    private LocalDateTime datetime17;
+
+    @Column(name = "datetime_18")
+    private LocalDateTime datetime18;
+
+    @Column(name = "datetime_19")
+    private LocalDateTime datetime19;
+
+    @Column(name = "datetime_20")
+    private LocalDateTime datetime20;
+
+    @Column(name = "datetime_21")
+    private LocalDateTime datetime21;
+
+    @Column(name = "datetime_22")
+    private LocalDateTime datetime22;
+
+    @Column(name = "datetime_23")
+    private LocalDateTime datetime23;
+
+    @Column(name = "datetime_24")
+    private LocalDateTime datetime24;
+
+    @Column(name = "datetime_25")
+    private LocalDateTime datetime25;
+
+    @Column(name = "datetime_26")
+    private LocalDateTime datetime26;
+
+    @Column(name = "datetime_27")
+    private LocalDateTime datetime27;
+
+    @Column(name = "datetime_28")
+    private LocalDateTime datetime28;
+
+    @Column(name = "datetime_29")
+    private LocalDateTime datetime29;
+
+    @Column(name = "datetime_30")
+    private LocalDateTime datetime30;
+
     // Audit columns
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -374,6 +465,79 @@ public class GridRow {
             case 29 -> float29 = value;
             case 30 -> float30 = value;
             default -> throw new IllegalArgumentException("Invalid float index: " + index);
+        }
+    }
+
+    // Helper methods to get/set datetime by index
+    public LocalDateTime getDatetime(int index) {
+        return switch (index) {
+            case 1 -> datetime1;
+            case 2 -> datetime2;
+            case 3 -> datetime3;
+            case 4 -> datetime4;
+            case 5 -> datetime5;
+            case 6 -> datetime6;
+            case 7 -> datetime7;
+            case 8 -> datetime8;
+            case 9 -> datetime9;
+            case 10 -> datetime10;
+            case 11 -> datetime11;
+            case 12 -> datetime12;
+            case 13 -> datetime13;
+            case 14 -> datetime14;
+            case 15 -> datetime15;
+            case 16 -> datetime16;
+            case 17 -> datetime17;
+            case 18 -> datetime18;
+            case 19 -> datetime19;
+            case 20 -> datetime20;
+            case 21 -> datetime21;
+            case 22 -> datetime22;
+            case 23 -> datetime23;
+            case 24 -> datetime24;
+            case 25 -> datetime25;
+            case 26 -> datetime26;
+            case 27 -> datetime27;
+            case 28 -> datetime28;
+            case 29 -> datetime29;
+            case 30 -> datetime30;
+            default -> throw new IllegalArgumentException("Invalid datetime index: " + index);
+        };
+    }
+
+    public void setDatetime(int index, LocalDateTime value) {
+        switch (index) {
+            case 1 -> datetime1 = value;
+            case 2 -> datetime2 = value;
+            case 3 -> datetime3 = value;
+            case 4 -> datetime4 = value;
+            case 5 -> datetime5 = value;
+            case 6 -> datetime6 = value;
+            case 7 -> datetime7 = value;
+            case 8 -> datetime8 = value;
+            case 9 -> datetime9 = value;
+            case 10 -> datetime10 = value;
+            case 11 -> datetime11 = value;
+            case 12 -> datetime12 = value;
+            case 13 -> datetime13 = value;
+            case 14 -> datetime14 = value;
+            case 15 -> datetime15 = value;
+            case 16 -> datetime16 = value;
+            case 17 -> datetime17 = value;
+            case 18 -> datetime18 = value;
+            case 19 -> datetime19 = value;
+            case 20 -> datetime20 = value;
+            case 21 -> datetime21 = value;
+            case 22 -> datetime22 = value;
+            case 23 -> datetime23 = value;
+            case 24 -> datetime24 = value;
+            case 25 -> datetime25 = value;
+            case 26 -> datetime26 = value;
+            case 27 -> datetime27 = value;
+            case 28 -> datetime28 = value;
+            case 29 -> datetime29 = value;
+            case 30 -> datetime30 = value;
+            default -> throw new IllegalArgumentException("Invalid datetime index: " + index);
         }
     }
 }

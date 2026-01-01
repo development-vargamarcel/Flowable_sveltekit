@@ -173,6 +173,38 @@ CREATE TABLE IF NOT EXISTS grid_rows (
     float_29 DOUBLE,
     float_30 DOUBLE,
 
+    -- 30 DATETIME columns
+    datetime_1 TIMESTAMP,
+    datetime_2 TIMESTAMP,
+    datetime_3 TIMESTAMP,
+    datetime_4 TIMESTAMP,
+    datetime_5 TIMESTAMP,
+    datetime_6 TIMESTAMP,
+    datetime_7 TIMESTAMP,
+    datetime_8 TIMESTAMP,
+    datetime_9 TIMESTAMP,
+    datetime_10 TIMESTAMP,
+    datetime_11 TIMESTAMP,
+    datetime_12 TIMESTAMP,
+    datetime_13 TIMESTAMP,
+    datetime_14 TIMESTAMP,
+    datetime_15 TIMESTAMP,
+    datetime_16 TIMESTAMP,
+    datetime_17 TIMESTAMP,
+    datetime_18 TIMESTAMP,
+    datetime_19 TIMESTAMP,
+    datetime_20 TIMESTAMP,
+    datetime_21 TIMESTAMP,
+    datetime_22 TIMESTAMP,
+    datetime_23 TIMESTAMP,
+    datetime_24 TIMESTAMP,
+    datetime_25 TIMESTAMP,
+    datetime_26 TIMESTAMP,
+    datetime_27 TIMESTAMP,
+    datetime_28 TIMESTAMP,
+    datetime_29 TIMESTAMP,
+    datetime_30 TIMESTAMP,
+
     -- Audit columns
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -199,10 +231,10 @@ CREATE TABLE IF NOT EXISTS column_mapping (
 
     -- Field info
     field_name VARCHAR(255) NOT NULL,
-    field_type VARCHAR(20) NOT NULL,           -- 'VARCHAR' or 'FLOAT'
+    field_type VARCHAR(20) NOT NULL,           -- 'VARCHAR', 'FLOAT', or 'DATETIME'
 
     -- Assigned column
-    column_name VARCHAR(20) NOT NULL,          -- e.g., 'varchar_7', 'float_12'
+    column_name VARCHAR(20) NOT NULL,          -- e.g., 'varchar_7', 'float_12', 'datetime_3'
 
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
