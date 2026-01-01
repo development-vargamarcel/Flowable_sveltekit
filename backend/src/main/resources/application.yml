@@ -117,6 +117,8 @@ spring:
     password:
     # HikariCP connection pool settings - reduced for low memory environments
     hikari:
+      # Explicitly set driver class name for HikariCP
+      driver-class-name: org.h2.Driver
       minimum-idle: 1
       maximum-pool-size: 3
       idle-timeout: 30000
@@ -151,6 +153,8 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:}
     # HikariCP connection pool settings - optimized for production
     hikari:
+      # Explicitly set driver class name to avoid H2 driver being auto-detected
+      driver-class-name: org.postgresql.Driver
       minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:2}
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:10}
       idle-timeout: 300000
