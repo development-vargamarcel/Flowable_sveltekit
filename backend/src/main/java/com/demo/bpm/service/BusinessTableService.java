@@ -9,6 +9,7 @@ import com.demo.bpm.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -250,8 +251,10 @@ public class BusinessTableService {
 
     /**
      * Save all data (document + grids) for a process instance.
+     * Uses REQUIRES_NEW propagation to run in a separate transaction,
+     * preventing rollback-only issues when called from other transactional methods.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveAllData(String processInstanceId, String businessKey,
                             String processDefKey, String processDefName,
                             Map<String, Object> variables, String userId) {
