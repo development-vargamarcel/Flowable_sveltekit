@@ -418,3 +418,30 @@ export interface RuntimeFormGrid extends FormGrid {
 export interface RuntimeGridColumn extends GridColumn {
   computedState?: ComputedFieldState;
 }
+
+// ============================================
+// Database Table Viewer Types
+// ============================================
+
+/**
+ * Column metadata for a database table
+ */
+export interface TableColumn {
+  name: string;
+  type: string;
+  size: number;
+  nullable: boolean;
+}
+
+/**
+ * Paginated table data response
+ */
+export interface TableDataResponse {
+  tableName: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  page: number;
+  size: number;
+  totalRows: number;
+  totalPages: number;
+}

@@ -66,6 +66,12 @@
 						>
 							Start Process
 						</a>
+						<a
+							href="/database"
+							class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
+						>
+							Database
+						</a>
 					</div>
 				{/if}
 			</div>
@@ -106,6 +112,9 @@
 				</a>
 				<a href="/processes" class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md">
 					Start
+				</a>
+				<a href="/database" class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md">
+					DB
 				</a>
 			</div>
 		</div>

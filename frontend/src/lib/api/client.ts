@@ -13,7 +13,9 @@ import type {
   Approval,
   HandoffRequest,
   FormDefinition,
-  TaskFormWithConfig
+  TaskFormWithConfig,
+  TableColumn,
+  TableDataResponse
 } from '$lib/types';
 import { createLogger } from '$lib/utils/logger';
 import { backendStatus } from '$lib/stores/backendStatus';
@@ -574,5 +576,25 @@ export const api = {
     elementId: string
   ): Promise<FormDefinition> {
     return fetchApi(`/api/processes/${processDefinitionId}/forms/${elementId}`);
+  },
+
+  // Database Table Viewer
+  async getDatabaseTables(): Promise<string[]> {
+    return fetchApi('/api/database/tables');
+  },
+
+  async getTableColumns(tableName: string): Promise<TableColumn[]> {
+    return fetchApi(`/api/database/tables/${tableName}/columns`);
+  },
+
+  async getTableData(
+    tableName: string,
+    page: number = 0,
+    size: number = 20
+  ): Promise<TableDataResponse> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('size', size.toString());
+    return fetchApi(`/api/database/tables/${tableName}/data?${params.toString()}`);
   }
 };
