@@ -291,6 +291,13 @@ CREATE TABLE IF NOT EXISTS column_mapping (
     CONSTRAINT uk_column_mapping UNIQUE (scope_type, process_definition_key, document_type, grid_name, field_name)
 );
 
+-- Ensure columns exist for existing column_mapping tables (handles schema migration)
+ALTER TABLE column_mapping ADD COLUMN IF NOT EXISTS document_type VARCHAR(100);
+
+-- Drop and recreate unique constraint to include document_type column (if not already present)
+ALTER TABLE column_mapping DROP CONSTRAINT IF EXISTS uk_column_mapping;
+ALTER TABLE column_mapping ADD CONSTRAINT uk_column_mapping UNIQUE (scope_type, process_definition_key, document_type, grid_name, field_name);
+
 CREATE INDEX IF NOT EXISTS idx_column_mapping_process ON column_mapping(process_definition_key);
 CREATE INDEX IF NOT EXISTS idx_column_mapping_document_type ON column_mapping(document_type);
 CREATE INDEX IF NOT EXISTS idx_column_mapping_lookup ON column_mapping(scope_type, process_definition_key, document_type, grid_name);
