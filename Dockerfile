@@ -307,7 +307,7 @@ http {
 }
 EOF
 
-# Create supervisor config
+# Create supervisor config with proper SIGTERM handling
 RUN cat > /etc/supervisord.conf << 'EOF'
 [supervisord]
 nodaemon=true
@@ -318,36 +318,48 @@ user=root
 [program:nginx]
 command=/app/start-nginx.sh
 autostart=true
-autorestart=true
+autorestart=unexpected
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 startsecs=0
 priority=10
+stopsignal=QUIT
+stopwaitsecs=10
+stopasgroup=true
+killasgroup=true
 
 [program:backend]
 command=java -XX:+UseContainerSupport -Xms64m -Xmx256m -XX:MaxMetaspaceSize=150m -XX:CompressedClassSpaceSize=32m -XX:ReservedCodeCacheSize=32m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss256k -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8081 -jar /app/backend/app.jar
 directory=/app/backend
 autostart=true
-autorestart=true
+autorestart=unexpected
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 priority=100
+stopsignal=TERM
+stopwaitsecs=30
+stopasgroup=true
+killasgroup=true
 
 [program:frontend]
 command=/app/start-frontend.sh
 directory=/app/frontend
 environment=NODE_ENV="production",PORT="3000"
 autostart=true
-autorestart=true
+autorestart=unexpected
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 priority=100
+stopsignal=TERM
+stopwaitsecs=10
+stopasgroup=true
+killasgroup=true
 EOF
 
 # Create nginx wrapper script - starts immediately for health checks
@@ -382,7 +394,7 @@ EOF
 
 RUN chmod +x /app/start-frontend.sh
 
-# Create startup script
+# Create startup script with proper signal handling
 RUN cat > /app/start.sh << 'EOF'
 #!/bin/sh
 set -e
@@ -398,8 +410,31 @@ echo "  - nginx (reverse proxy) on port $PORT"
 echo "  - backend (Spring Boot) on port 8081"
 echo "  - frontend (SvelteKit) on port 3000"
 
+# Trap SIGTERM and convert exit code 143 to 0 for clean shutdown
+# This ensures platforms like Railway see a clean exit
+cleanup() {
+    echo "Received shutdown signal, stopping gracefully..."
+    # supervisord will handle stopping child processes
+    exit 0
+}
+trap cleanup TERM INT
+
 # Start supervisor which manages all processes
-exec /usr/bin/supervisord -c /etc/supervisord.conf
+# Run in background so we can trap signals
+/usr/bin/supervisord -c /etc/supervisord.conf &
+SUPERVISOR_PID=$!
+
+# Wait for supervisord and handle its exit
+wait $SUPERVISOR_PID
+EXIT_CODE=$?
+
+# Convert SIGTERM exit code (143) to 0 for clean shutdown
+if [ $EXIT_CODE -eq 143 ]; then
+    echo "Supervisord exited with SIGTERM (143), treating as clean shutdown"
+    exit 0
+fi
+
+exit $EXIT_CODE
 EOF
 
 RUN chmod +x /app/start.sh

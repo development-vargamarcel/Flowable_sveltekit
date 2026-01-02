@@ -111,7 +111,7 @@ http {
 }
 NGINXEOF
 
-# Create supervisor config to manage both nginx and Spring Boot
+# Create supervisor config with proper SIGTERM handling
 RUN cat > /etc/supervisord.conf << 'SUPERVISOREOF'
 [supervisord]
 nodaemon=true
@@ -122,24 +122,32 @@ user=root
 [program:nginx]
 command=/app/start-nginx.sh
 autostart=true
-autorestart=true
+autorestart=unexpected
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 startsecs=0
 priority=10
+stopsignal=QUIT
+stopwaitsecs=10
+stopasgroup=true
+killasgroup=true
 
 [program:backend]
 command=java -XX:+UseContainerSupport -Xms64m -Xmx256m -XX:MaxMetaspaceSize=150m -XX:CompressedClassSpaceSize=32m -XX:ReservedCodeCacheSize=32m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss256k -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dserver.address=0.0.0.0 -Dserver.port=8081 -jar /app/app.jar
 directory=/app
 autostart=true
-autorestart=true
+autorestart=unexpected
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 priority=100
+stopsignal=TERM
+stopwaitsecs=30
+stopasgroup=true
+killasgroup=true
 SUPERVISOREOF
 
 # Create nginx startup script
@@ -151,7 +159,7 @@ STARTEOF
 
 RUN chmod +x /app/start-nginx.sh
 
-# Create main startup script
+# Create main startup script with proper signal handling
 RUN cat > /app/start.sh << 'MAINEOF'
 #!/bin/sh
 set -e
@@ -170,8 +178,31 @@ echo "Starting services..."
 echo "  - nginx (immediate health response) on port $PORT"
 echo "  - Spring Boot on internal port 8081"
 
+# Trap SIGTERM and convert exit code 143 to 0 for clean shutdown
+# This ensures platforms like Railway see a clean exit
+cleanup() {
+    echo "Received shutdown signal, stopping gracefully..."
+    # supervisord will handle stopping child processes
+    exit 0
+}
+trap cleanup TERM INT
+
 # Start supervisor which manages all processes
-exec /usr/bin/supervisord -c /etc/supervisord.conf
+# Run in background so we can trap signals
+/usr/bin/supervisord -c /etc/supervisord.conf &
+SUPERVISOR_PID=$!
+
+# Wait for supervisord and handle its exit
+wait $SUPERVISOR_PID
+EXIT_CODE=$?
+
+# Convert SIGTERM exit code (143) to 0 for clean shutdown
+if [ $EXIT_CODE -eq 143 ]; then
+    echo "Supervisord exited with SIGTERM (143), treating as clean shutdown"
+    exit 0
+fi
+
+exit $EXIT_CODE
 MAINEOF
 
 RUN chmod +x /app/start.sh
