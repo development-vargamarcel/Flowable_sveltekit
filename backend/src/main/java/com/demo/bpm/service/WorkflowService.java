@@ -338,54 +338,41 @@ public class WorkflowService {
     }
 
     public DashboardDTO getDashboard(String userId) {
-        // Get all active processes
-        List<ProcessInstance> activeProcesses = runtimeService.createProcessInstanceQuery()
-                .orderByStartTime().desc()
-                .list();
+        // Get counts for stats
+        long totalActive = runtimeService.createProcessInstanceQuery().count();
+        long totalCompleted = historyService.createHistoricProcessInstanceQuery().finished().count();
+        long totalPending = taskService.createTaskQuery().count();
+        long myTasks = taskService.createTaskQuery().taskCandidateOrAssigned(userId).count();
+        long myProcesses = runtimeService.createProcessInstanceQuery().variableValueEquals("startedBy", userId).count();
+        long pendingEscalations = runtimeService.createProcessInstanceQuery().variableValueGreaterThan("escalationCount", 0).count();
 
-        // Get completed processes (last 30 days)
+        // Get paginated lists for display
+        List<ProcessInstance> activeProcessesForDisplay = runtimeService.createProcessInstanceQuery()
+                .orderByStartTime().desc()
+                .listPage(0, 20);
+
         List<HistoricProcessInstance> completedProcesses = historyService.createHistoricProcessInstanceQuery()
                 .finished()
                 .orderByProcessInstanceEndTime().desc()
                 .listPage(0, 50);
 
-        // Get user's tasks
-        long myTasks = taskService.createTaskQuery()
-                .taskCandidateOrAssigned(userId)
-                .count();
-
-        // Get user's processes
-        long myProcesses = runtimeService.createProcessInstanceQuery()
-                .variableValueEquals("startedBy", userId)
-                .count();
-
-        // Calculate stats
-        long totalActive = activeProcesses.size();
-        long totalCompleted = completedProcesses.size();
-        long totalPending = taskService.createTaskQuery().count();
-
-        // Count escalated processes
-        long pendingEscalations = 0;
-        for (ProcessInstance pi : activeProcesses) {
-            Map<String, Object> vars = runtimeService.getVariables(pi.getId());
-            int escalationCount = ((Number) vars.getOrDefault("escalationCount", 0)).intValue();
-            if (escalationCount > 0) {
-                pendingEscalations++;
-            }
-        }
-
-        // Calculate average completion time
+        // Calculate average completion time from a sample of recent completed processes
         long avgCompletionTimeHours = 0;
         if (!completedProcesses.isEmpty()) {
             long totalMillis = completedProcesses.stream()
                     .filter(p -> p.getDurationInMillis() != null)
                     .mapToLong(HistoricProcessInstance::getDurationInMillis)
                     .sum();
-            avgCompletionTimeHours = totalMillis / (completedProcesses.size() * 3600000);
+            if (completedProcesses.size() > 0) {
+                avgCompletionTimeHours = totalMillis / (completedProcesses.size() * 3600000);
+            }
         }
 
-        // Group by type
-        Map<String, Long> activeByType = activeProcesses.stream()
+        // For activeByType, query a limited sample to get a representative distribution
+        List<ProcessInstance> activeProcessesForGrouping = runtimeService.createProcessInstanceQuery()
+                .orderByStartTime().desc()
+                .listPage(0, 1000);
+        Map<String, Long> activeByType = activeProcessesForGrouping.stream()
                 .collect(Collectors.groupingBy(ProcessInstance::getProcessDefinitionKey, Collectors.counting()));
 
         // Group by status
@@ -394,36 +381,35 @@ public class WorkflowService {
         byStatus.put("COMPLETED", totalCompleted);
         byStatus.put("PENDING", totalPending);
 
-        // Get recent completed
+        // Get recent completed DTOs
         List<WorkflowHistoryDTO> recentCompleted = completedProcesses.stream()
                 .limit(10)
                 .map(hp -> getWorkflowHistory(hp.getId()))
                 .collect(Collectors.toList());
 
-        // Get active with details
-        List<WorkflowHistoryDTO> activeWithDetails = activeProcesses.stream()
-                .limit(20)
+        // Get active with details from the paginated list
+        List<WorkflowHistoryDTO> activeWithDetails = activeProcessesForDisplay.stream()
                 .map(ap -> getWorkflowHistory(ap.getId()))
                 .collect(Collectors.toList());
 
-        // Get user's pending approvals
+        // Get user's pending approvals with pagination
         List<Task> userTasks = taskService.createTaskQuery()
                 .taskCandidateOrAssigned(userId)
                 .orderByTaskCreateTime().desc()
-                .list();
+                .listPage(0, 10);
 
         List<WorkflowHistoryDTO> myPendingApprovals = userTasks.stream()
-                .limit(10)
                 .map(t -> getWorkflowHistory(t.getProcessInstanceId()))
                 .distinct()
                 .collect(Collectors.toList());
 
-        // Escalation metrics
+        // Escalation metrics based on the same sample of active processes
         long totalEscalations = 0;
         long totalDeEscalations = 0;
         Map<String, Long> escalationsByLevel = new HashMap<>();
+        long activeEscalatedProcesses = pendingEscalations;
 
-        for (ProcessInstance pi : activeProcesses) {
+        for (ProcessInstance pi : activeProcessesForGrouping) {
             Map<String, Object> vars = runtimeService.getVariables(pi.getId());
             List<Map<String, Object>> escHistory = getEscalationHistoryList(vars);
             for (Map<String, Object> esc : escHistory) {
@@ -451,7 +437,7 @@ public class WorkflowService {
         DashboardDTO.EscalationMetrics escalationMetrics = DashboardDTO.EscalationMetrics.builder()
                 .totalEscalations(totalEscalations)
                 .totalDeEscalations(totalDeEscalations)
-                .activeEscalatedProcesses(pendingEscalations)
+                .activeEscalatedProcesses(activeEscalatedProcesses)
                 .escalationsByLevel(escalationsByLevel)
                 .build();
 
