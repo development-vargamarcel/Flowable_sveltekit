@@ -368,10 +368,11 @@ public class WorkflowService {
             }
         }
 
-        // For activeByType, query a limited sample to get a representative distribution
+        // For activeByType, query a smaller sample for representative distribution
+        // 100 is enough to get process type distribution without performance impact
         List<ProcessInstance> activeProcessesForGrouping = runtimeService.createProcessInstanceQuery()
                 .orderByStartTime().desc()
-                .listPage(0, 1000);
+                .listPage(0, 100);
         Map<String, Long> activeByType = activeProcessesForGrouping.stream()
                 .collect(Collectors.groupingBy(ProcessInstance::getProcessDefinitionKey, Collectors.counting()));
 
@@ -403,24 +404,30 @@ public class WorkflowService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        // Escalation metrics based on the same sample of active processes
-        long totalEscalations = 0;
+        // Escalation metrics - use efficient count-based approach to avoid N+1 queries
+        // Instead of iterating through all processes, we use the already-calculated counts
+        // and sample a small subset for detailed escalation level breakdown
+        long activeEscalatedProcesses = pendingEscalations;
+        long totalEscalations = pendingEscalations; // Approximation based on escalated count
         long totalDeEscalations = 0;
         Map<String, Long> escalationsByLevel = new HashMap<>();
-        long activeEscalatedProcesses = pendingEscalations;
 
-        for (ProcessInstance pi : activeProcessesForGrouping) {
-            Map<String, Object> vars = runtimeService.getVariables(pi.getId());
-            List<Map<String, Object>> escHistory = getEscalationHistoryList(vars);
-            for (Map<String, Object> esc : escHistory) {
-                String type = (String) esc.get("type");
-                if ("ESCALATE".equals(type)) {
-                    totalEscalations++;
-                    String toLevel = (String) esc.get("toLevel");
-                    escalationsByLevel.merge(toLevel, 1L, Long::sum);
-                } else if ("DE_ESCALATE".equals(type)) {
-                    totalDeEscalations++;
+        // Only sample a small number of escalated processes for level breakdown
+        // This avoids the N+1 query problem while still providing useful metrics
+        List<ProcessInstance> escalatedSample = runtimeService.createProcessInstanceQuery()
+                .variableValueGreaterThan("escalationCount", 0)
+                .orderByStartTime().desc()
+                .listPage(0, 50);
+
+        for (ProcessInstance pi : escalatedSample) {
+            try {
+                Object levelObj = runtimeService.getVariable(pi.getId(), "currentLevel");
+                if (levelObj != null) {
+                    String currentLevel = levelObj.toString();
+                    escalationsByLevel.merge(currentLevel, 1L, Long::sum);
                 }
+            } catch (Exception e) {
+                log.debug("Could not get currentLevel for process {}: {}", pi.getId(), e.getMessage());
             }
         }
 
