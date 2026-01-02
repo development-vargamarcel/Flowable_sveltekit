@@ -124,6 +124,16 @@ CREATE TABLE IF NOT EXISTS document (
     CONSTRAINT uk_document_process_type UNIQUE (process_instance_id, type)
 );
 
+-- Ensure columns exist for existing tables (handles schema migration)
+ALTER TABLE document ADD COLUMN IF NOT EXISTS type VARCHAR(100) NOT NULL DEFAULT 'main';
+ALTER TABLE document ADD COLUMN IF NOT EXISTS business_key VARCHAR(255);
+ALTER TABLE document ADD COLUMN IF NOT EXISTS process_definition_key VARCHAR(255);
+ALTER TABLE document ADD COLUMN IF NOT EXISTS process_definition_name VARCHAR(255);
+
+-- Drop and recreate unique constraint to include type column (if not already present)
+ALTER TABLE document DROP CONSTRAINT IF EXISTS uk_document_process_type;
+ALTER TABLE document ADD CONSTRAINT uk_document_process_type UNIQUE (process_instance_id, type);
+
 CREATE INDEX IF NOT EXISTS idx_document_process_instance ON document(process_instance_id);
 CREATE INDEX IF NOT EXISTS idx_document_type ON document(type);
 CREATE INDEX IF NOT EXISTS idx_document_business_key ON document(business_key);
