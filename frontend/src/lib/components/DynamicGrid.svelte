@@ -304,7 +304,9 @@
 												onValueChange={(v) => handleSelectChange(row, column.name, v)}
 											>
 												<Select.Trigger class={row.errors[column.name] ? 'border-destructive' : ''}>
-													<Select.Value placeholder="Select..." />
+													<span class="block truncate">
+														{row.data[column.name] || 'Select...'}
+													</span>
 												</Select.Trigger>
 												<Select.Content>
 													{#each column.options || [] as option}

@@ -5,7 +5,7 @@
 
   import BpmnViewer from 'bpmn-js/lib/Viewer';
   // @ts-ignore
-  import BpmnDiffer from 'bpmn-js-differ';
+  import { diff } from 'bpmn-js-differ';
 
   let leftId = $state('');
   let rightId = $state('');
@@ -60,10 +60,7 @@
     if (!viewerContainer) return;
 
     viewer = new BpmnViewer({
-      container: viewerContainer,
-      additionalModules: [
-        BpmnDiffer
-      ]
+      container: viewerContainer
     });
 
     // Import the "left" (older/base) diagram first
@@ -93,36 +90,16 @@
 
              // Let's try to verify if the module is active
              try {
-                // This call might depend on exact version/API of bpmn-js-differ
-                // Typically: viewer.get('diff').diff(newDefinitions);
-                const diffing = viewer.get('diff');
-                const changes = diffing.diff(newDefinitions);
-
-                // Calculate stats
-                // changes is an object with keys for added, removed, changed...
-                // e.g. { _added: {...}, _removed: {...}, ... }
-                // or a flat list of change objects.
+                const changes = diff(viewer.getDefinitions(), newDefinitions);
 
                 // Debug log
                 console.log('Diff result:', changes);
 
-                // Let's count them roughly
-                let a = 0, r = 0, c = 0, l = 0;
-
-                // Helper to walk changes
-                // The structure is usually { <elementId>: { changeType: 'added'|'removed'|'changed' } }
-                for (const key in changes) {
-                    const change = changes[key];
-                    if (change.changeType === 'added') a++;
-                    else if (change.changeType === 'removed') r++;
-                    else if (change.changeType === 'changed') c++;
-                    else if (change.changeType === 'layout-changed') l++;
-                }
-
-                added = a;
-                removed = r;
-                changed = c;
-                layoutChanged = l;
+                // Calculate stats
+                added = Object.keys(changes._added || {}).length;
+                removed = Object.keys(changes._removed || {}).length;
+                changed = Object.keys(changes._changed || {}).length;
+                layoutChanged = Object.keys(changes._layoutChanged || {}).length;
 
              } catch (e) {
                 console.error('Diff calculation failed', e);
