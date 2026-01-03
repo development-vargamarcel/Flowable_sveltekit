@@ -9,6 +9,8 @@ import com.demo.bpm.service.BusinessTableService;
 import com.demo.bpm.service.ProcessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,10 +36,12 @@ public class BusinessTableController {
      * Get all documents for a process instance.
      */
     @GetMapping("/processes/{processInstanceId}/documents")
-    public ResponseEntity<List<DocumentDTO>> getAllDocuments(
-            @PathVariable String processInstanceId) {
+    public ResponseEntity<Page<DocumentDTO>> getAllDocuments(
+            @PathVariable String processInstanceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
-        List<DocumentDTO> documents = businessTableService.getDocumentsByProcessInstanceId(processInstanceId);
+        Page<DocumentDTO> documents = businessTableService.getDocumentsByProcessInstanceId(processInstanceId, PageRequest.of(page, size));
         return ResponseEntity.ok(documents);
     }
 
@@ -106,10 +110,12 @@ public class BusinessTableController {
      * Get all documents by business key.
      */
     @GetMapping("/documents/all/by-business-key/{businessKey}")
-    public ResponseEntity<List<DocumentDTO>> getAllDocumentsByBusinessKey(
-            @PathVariable String businessKey) {
+    public ResponseEntity<Page<DocumentDTO>> getAllDocumentsByBusinessKey(
+            @PathVariable String businessKey,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
-        List<DocumentDTO> documents = businessTableService.getDocumentsByBusinessKey(businessKey);
+        Page<DocumentDTO> documents = businessTableService.getDocumentsByBusinessKey(businessKey, PageRequest.of(page, size));
         return ResponseEntity.ok(documents);
     }
 
@@ -191,12 +197,14 @@ public class BusinessTableController {
      * Get grid rows for a process instance, document type, and grid name.
      */
     @GetMapping("/processes/{processInstanceId}/documents/{type}/grids/{gridName}")
-    public ResponseEntity<List<GridRowDTO>> getGridRowsWithType(
+    public ResponseEntity<Page<GridRowDTO>> getGridRowsWithType(
             @PathVariable String processInstanceId,
             @PathVariable String type,
-            @PathVariable String gridName) {
+            @PathVariable String gridName,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
-        List<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, type, gridName);
+        Page<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, type, gridName, PageRequest.of(page, size));
         return ResponseEntity.ok(rows);
     }
 
@@ -204,7 +212,7 @@ public class BusinessTableController {
      * Save grid rows with document type.
      */
     @PostMapping("/processes/{processInstanceId}/documents/{type}/grids/{gridName}")
-    public ResponseEntity<List<GridRowDTO>> saveGridRowsWithType(
+    public ResponseEntity<Page<GridRowDTO>> saveGridRowsWithType(
             @PathVariable String processInstanceId,
             @PathVariable String type,
             @PathVariable String gridName,
@@ -218,7 +226,7 @@ public class BusinessTableController {
                 request.getRows()
         );
 
-        List<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, type, gridName);
+        Page<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, type, gridName, PageRequest.of(0, 10));
         return ResponseEntity.ok(rows);
     }
 
@@ -239,11 +247,13 @@ public class BusinessTableController {
      * Get grid rows for a process instance and grid name (legacy - uses main type).
      */
     @GetMapping("/documents/{processInstanceId}/grids/{gridName}")
-    public ResponseEntity<List<GridRowDTO>> getGridRows(
+    public ResponseEntity<Page<GridRowDTO>> getGridRows(
             @PathVariable String processInstanceId,
-            @PathVariable String gridName) {
+            @PathVariable String gridName,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
-        List<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, "main", gridName);
+        Page<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, "main", gridName, PageRequest.of(page, size));
         return ResponseEntity.ok(rows);
     }
 
@@ -251,7 +261,7 @@ public class BusinessTableController {
      * Save grid rows (legacy - uses main type).
      */
     @PostMapping("/documents/{processInstanceId}/grids/{gridName}")
-    public ResponseEntity<List<GridRowDTO>> saveGridRows(
+    public ResponseEntity<Page<GridRowDTO>> saveGridRows(
             @PathVariable String processInstanceId,
             @PathVariable String gridName,
             @RequestBody SaveGridRowsRequest request) {
@@ -265,7 +275,7 @@ public class BusinessTableController {
                 request.getRows()
         );
 
-        List<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, docType, gridName);
+        Page<GridRowDTO> rows = businessTableService.getGridRows(processInstanceId, docType, gridName, PageRequest.of(0, 10));
         return ResponseEntity.ok(rows);
     }
 

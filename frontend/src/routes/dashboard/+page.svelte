@@ -3,9 +3,10 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
 	import { processStore } from '$lib/stores/processes.svelte';
-	import type { WorkflowHistory } from '$lib/types';
+	import type { WorkflowHistory, Page } from '$lib/types';
 	import ProcessTimeline from '$lib/components/ProcessTimeline.svelte';
 	import EscalationBadge from '$lib/components/EscalationBadge.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 
 	let loading = $state(true);
 	let error = $state('');
@@ -13,6 +14,7 @@
 	let selectedProcess = $state<WorkflowHistory | null>(null);
 	let statusFilter = $state<string>('');
 	let typeFilter = $state<string>('');
+	let currentPage = $state(0);
 
 	// Subscribe to process changes for reactive updates
 	let unsubscribe: (() => void) | null = null;
@@ -24,10 +26,10 @@
 		// Subscribe to process changes from other components
 		unsubscribe = processStore.onProcessChange(() => {
 			// Force refresh when processes change elsewhere
-			loadDashboard(true);
+			loadDashboard(true, 0);
 		});
 
-		await loadDashboard();
+		await loadDashboard(false, 0);
 	});
 
 	onDestroy(() => {
@@ -36,11 +38,15 @@
 		}
 	});
 
-	async function loadDashboard(forceRefresh = false) {
+	async function loadDashboard(forceRefresh = false, page = 0) {
 		loading = true;
 		error = '';
 		try {
-			await processStore.loadDashboard(() => api.getDashboard(), forceRefresh);
+			await processStore.loadDashboard(
+				() => api.getDashboard(page, 10, statusFilter, typeFilter),
+				forceRefresh
+			);
+			currentPage = page;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load dashboard';
 		} finally {
@@ -48,32 +54,19 @@
 		}
 	}
 
-	function getDisplayProcesses(): WorkflowHistory[] {
-		if (!dashboard) return [];
+	function getDisplayProcesses(): Page<WorkflowHistory> | null {
+		if (!dashboard) return null;
 
-		let processes: WorkflowHistory[] = [];
 		switch (activeTab) {
 			case 'active':
-				processes = dashboard.activeProcesses;
-				break;
+				return dashboard.activeProcesses;
 			case 'completed':
-				processes = dashboard.recentCompleted;
-				break;
+				return dashboard.recentCompleted;
 			case 'my-approvals':
-				processes = dashboard.myPendingApprovals;
-				break;
+				return dashboard.myPendingApprovals;
 			default:
-				processes = [...dashboard.activeProcesses, ...dashboard.recentCompleted];
+				return dashboard.activeProcesses;
 		}
-
-		if (statusFilter) {
-			processes = processes.filter(p => p.status === statusFilter);
-		}
-		if (typeFilter) {
-			processes = processes.filter(p => p.processDefinitionKey === typeFilter);
-		}
-
-		return processes;
 	}
 
 	function formatDate(dateStr: string): string {
@@ -136,6 +129,10 @@
 	}
 
 	let displayProcesses = $derived(getDisplayProcesses());
+
+	function handlePageChange(page: number) {
+		loadDashboard(false, page);
+	}
 </script>
 
 <svelte:head>
@@ -310,73 +307,84 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-gray-200">
-					{#each displayProcesses as process}
-						<tr class="hover:bg-gray-50">
-							<td class="px-4 py-3">
-								<div class="flex items-center gap-2">
-									<span class="text-lg">{getProcessTypeIcon(process.processDefinitionKey)}</span>
-									<div>
-										<div class="font-medium text-gray-900">
-											{process.processDefinitionName || process.processDefinitionKey}
+					{#if displayProcesses}
+						{#each displayProcesses.content as process}
+							<tr class="hover:bg-gray-50">
+								<td class="px-4 py-3">
+									<div class="flex items-center gap-2">
+										<span class="text-lg">{getProcessTypeIcon(process.processDefinitionKey)}</span>
+										<div>
+											<div class="font-medium text-gray-900">
+												{process.processDefinitionName || process.processDefinitionKey}
+											</div>
+											<div class="text-xs text-gray-500">{process.initiatorName || process.initiatorId}</div>
 										</div>
-										<div class="text-xs text-gray-500">{process.initiatorName || process.initiatorId}</div>
 									</div>
-								</div>
-							</td>
-							<td class="px-4 py-3 text-sm font-mono text-gray-600">{process.businessKey}</td>
-							<td class="px-4 py-3">
-								<span class="px-2 py-1 rounded-full text-xs font-medium {getStatusColor(process.status)}">
-									{process.status}
-								</span>
-								{#if process.escalationCount > 0}
-									<EscalationBadge count={process.escalationCount} />
-								{/if}
-							</td>
-							<td class="px-4 py-3 text-sm text-gray-600">
-								{#if process.currentTaskName}
-									<span class="font-medium">{process.currentTaskName}</span>
-									{#if process.currentAssignee}
-										<span class="text-gray-400 ml-1">({process.currentAssignee})</span>
+								</td>
+								<td class="px-4 py-3 text-sm font-mono text-gray-600">{process.businessKey}</td>
+								<td class="px-4 py-3">
+									<span class="px-2 py-1 rounded-full text-xs font-medium {getStatusColor(process.status)}">
+										{process.status}
+									</span>
+									{#if process.escalationCount > 0}
+										<EscalationBadge count={process.escalationCount} />
 									{/if}
-								{:else}
-									<span class="text-gray-400">-</span>
-								{/if}
-							</td>
-							<td class="px-4 py-3">
-								<span class="px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
-									{process.currentLevel}
-								</span>
-							</td>
-							<td class="px-4 py-3 text-sm text-gray-600">{formatDate(process.startTime)}</td>
-							<td class="px-4 py-3 text-sm text-gray-600">{formatDuration(process.durationInMillis)}</td>
-							<td class="px-4 py-3">
-								<div class="flex gap-2">
-									<button
-										onclick={() => viewProcessDetails(process)}
-										class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-									>
-										Details
-									</button>
-									{#if process.currentTaskId}
+								</td>
+								<td class="px-4 py-3 text-sm text-gray-600">
+									{#if process.currentTaskName}
+										<span class="font-medium">{process.currentTaskName}</span>
+										{#if process.currentAssignee}
+											<span class="text-gray-400 ml-1">({process.currentAssignee})</span>
+										{/if}
+									{:else}
+										<span class="text-gray-400">-</span>
+									{/if}
+								</td>
+								<td class="px-4 py-3">
+									<span class="px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+										{process.currentLevel}
+									</span>
+								</td>
+								<td class="px-4 py-3 text-sm text-gray-600">{formatDate(process.startTime)}</td>
+								<td class="px-4 py-3 text-sm text-gray-600">{formatDuration(process.durationInMillis)}</td>
+								<td class="px-4 py-3">
+									<div class="flex gap-2">
 										<button
-											onclick={() => navigateToTask(process.currentTaskId!)}
-											class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+											onclick={() => viewProcessDetails(process)}
+											class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
 										>
-											View Task
+											Details
 										</button>
-									{/if}
-								</div>
-							</td>
-						</tr>
-					{:else}
-						<tr>
-							<td colspan="8" class="px-4 py-8 text-center text-gray-500">
-								No processes found matching the current filters.
-							</td>
-						</tr>
-					{/each}
+										{#if process.currentTaskId}
+											<button
+												onclick={() => navigateToTask(process.currentTaskId!)}
+												class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+											>
+												View Task
+											</button>
+										{/if}
+									</div>
+								</td>
+							</tr>
+						{:else}
+							<tr>
+								<td colspan="8" class="px-4 py-8 text-center text-gray-500">
+									No processes found matching the current filters.
+								</td>
+							</tr>
+						{/each}
+					{/if}
 				</tbody>
 			</table>
+			{#if displayProcesses && displayProcesses.totalPages > 1}
+				<div class="p-4">
+					<Pagination
+						currentPage={displayProcesses.number}
+						totalPages={displayProcesses.totalPages}
+						onPageChange={handlePageChange}
+					/>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

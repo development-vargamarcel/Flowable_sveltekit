@@ -4,8 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Page;
 
-import java.util.List;
 import java.util.Map;
 
 @Data
@@ -23,9 +23,9 @@ public class DashboardDTO {
     private Map<String, Long> byStatus;
 
     // Recent Activity
-    private List<WorkflowHistoryDTO> recentCompleted;
-    private List<WorkflowHistoryDTO> activeProcesses;
-    private List<WorkflowHistoryDTO> myPendingApprovals;
+    private Page<WorkflowHistoryDTO> recentCompleted;
+    private Page<WorkflowHistoryDTO> activeProcesses;
+    private Page<WorkflowHistoryDTO> myPendingApprovals;
 
     // Escalation Metrics
     private EscalationMetrics escalationMetrics;

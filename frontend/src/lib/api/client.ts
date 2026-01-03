@@ -440,8 +440,11 @@ export const api = {
     return fetchApi(`/api/processes/instance/${processInstanceId}`);
   },
 
-  async getMyProcesses(): Promise<ProcessInstance[]> {
-    return fetchApi('/api/processes/my-processes');
+  async getMyProcesses(page: number = 0, size: number = 10): Promise<Page<ProcessInstance>> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('size', size.toString());
+    return fetchApi(`/api/processes/my-processes?${params.toString()}`);
   },
 
   async getUsers(): Promise<User[]> {
@@ -449,8 +452,22 @@ export const api = {
   },
 
   // Workflow Dashboard
-  async getDashboard(): Promise<Dashboard> {
-    return fetchApi('/api/workflow/dashboard');
+  async getDashboard(
+    page: number = 0,
+    size: number = 10,
+    status?: string,
+    type?: string
+  ): Promise<Dashboard> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('size', size.toString());
+    if (status) {
+      params.append('status', status);
+    }
+    if (type) {
+      params.append('type', type);
+    }
+    return fetchApi(`/api/workflow/dashboard?${params.toString()}`);
   },
 
   // Workflow History & Processes
@@ -631,8 +648,11 @@ export const api = {
   /**
    * Get all documents for a process instance
    */
-  async getDocuments(processInstanceId: string): Promise<DocumentDTO[]> {
-    return fetchApi(`/api/business/processes/${processInstanceId}/documents`);
+  async getDocuments(processInstanceId: string, page: number = 0, size: number = 10): Promise<Page<DocumentDTO>> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('size', size.toString());
+    return fetchApi(`/api/business/processes/${processInstanceId}/documents?${params.toString()}`);
   },
 
   /**
@@ -662,10 +682,15 @@ export const api = {
   async getGridRows(
     processInstanceId: string,
     documentType: string,
-    gridName: string
-  ): Promise<GridRowDTO[]> {
+    gridName: string,
+    page: number = 0,
+    size: number = 10
+  ): Promise<Page<GridRowDTO>> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('size', size.toString());
     return fetchApi(
-      `/api/business/processes/${processInstanceId}/documents/${documentType}/grids/${gridName}`
+      `/api/business/processes/${processInstanceId}/documents/${documentType}/grids/${gridName}?${params.toString()}`
     );
   },
 
@@ -677,7 +702,7 @@ export const api = {
     documentType: string,
     gridName: string,
     request: SaveGridRowsRequest
-  ): Promise<GridRowDTO[]> {
+  ): Promise<Page<GridRowDTO>> {
     return fetchApi(
       `/api/business/processes/${processInstanceId}/documents/${documentType}/grids/${gridName}`,
       {
@@ -706,7 +731,10 @@ export const api = {
   /**
    * Get all documents by business key
    */
-  async getDocumentsByBusinessKey(businessKey: string): Promise<DocumentDTO[]> {
-    return fetchApi(`/api/business/documents/all/by-business-key/${businessKey}`);
+  async getDocumentsByBusinessKey(businessKey: string, page: number = 0, size: number = 10): Promise<Page<DocumentDTO>> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('size', size.toString());
+    return fetchApi(`/api/business/documents/all/by-business-key/${businessKey}?${params.toString()}`);
   }
 };

@@ -17,6 +17,9 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.flowable.task.api.history.HistoricTaskInstance;
 import org.flowable.variable.api.history.HistoricVariableInstance;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -337,7 +340,7 @@ public class WorkflowService {
                 .collect(Collectors.toList());
     }
 
-    public DashboardDTO getDashboard(String userId) {
+    public DashboardDTO getDashboard(String userId, Pageable pageable, String status, String type) {
         // Get counts for stats
         long totalActive = runtimeService.createProcessInstanceQuery().count();
         long totalCompleted = historyService.createHistoricProcessInstanceQuery().finished().count();
@@ -349,12 +352,12 @@ public class WorkflowService {
         // Get paginated lists for display
         List<ProcessInstance> activeProcessesForDisplay = runtimeService.createProcessInstanceQuery()
                 .orderByStartTime().desc()
-                .listPage(0, 20);
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
 
         List<HistoricProcessInstance> completedProcesses = historyService.createHistoricProcessInstanceQuery()
                 .finished()
                 .orderByProcessInstanceEndTime().desc()
-                .listPage(0, 50);
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
 
         // Calculate average completion time from a sample of recent completed processes
         long avgCompletionTimeHours = 0;
@@ -383,26 +386,25 @@ public class WorkflowService {
         byStatus.put("PENDING", totalPending);
 
         // Get recent completed DTOs
-        List<WorkflowHistoryDTO> recentCompleted = completedProcesses.stream()
-                .limit(10)
+        Page<WorkflowHistoryDTO> recentCompleted = new PageImpl<>(completedProcesses.stream()
                 .map(hp -> getWorkflowHistory(hp.getId()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()), pageable, totalCompleted);
 
         // Get active with details from the paginated list
-        List<WorkflowHistoryDTO> activeWithDetails = activeProcessesForDisplay.stream()
+        Page<WorkflowHistoryDTO> activeWithDetails = new PageImpl<>(activeProcessesForDisplay.stream()
                 .map(ap -> getWorkflowHistory(ap.getId()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()), pageable, totalActive);
 
         // Get user's pending approvals with pagination
         List<Task> userTasks = taskService.createTaskQuery()
                 .taskCandidateOrAssigned(userId)
                 .orderByTaskCreateTime().desc()
-                .listPage(0, 10);
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
 
-        List<WorkflowHistoryDTO> myPendingApprovals = userTasks.stream()
+        Page<WorkflowHistoryDTO> myPendingApprovals = new PageImpl<>(userTasks.stream()
                 .map(t -> getWorkflowHistory(t.getProcessInstanceId()))
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()), pageable, myTasks);
 
         // Escalation metrics - use efficient count-based approach to avoid N+1 queries
         // Instead of iterating through all processes, we use the already-calculated counts

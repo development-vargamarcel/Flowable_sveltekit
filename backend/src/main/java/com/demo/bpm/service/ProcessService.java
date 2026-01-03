@@ -11,6 +11,9 @@ import org.flowable.engine.RuntimeService;
 import org.flowable.engine.history.HistoricProcessInstance;
 import org.flowable.engine.repository.ProcessDefinition;
 import org.flowable.engine.runtime.ProcessInstance;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -116,14 +119,21 @@ public class ProcessService {
                 .build();
     }
 
-    public List<ProcessInstanceDTO> getActiveProcesses(String userId) {
-        return runtimeService.createProcessInstanceQuery()
+    public Page<ProcessInstanceDTO> getActiveProcesses(String userId, Pageable pageable) {
+        List<ProcessInstance> instances = runtimeService.createProcessInstanceQuery()
                 .variableValueEquals("_startedBy", userId)
                 .orderByStartTime().desc()
-                .list()
-                .stream()
+                .listPage((int) pageable.getOffset(), pageable.getPageSize());
+
+        long total = runtimeService.createProcessInstanceQuery()
+                .variableValueEquals("_startedBy", userId)
+                .count();
+
+        List<ProcessInstanceDTO> dtos = instances.stream()
                 .map(instance -> getProcessInstance(instance.getId()))
                 .collect(Collectors.toList());
+
+        return new PageImpl<>(dtos, pageable, total);
     }
 
     private ProcessDTO convertToDTO(ProcessDefinition definition) {

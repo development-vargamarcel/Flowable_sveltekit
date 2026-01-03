@@ -1,6 +1,9 @@
 package com.demo.bpm.repository;
 
 import com.demo.bpm.entity.GridRow;
+import com.demo.bpm.entity.GridRow;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +15,7 @@ import java.util.List;
 @Repository
 public interface GridRowRepository extends JpaRepository<GridRow, Long> {
 
-    List<GridRow> findByDocumentIdAndGridNameOrderByRowIndex(Long documentId, String gridName);
+    Page<GridRow> findByDocumentIdAndGridNameOrderByRowIndex(Long documentId, String gridName, Pageable pageable);
 
     List<GridRow> findByProcessInstanceIdAndGridNameOrderByRowIndex(String processInstanceId, String gridName);
 

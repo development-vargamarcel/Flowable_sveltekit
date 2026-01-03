@@ -1,6 +1,8 @@
 package com.demo.bpm.repository;
 
 import com.demo.bpm.entity.Document;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,7 +13,7 @@ import java.util.Optional;
 public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     // Find all documents for a process instance
-    List<Document> findByProcessInstanceId(String processInstanceId);
+    Page<Document> findByProcessInstanceId(String processInstanceId, Pageable pageable);
 
     // Find specific document by process instance ID and type
     Optional<Document> findByProcessInstanceIdAndType(String processInstanceId, String type);
@@ -20,7 +22,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     Optional<Document> findByBusinessKeyAndType(String businessKey, String type);
 
     // Find all documents by business key
-    List<Document> findByBusinessKey(String businessKey);
+    Page<Document> findByBusinessKey(String businessKey, Pageable pageable);
 
     List<Document> findByProcessDefinitionKey(String processDefinitionKey);
 

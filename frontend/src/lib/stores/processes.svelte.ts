@@ -1,4 +1,4 @@
-import type { ProcessDefinition, ProcessInstance, Dashboard } from '$lib/types';
+import type { ProcessDefinition, ProcessInstance, Dashboard, Page } from '$lib/types';
 
 /**
  * Centralized process store for managing process definitions and instances.
@@ -18,7 +18,7 @@ class ProcessStore {
   definitionsLastFetched = $state<number | null>(null);
 
   // My process instances
-  myInstances = $state<ProcessInstance[]>([]);
+  myInstances = $state<Page<ProcessInstance> | null>(null);
   myInstancesLoading = $state(false);
   myInstancesError = $state<string | null>(null);
   myInstancesLastFetched = $state<number | null>(null);
@@ -102,10 +102,10 @@ class ProcessStore {
    * Load my process instances with caching
    */
   async loadMyInstances(
-    fetchFn: () => Promise<ProcessInstance[]>,
+    fetchFn: () => Promise<Page<ProcessInstance>>,
     forceRefresh = false
-  ): Promise<ProcessInstance[]> {
-    if (!forceRefresh && this.isCacheValid(this.myInstancesLastFetched)) {
+  ): Promise<Page<ProcessInstance>> {
+    if (!forceRefresh && this.myInstances && this.isCacheValid(this.myInstancesLastFetched)) {
       return this.myInstances;
     }
 
@@ -254,7 +254,7 @@ class ProcessStore {
    */
   clear() {
     this.definitions = [];
-    this.myInstances = [];
+    this.myInstances = null;
     this.dashboard = null;
     this.definitionsLastFetched = null;
     this.myInstancesLastFetched = null;

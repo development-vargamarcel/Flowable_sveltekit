@@ -4,6 +4,8 @@ import com.demo.bpm.dto.*;
 import com.demo.bpm.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,8 +26,13 @@ public class WorkflowController {
 
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardDTO> getDashboard(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        DashboardDTO dashboard = workflowService.getDashboard(userDetails.getUsername());
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String type) {
+        Pageable pageable = PageRequest.of(page, size);
+        DashboardDTO dashboard = workflowService.getDashboard(userDetails.getUsername(), pageable, status, type);
         return ResponseEntity.ok(dashboard);
     }
 

@@ -8,6 +8,8 @@ import com.demo.bpm.entity.ColumnMapping.FieldType;
 import com.demo.bpm.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,10 +110,9 @@ public class BusinessTableService {
      * Get all documents for a process instance.
      */
     @Transactional(readOnly = true)
-    public List<DocumentDTO> getDocumentsByProcessInstanceId(String processInstanceId) {
-        return documentRepository.findByProcessInstanceId(processInstanceId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+    public Page<DocumentDTO> getDocumentsByProcessInstanceId(String processInstanceId, Pageable pageable) {
+        return documentRepository.findByProcessInstanceId(processInstanceId, pageable)
+                .map(this::convertToDTO);
     }
 
     /**
@@ -148,10 +149,9 @@ public class BusinessTableService {
      * Get all documents by business key.
      */
     @Transactional(readOnly = true)
-    public List<DocumentDTO> getDocumentsByBusinessKey(String businessKey) {
-        return documentRepository.findByBusinessKey(businessKey).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+    public Page<DocumentDTO> getDocumentsByBusinessKey(String businessKey, Pageable pageable) {
+        return documentRepository.findByBusinessKey(businessKey, pageable)
+                .map(this::convertToDTO);
     }
 
     // ==================== Grid Row Operations ====================
@@ -237,32 +237,30 @@ public class BusinessTableService {
      * Get grid rows for a document (default type "main").
      */
     @Transactional(readOnly = true)
-    public List<GridRowDTO> getGridRows(String processInstanceId, String gridName) {
-        return getGridRows(processInstanceId, DEFAULT_DOCUMENT_TYPE, gridName);
+    public Page<GridRowDTO> getGridRows(String processInstanceId, String gridName, Pageable pageable) {
+        return getGridRows(processInstanceId, DEFAULT_DOCUMENT_TYPE, gridName, pageable);
     }
 
     /**
      * Get grid rows for a document with specific type.
      */
     @Transactional(readOnly = true)
-    public List<GridRowDTO> getGridRows(String processInstanceId, String documentType, String gridName) {
+    public Page<GridRowDTO> getGridRows(String processInstanceId, String documentType, String gridName, Pageable pageable) {
         String docType = documentType != null ? documentType : DEFAULT_DOCUMENT_TYPE;
 
         Document document = documentRepository.findByProcessInstanceIdAndType(processInstanceId, docType)
                 .orElse(null);
         if (document == null) {
-            return Collections.emptyList();
+            return Page.empty(pageable);
         }
 
-        List<GridRow> rows = gridRowRepository.findByDocumentIdAndGridNameOrderByRowIndex(
-                document.getId(), gridName);
+        Page<GridRow> rows = gridRowRepository.findByDocumentIdAndGridNameOrderByRowIndex(
+                document.getId(), gridName, pageable);
 
         String processDefKey = document.getProcessDefinitionKey();
         Map<String, ColumnMapping> mappings = columnMappingService.getGridMappings(processDefKey, docType, gridName);
 
-        return rows.stream()
-                .map(row -> convertGridRowToDTO(row, mappings))
-                .collect(Collectors.toList());
+        return rows.map(row -> convertGridRowToDTO(row, mappings));
     }
 
     /**
