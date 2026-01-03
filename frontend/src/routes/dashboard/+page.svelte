@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { api } from '$lib/api/client';
+	import { api, ApiError } from '$lib/api/client';
 	import { processStore } from '$lib/stores/processes.svelte';
 	import type { WorkflowHistory, Page } from '$lib/types';
 	import ProcessTimeline from '$lib/components/ProcessTimeline.svelte';
@@ -9,7 +9,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	let loading = $state(true);
-	let error = $state('');
+	let error = $state<ApiError | string | null>(null);
 	let activeTab = $state<'all' | 'active' | 'completed' | 'my-approvals'>('all');
 	let selectedProcess = $state<WorkflowHistory | null>(null);
 	let statusFilter = $state<string>('');
@@ -40,7 +40,7 @@
 
 	async function loadDashboard(forceRefresh = false, page = 0) {
 		loading = true;
-		error = '';
+		error = null;
 		try {
 			await processStore.loadDashboard(
 				() => api.getDashboard(page, 10, statusFilter, typeFilter),
@@ -48,7 +48,11 @@
 			);
 			currentPage = page;
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load dashboard';
+			if (err instanceof ApiError) {
+				error = err;
+			} else {
+				error = err instanceof Error ? err.message : 'Failed to load dashboard';
+			}
 		} finally {
 			loading = false;
 		}
@@ -128,6 +132,27 @@
 		goto(`/tasks/${taskId}`);
 	}
 
+	function copyErrorDetails() {
+		if (error instanceof ApiError) {
+			const details = JSON.stringify(
+				{
+					message: error.message,
+					status: error.status,
+					details: error.details,
+					fieldErrors: error.fieldErrors,
+					timestamp: error.timestamp
+				},
+				null,
+				2
+			);
+			navigator.clipboard.writeText(details);
+			alert('Error details copied to clipboard');
+		} else {
+			navigator.clipboard.writeText(String(error));
+			alert('Error message copied to clipboard');
+		}
+	}
+
 	let displayProcesses = $derived(getDisplayProcesses());
 
 	function handlePageChange(page: number) {
@@ -152,8 +177,29 @@
 		</div>
 	{:else if error}
 		<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-			{error}
-			<button onclick={() => loadDashboard()} class="ml-4 underline">Retry</button>
+			<div class="flex items-start">
+				<div class="flex-1">
+					<h3 class="font-bold">Error Loading Dashboard</h3>
+					<p class="mt-1">
+						{#if error instanceof ApiError}
+							{error.getFullMessage()}
+						{:else}
+							{error}
+						{/if}
+					</p>
+					{#if error instanceof ApiError && error.timestamp}
+						<p class="mt-2 text-xs text-red-500">Timestamp: {error.timestamp}</p>
+					{/if}
+				</div>
+				<div class="ml-4 flex flex-col gap-2">
+					<button onclick={() => loadDashboard()} class="px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-sm">
+						Retry
+					</button>
+					<button onclick={copyErrorDetails} class="px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-sm">
+						Copy Error
+					</button>
+				</div>
+			</div>
 		</div>
 	{:else if dashboard}
 		<!-- Stats Overview -->

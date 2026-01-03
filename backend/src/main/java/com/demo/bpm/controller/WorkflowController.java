@@ -49,13 +49,9 @@ public class WorkflowController {
     }
 
     @GetMapping("/processes/{processInstanceId}")
-    public ResponseEntity<?> getProcessHistory(@PathVariable String processInstanceId) {
-        try {
-            WorkflowHistoryDTO history = workflowService.getWorkflowHistory(processInstanceId);
-            return ResponseEntity.ok(history);
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<WorkflowHistoryDTO> getProcessHistory(@PathVariable String processInstanceId) {
+        WorkflowHistoryDTO history = workflowService.getWorkflowHistory(processInstanceId);
+        return ResponseEntity.ok(history);
     }
 
     @GetMapping("/processes/{processInstanceId}/tasks")
@@ -72,18 +68,11 @@ public class WorkflowController {
             @PathVariable String taskId,
             @RequestBody EscalationRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            EscalationDTO escalation = workflowService.escalateTask(taskId, request, userDetails.getUsername());
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task escalated successfully",
-                    "escalation", escalation
-            ));
-        } catch (Exception e) {
-            log.error("Error escalating task {}: {}", taskId, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        EscalationDTO escalation = workflowService.escalateTask(taskId, request, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "message", "Task escalated successfully",
+                "escalation", escalation
+        ));
     }
 
     @PostMapping("/tasks/{taskId}/de-escalate")
@@ -91,34 +80,21 @@ public class WorkflowController {
             @PathVariable String taskId,
             @RequestBody EscalationRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            EscalationDTO deEscalation = workflowService.deEscalateTask(taskId, request, userDetails.getUsername());
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task de-escalated successfully",
-                    "deEscalation", deEscalation
-            ));
-        } catch (Exception e) {
-            log.error("Error de-escalating task {}: {}", taskId, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        EscalationDTO deEscalation = workflowService.deEscalateTask(taskId, request, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "message", "Task de-escalated successfully",
+                "deEscalation", deEscalation
+        ));
     }
 
     @GetMapping("/tasks/{taskId}/escalation-options")
     public ResponseEntity<?> getEscalationOptions(@PathVariable String taskId) {
-        try {
-            List<String> escalateOptions = workflowService.getEscalationOptions(taskId);
-            List<String> deEscalateOptions = workflowService.getDeEscalationOptions(taskId);
-            return ResponseEntity.ok(Map.of(
-                    "escalateTo", escalateOptions,
-                    "deEscalateTo", deEscalateOptions
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        List<String> escalateOptions = workflowService.getEscalationOptions(taskId);
+        List<String> deEscalateOptions = workflowService.getDeEscalationOptions(taskId);
+        return ResponseEntity.ok(Map.of(
+                "escalateTo", escalateOptions,
+                "deEscalateTo", deEscalateOptions
+        ));
     }
 
     // ==================== Handoff ====================
@@ -128,26 +104,17 @@ public class WorkflowController {
             @PathVariable String taskId,
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            String toUserId = request.get("toUserId");
-            String reason = request.get("reason");
+        String toUserId = request.get("toUserId");
+        String reason = request.get("reason");
 
-            if (toUserId == null || toUserId.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Target user is required"
-                ));
-            }
-
-            workflowService.handoffTask(taskId, toUserId, reason, userDetails.getUsername());
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task handed off successfully to " + toUserId
-            ));
-        } catch (Exception e) {
-            log.error("Error handing off task {}: {}", taskId, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
+        if (toUserId == null || toUserId.isEmpty()) {
+            throw new IllegalArgumentException("Target user is required");
         }
+
+        workflowService.handoffTask(taskId, toUserId, reason, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "message", "Task handed off successfully to " + toUserId
+        ));
     }
 
     // ==================== Approvals ====================
@@ -157,19 +124,12 @@ public class WorkflowController {
             @PathVariable String taskId,
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            String comments = request.get("comments");
-            ApprovalDTO approval = workflowService.recordApproval(taskId, "APPROVED", comments, userDetails.getUsername());
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task approved successfully",
-                    "approval", approval
-            ));
-        } catch (Exception e) {
-            log.error("Error approving task {}: {}", taskId, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        String comments = request.get("comments");
+        ApprovalDTO approval = workflowService.recordApproval(taskId, "APPROVED", comments, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "message", "Task approved successfully",
+                "approval", approval
+        ));
     }
 
     @PostMapping("/tasks/{taskId}/reject")
@@ -177,24 +137,15 @@ public class WorkflowController {
             @PathVariable String taskId,
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            String comments = request.get("comments");
-            if (comments == null || comments.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Rejection reason is required"
-                ));
-            }
-            ApprovalDTO approval = workflowService.recordApproval(taskId, "REJECTED", comments, userDetails.getUsername());
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task rejected",
-                    "approval", approval
-            ));
-        } catch (Exception e) {
-            log.error("Error rejecting task {}: {}", taskId, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
+        String comments = request.get("comments");
+        if (comments == null || comments.isEmpty()) {
+            throw new IllegalArgumentException("Rejection reason is required");
         }
+        ApprovalDTO approval = workflowService.recordApproval(taskId, "REJECTED", comments, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "message", "Task rejected",
+                "approval", approval
+        ));
     }
 
     @PostMapping("/tasks/{taskId}/request-changes")
@@ -202,23 +153,14 @@ public class WorkflowController {
             @PathVariable String taskId,
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            String comments = request.get("comments");
-            if (comments == null || comments.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Change request details are required"
-                ));
-            }
-            ApprovalDTO approval = workflowService.recordApproval(taskId, "REQUEST_CHANGES", comments, userDetails.getUsername());
-            return ResponseEntity.ok(Map.of(
-                    "message", "Changes requested",
-                    "approval", approval
-            ));
-        } catch (Exception e) {
-            log.error("Error requesting changes for task {}: {}", taskId, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
+        String comments = request.get("comments");
+        if (comments == null || comments.isEmpty()) {
+            throw new IllegalArgumentException("Change request details are required");
         }
+        ApprovalDTO approval = workflowService.recordApproval(taskId, "REQUEST_CHANGES", comments, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "message", "Changes requested",
+                "approval", approval
+        ));
     }
 }

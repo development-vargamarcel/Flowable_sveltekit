@@ -1,6 +1,7 @@
 package com.demo.bpm.service;
 
 import com.demo.bpm.dto.*;
+import com.demo.bpm.exception.ResourceNotFoundException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,7 +68,7 @@ public class WorkflowService {
                 .singleResult();
 
         if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
+            throw new ResourceNotFoundException("Task not found: " + taskId);
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
@@ -256,7 +257,7 @@ public class WorkflowService {
                     .singleResult();
 
             if (historicInstance == null) {
-                throw new RuntimeException("Process instance not found: " + processInstanceId);
+                throw new ResourceNotFoundException("Process instance not found: " + processInstanceId);
             }
 
             List<HistoricVariableInstance> historicVars = historyService.createHistoricVariableInstanceQuery()
@@ -499,7 +500,7 @@ public class WorkflowService {
                 .singleResult();
 
         if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
+            throw new ResourceNotFoundException("Task not found: " + taskId);
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
@@ -533,7 +534,7 @@ public class WorkflowService {
                 .singleResult();
 
         if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
+            throw new ResourceNotFoundException("Task not found: " + taskId);
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
