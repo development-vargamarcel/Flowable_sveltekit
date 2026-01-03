@@ -187,9 +187,15 @@ function parseErrorResponse(
 }
 
 /**
- * Check if an error response indicates the backend is still starting up
+ * Check if an error response indicates the backend is still starting up or unavailable
  */
-function isBackendStartingError(errorBody: Record<string, unknown> | null): boolean {
+function isBackendStartingError(
+  errorBody: Record<string, unknown> | null,
+  status?: number
+): boolean {
+  // 502 errors from the proxy indicate backend is unavailable - should retry
+  if (status === 502) return true;
+
   if (!errorBody) return false;
 
   const error = errorBody.error as string | undefined;
@@ -199,6 +205,12 @@ function isBackendStartingError(errorBody: Record<string, unknown> | null): bool
   if (error === 'Service starting') return true;
   if (message?.toLowerCase().includes('backend is initializing')) return true;
   if (message?.toLowerCase().includes('service starting')) return true;
+
+  // Check for proxy error messages from hooks.server.ts
+  if (error?.toLowerCase().includes('backend unavailable')) return true;
+  if (error?.toLowerCase().includes('connection refused')) return true;
+  if (error?.toLowerCase().includes('connection timed out')) return true;
+  if (message?.toLowerCase().includes('could not connect')) return true;
 
   return false;
 }
@@ -260,8 +272,8 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
           });
         }
 
-        // Check if backend is still starting up - retry with exponential backoff
-        if (isBackendStartingError(errorBody)) {
+        // Check if backend is still starting up or unavailable - retry with exponential backoff
+        if (isBackendStartingError(errorBody, response.status)) {
           const delay = getRetryDelay(attempt);
           log.info(
             `Backend is starting, retrying in ${delay}ms (attempt ${attempt + 1}/${STARTUP_RETRY_CONFIG.maxRetries + 1})`,
@@ -648,7 +660,11 @@ export const api = {
   /**
    * Get all documents for a process instance
    */
-  async getDocuments(processInstanceId: string, page: number = 0, size: number = 10): Promise<Page<DocumentDTO>> {
+  async getDocuments(
+    processInstanceId: string,
+    page: number = 0,
+    size: number = 10
+  ): Promise<Page<DocumentDTO>> {
     const params = new URLSearchParams();
     params.append('page', page.toString());
     params.append('size', size.toString());
@@ -731,10 +747,16 @@ export const api = {
   /**
    * Get all documents by business key
    */
-  async getDocumentsByBusinessKey(businessKey: string, page: number = 0, size: number = 10): Promise<Page<DocumentDTO>> {
+  async getDocumentsByBusinessKey(
+    businessKey: string,
+    page: number = 0,
+    size: number = 10
+  ): Promise<Page<DocumentDTO>> {
     const params = new URLSearchParams();
     params.append('page', page.toString());
     params.append('size', size.toString());
-    return fetchApi(`/api/business/documents/all/by-business-key/${businessKey}?${params.toString()}`);
+    return fetchApi(
+      `/api/business/documents/all/by-business-key/${businessKey}?${params.toString()}`
+    );
   }
 };
