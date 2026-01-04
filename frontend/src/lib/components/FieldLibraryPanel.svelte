@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FormField, FormGrid, GridColumn, ProcessFieldLibrary } from '$lib/types';
 	import Modal from './Modal.svelte';
+	import CodeEditor from './CodeEditor.svelte';
 	import Sortable from 'sortablejs';
 	import { complexDemoLibrary } from '$lib/utils/demo-data';
 
@@ -68,7 +69,21 @@
 		type: 'text' as GridColumn['type'],
 		required: false,
 		placeholder: '',
-		options: [] as string[]
+		options: [] as string[],
+		validation: {
+			minLength: null as number | null,
+			maxLength: null as number | null,
+			min: null as number | null,
+			max: null as number | null,
+			pattern: '',
+			patternMessage: ''
+		},
+		logic: {
+			type: 'None' as 'None' | 'JS' | 'SQL',
+			content: '',
+			dependencies: [] as string[],
+			autoCalculate: false
+		}
 	});
 
 	const fieldTypes = [
@@ -96,11 +111,47 @@
 		{ value: 'number', label: 'Number' },
 		{ value: 'date', label: 'Date' },
 		{ value: 'select', label: 'Select' },
-		{ value: 'textarea', label: 'Text Area' }
+		{ value: 'textarea', label: 'Text Area' },
+		{ value: 'checkbox', label: 'Checkbox' },
+		{ value: 'email', label: 'Email' },
+		{ value: 'currency', label: 'Currency' },
+		{ value: 'percentage', label: 'Percentage' }
 	];
 
 	function generateId(prefix: string): string {
 		return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+	}
+
+	// Generate autocomplete suggestions for code editors
+	function getCodeSuggestions() {
+		const suggestions: Array<{ label: string; value: string; type: 'field' | 'grid' | 'column' | 'variable' | 'function'; description?: string }> = [];
+		
+		// Built-in variables
+		suggestions.push(
+			{ label: 'value', value: 'value', type: 'variable', description: 'Current field value' },
+			{ label: 'form', value: 'form', type: 'variable', description: 'All form fields' },
+			{ label: 'grids', value: 'grids', type: 'variable', description: 'All grids data' },
+			{ label: 'row', value: 'row', type: 'variable', description: 'Current grid row' }
+		);
+		
+		// Fields
+		library.fields.forEach(f => {
+			suggestions.push({ label: `form.${f.name}`, value: `form.${f.name}`, type: 'field', description: f.label });
+		});
+		
+		// Grids and columns
+		library.grids.forEach(g => {
+			suggestions.push({ label: `grids.${g.name}`, value: `grids.${g.name}`, type: 'grid', description: g.label });
+			suggestions.push({ label: `grids.${g.name}.selectedRow`, value: `grids.${g.name}.selectedRow`, type: 'grid', description: 'Selected row' });
+			suggestions.push({ label: `grids.${g.name}.rows`, value: `grids.${g.name}.rows`, type: 'grid', description: 'All rows' });
+			suggestions.push({ label: `grids.${g.name}.sum`, value: `grids.${g.name}.sum('')`, type: 'function', description: 'Sum column' });
+			
+			g.columns.forEach(c => {
+				suggestions.push({ label: `row.${c.name}`, value: `row.${c.name}`, type: 'column', description: `${g.label} - ${c.label}` });
+			});
+		});
+		
+		return suggestions;
 	}
 
 	function sortableList(node: HTMLElement) {
@@ -162,7 +213,7 @@
 		showFieldEditor = true;
 	}
 
-	function handleEditField(field: FormField) {
+	function _handleEditField(field: FormField) {
 		editingField = field;
 		fieldForm = {
 			id: field.id,
@@ -349,7 +400,21 @@
 			type: 'text',
 			required: false,
 			placeholder: '',
-			options: []
+			options: [],
+			validation: {
+				minLength: null,
+				maxLength: null,
+				min: null,
+				max: null,
+				pattern: '',
+				patternMessage: ''
+			},
+			logic: {
+				type: 'None',
+				content: '',
+				dependencies: [],
+				autoCalculate: false
+			}
 		};
 		editingColumn = { gridIndex, column: null as unknown as GridColumn };
 		showColumnEditor = true;
@@ -364,7 +429,26 @@
 			type: column.type as typeof columnForm.type,
 			required: column.required,
 			placeholder: column.placeholder || '',
-			options: column.options || []
+			options: column.options || [],
+			validation: column.validation ? { ...column.validation } : {
+				minLength: null,
+				maxLength: null,
+				min: null,
+				max: null,
+				pattern: '',
+				patternMessage: ''
+			},
+			logic: column.logic ? {
+				type: column.logic.type || 'None',
+				content: column.logic.content || '',
+				dependencies: column.logic.dependencies ? [...column.logic.dependencies] : [],
+				autoCalculate: column.logic.autoCalculate || false
+			} : {
+				type: 'None',
+				content: '',
+				dependencies: [],
+				autoCalculate: false
+			}
 		};
 		showColumnEditor = true;
 	}
@@ -380,7 +464,20 @@
 			required: columnForm.required,
 			placeholder: columnForm.placeholder,
 			options: columnForm.type === 'select' ? columnForm.options : null,
-			validation: null
+			validation: {
+				minLength: columnForm.validation.minLength || undefined,
+				maxLength: columnForm.validation.maxLength || undefined,
+				min: columnForm.validation.min || undefined,
+				max: columnForm.validation.max || undefined,
+				pattern: columnForm.validation.pattern || undefined,
+				patternMessage: columnForm.validation.patternMessage || undefined
+			},
+			logic: columnForm.logic.type !== 'None' ? {
+				type: columnForm.logic.type,
+				content: columnForm.logic.content,
+				dependencies: columnForm.logic.dependencies,
+				autoCalculate: columnForm.logic.autoCalculate
+			} : undefined
 		};
 
 		const grid = library.grids[editingColumn.gridIndex];
@@ -426,14 +523,6 @@
 
 	function removeColumnOption(index: number) {
 		columnForm.options = columnForm.options.filter((_, i) => i !== index);
-	}
-
-	function getFieldTypeLabel(type: string): string {
-		return fieldTypes.find((t) => t.value === type)?.label || type;
-	}
-
-	function getColumnTypeLabel(type: string): string {
-		return columnTypes.find((t) => t.value === type)?.label || type;
 	}
 </script>
 
@@ -946,42 +1035,57 @@
         {#if fieldForm.logic.type !== 'None'}
           <div>
             <label for="f_deps" class="block text-sm font-medium text-gray-700"
-              >Dependencies (Field Names)</label
+              >Dependencies (Fields, Grids & Columns)</label
             >
             <select
               id="f_deps"
               multiple
               bind:value={fieldForm.logic.dependencies}
               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              size="3"
+              size="4"
             >
-              {#each library.fields as f}
-                {#if f.name !== fieldForm.name}
-                  <option value={f.name}>{f.label} ({f.name})</option>
-                {/if}
-              {/each}
+              <optgroup label="Fields">
+                {#each library.fields as f}
+                  {#if f.name !== fieldForm.name}
+                    <option value={f.name}>{f.label} ({f.name})</option>
+                  {/if}
+                {/each}
+              </optgroup>
+              <optgroup label="Grids">
+                {#each library.grids as g}
+                  <option value={g.name}>{g.label} [grid] ({g.name})</option>
+                  <option value="{g.name}.selectedRow">{g.label}.selectedRow</option>
+                  {#each g.columns as c}
+                    <option value="{g.name}.{c.name}">{g.label}.{c.label} ({g.name}.{c.name})</option>
+                  {/each}
+                {/each}
+              </optgroup>
             </select>
-            <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple.</p>
+            <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Use grid.selectedRow for current row, grid.column for column values.</p>
           </div>
 
           <div>
             <label for="f_logiccontent" class="block text-sm font-medium text-gray-700">
               {fieldForm.logic.type === 'JS' ? 'JavaScript Code' : 'SQL Query'}
             </label>
-            <textarea
-              id="f_logiccontent"
-              bind:value={fieldForm.logic.content}
-              rows="5"
-              class="mt-1 block w-full font-mono text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            <CodeEditor
+              value={fieldForm.logic.content}
+              language={fieldForm.logic.type === 'JS' ? 'javascript' : 'sql'}
+              suggestions={getCodeSuggestions()}
               placeholder={fieldForm.logic.type === 'JS'
-                ? "return (Number(form.price) || 0) * (Number(form.qty) || 0);"
+                ? "return (Number(form.price) || 0) * (Number(form.qty) || 0);\n// Or use grid: grids.items.selectedRow.price"
                 : "SELECT name FROM users WHERE id = ${form.userId}"}
-            ></textarea>
-            <p class="text-xs text-gray-500 mt-1">
-              {fieldForm.logic.type === 'JS'
-                ? 'Available variables: value, form (values), db (query), lib (functions)'
-                : 'Use ${form.fieldName} to inject values'}
-            </p>
+              rows={5}
+              onchange={(v) => fieldForm.logic.content = v}
+            />
+            <div class="text-xs text-gray-500 mt-1 space-y-1">
+              {#if fieldForm.logic.type === 'JS'}
+                <p><strong>Available:</strong> value, form (all field values), grids (all grids data)</p>
+                <p><strong>Grid access:</strong> grids.gridName.rows, grids.gridName.selectedRow, grids.gridName.sum('columnName')</p>
+              {:else}
+                <p>Use ${'{'}form.fieldName{'}'} or ${'{'}grids.gridName.selectedRow.column{'}'} to inject values</p>
+              {/if}
+            </div>
           </div>
 
           <div class="flex items-center">
@@ -1129,9 +1233,9 @@
 	open={showColumnEditor}
 	title={editingColumn?.column ? 'Edit Column' : 'Add Column'}
 	onClose={() => (showColumnEditor = false)}
-	maxWidth="md"
+	maxWidth="lg"
 >
-	<div class="space-y-4">
+	<div class="space-y-4 max-h-[70vh] overflow-y-auto px-1">
 		<div class="grid grid-cols-2 gap-4">
 			<div>
 				<label for="columnLabel" class="block text-sm font-medium text-gray-700 mb-1">Label</label>
@@ -1222,9 +1326,150 @@
 			</div>
 		{/if}
 
-		<div class="flex items-center gap-2">
-			<input type="checkbox" id="columnRequired" bind:checked={columnForm.required} class="rounded" />
-			<label for="columnRequired" class="text-sm text-gray-700">Required</label>
+		<!-- Validation Rules -->
+		<div class="border rounded-md p-4 bg-gray-50">
+			<h4 class="text-sm font-medium text-gray-900 mb-3">Validation Rules</h4>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div class="flex items-center">
+					<input type="checkbox" id="columnRequired" bind:checked={columnForm.required} class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+					<label for="columnRequired" class="ml-2 block text-sm text-gray-900">Required</label>
+				</div>
+
+				{#if ['text', 'textarea', 'email'].includes(columnForm.type)}
+					<div>
+						<label for="col_minlen" class="block text-xs font-medium text-gray-500">Min Length</label>
+						<input
+							id="col_minlen"
+							type="number"
+							bind:value={columnForm.validation.minLength}
+							class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+						/>
+					</div>
+					<div>
+						<label for="col_maxlen" class="block text-xs font-medium text-gray-500">Max Length</label>
+						<input
+							id="col_maxlen"
+							type="number"
+							bind:value={columnForm.validation.maxLength}
+							class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+						/>
+					</div>
+					<div class="col-span-2">
+						<label for="col_pattern" class="block text-xs font-medium text-gray-500">Regex Pattern</label>
+						<input
+							id="col_pattern"
+							type="text"
+							bind:value={columnForm.validation.pattern}
+							placeholder="e.g. ^[A-Z]+$"
+							class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+						/>
+					</div>
+					<div class="col-span-2">
+						<label for="col_patmsg" class="block text-xs font-medium text-gray-500">Pattern Error Message</label>
+						<input
+							id="col_patmsg"
+							type="text"
+							bind:value={columnForm.validation.patternMessage}
+							class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+						/>
+					</div>
+				{/if}
+
+				{#if ['number', 'currency', 'percentage', 'date'].includes(columnForm.type)}
+					<div>
+						<label for="col_min" class="block text-xs font-medium text-gray-500">Minimum Value</label>
+						<input
+							id="col_min"
+							type="number"
+							bind:value={columnForm.validation.min}
+							class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+						/>
+					</div>
+					<div>
+						<label for="col_max" class="block text-xs font-medium text-gray-500">Maximum Value</label>
+						<input
+							id="col_max"
+							type="number"
+							bind:value={columnForm.validation.max}
+							class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+						/>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Logic & Dependencies -->
+		<div class="border rounded-md p-4 bg-indigo-50 border-indigo-100">
+			<h4 class="text-sm font-medium text-indigo-900 mb-3">Logic & Dependencies</h4>
+			<div class="space-y-4">
+				<div>
+					<label for="col_logictype" class="block text-sm font-medium text-gray-700">Logic Type</label>
+					<select
+						id="col_logictype"
+						bind:value={columnForm.logic.type}
+						class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+					>
+						<option value="None">None</option>
+						<option value="JS">JavaScript Code</option>
+						<option value="SQL">SQL Query</option>
+					</select>
+				</div>
+
+				{#if columnForm.logic.type !== 'None'}
+					<div>
+						<label for="col_deps" class="block text-sm font-medium text-gray-700">Dependencies (Field/Column Names)</label>
+						<select
+							id="col_deps"
+							multiple
+							bind:value={columnForm.logic.dependencies}
+							class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+							size="3"
+						>
+							{#each library.fields as f}
+								<option value={f.name}>{f.label} ({f.name})</option>
+							{/each}
+							{#each library.grids as g}
+								<option value={g.name}>{g.label} [grid] ({g.name})</option>
+								{#each g.columns as c}
+									<option value="{g.name}.{c.name}">{g.label}.{c.label} ({g.name}.{c.name})</option>
+								{/each}
+							{/each}
+						</select>
+						<p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple. Use grid.column notation for grid columns.</p>
+					</div>
+
+					<div>
+						<label for="col_logiccontent" class="block text-sm font-medium text-gray-700">
+							{columnForm.logic.type === 'JS' ? 'JavaScript Code' : 'SQL Query'}
+						</label>
+						<CodeEditor
+						value={columnForm.logic.content}
+						language={columnForm.logic.type === 'JS' ? 'javascript' : 'sql'}
+						suggestions={getCodeSuggestions()}
+						placeholder={columnForm.logic.type === 'JS'
+							? "return (Number(row.price) || 0) * (Number(row.qty) || 0);"
+							: "SELECT name FROM products WHERE id = ${row.productId}"}
+						rows={4}
+						onchange={(v) => columnForm.logic.content = v}
+					/>
+						<p class="text-xs text-gray-500 mt-1">
+							{columnForm.logic.type === 'JS'
+								? 'Available: value, row (current row values), form (all form values), grid (grid data)'
+								: 'Use ${row.columnName} or ${form.fieldName} to inject values'}
+						</p>
+					</div>
+
+					<div class="flex items-center">
+						<input
+							id="col_autocalc"
+							type="checkbox"
+							bind:checked={columnForm.logic.autoCalculate}
+							class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+						/>
+						<label for="col_autocalc" class="ml-2 block text-sm text-gray-900">Auto-calculate on dependency change</label>
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 
