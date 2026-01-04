@@ -37,11 +37,30 @@
 	// Local form values - initialized in $effect
 	let formValues = $state<Record<string, unknown>>({});
 	let fieldErrors = $state<Record<string, string>>({});
+	let gridSelections = $state<Record<string, Record<string, unknown>[]>>({});
 	let formInitialized = $state(false);
 	let userHasMadeChanges = $state(false);
 
 	// Grid component references for validation
 	const gridRefs: Record<string, DynamicGrid> = {};
+
+	// Create grids context for logic execution
+	const gridsContext = $derived(
+		Object.fromEntries(
+			grids.map((g) => [
+				g.name,
+				{
+					rows: tryParseJson(formValues[g.name]),
+					selectedRows: gridSelections[g.name] || [],
+					selectedRow: (gridSelections[g.name] || [])[0] || null,
+					sum: (col: string) => {
+						const rows = tryParseJson(formValues[g.name]);
+						return rows.reduce((sum, row) => sum + (Number(row[col]) || 0), 0);
+					}
+				}
+			])
+		)
+	);
 
 	// Computed field and grid states based on condition rules
 	let computedFieldStates = $state<Record<string, ComputedFieldState>>({});
@@ -68,29 +87,30 @@
 		if (!field.logic || field.logic.type === 'None' || !field.logic.content) return;
 
 		console.log(`Executing logic for ${field.name} (${field.logic.type})`);
-		
+
 		try {
 			if (field.logic.type === 'JS') {
 				// prepare safe-ish execution context
 				const contextValues = { ...formValues };
-				
+
 				// dynamic function creation
-				// signature: (value, form, db, lib) => result
-				const func = new Function('value', 'form', 'db', 'lib', field.logic.content);
-				
+				// signature: (value, form, grids, db, lib) => result
+				const func = new Function('value', 'form', 'grids', 'db', 'lib', field.logic.content);
+
 				const dbMock = {
 					query: async (sql: string, params: any[]) => {
 						console.log('SQL Query:', sql, params);
 						return []; // Mock return
 					}
 				};
-				
+
 				const libMock = {}; // Placeholder for function library
-				
+
 				const result = await func(
-					formValues[field.name], 
-					contextValues, 
-					dbMock, 
+					formValues[field.name],
+					contextValues,
+					gridsContext,
+					dbMock,
 					libMock
 				);
 
@@ -229,6 +249,10 @@
 	function handleGridChange(gridName: string, data: Record<string, unknown>[]) {
 		formValues = { ...formValues, [gridName]: data };
 		userHasMadeChanges = true;
+	}
+
+	function handleGridSelectionChange(gridName: string, selectedRows: Record<string, unknown>[]) {
+		gridSelections = { ...gridSelections, [gridName]: selectedRows };
 	}
 
 	function validateField(field: FormField, value: unknown): string | null {
@@ -617,7 +641,11 @@
 						initialData={tryParseJson(formValues[grid.name])}
 						readonly={gridState.isReadonly}
 						columnStates={gridState.columnStates}
+						enableMultiSelect={true}
+						formValues={formValues}
+						gridsContext={gridsContext}
 						onDataChange={(data) => handleGridChange(grid.name, data)}
+						onSelectionChange={(selected) => handleGridSelectionChange(grid.name, selected)}
 					/>
 				</div>
 			{/if}

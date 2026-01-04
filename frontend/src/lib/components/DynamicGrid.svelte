@@ -24,6 +24,8 @@
     readonly?: boolean;
     columnStates?: Record<string, ComputedFieldState>;
     enableMultiSelect?: boolean;
+    formValues?: Record<string, unknown>;
+    gridsContext?: Record<string, any>;
     onDataChange?: (data: Record<string, unknown>[]) => void;
     onSelectionChange?: (selectedRows: Record<string, unknown>[]) => void;
   }
@@ -38,6 +40,8 @@
     readonly = false,
     columnStates = {},
     enableMultiSelect = false,
+    formValues = {},
+    gridsContext = {},
     onDataChange,
     onSelectionChange
   }: Props = $props();
@@ -116,12 +120,14 @@
 
     try {
       if (column.logic.type === 'JS') {
-        const func = new Function('value', 'row', 'db', 'lib', column.logic.content);
+        const func = new Function('value', 'row', 'form', 'grids', 'db', 'lib', column.logic.content);
 
         const rowData = { ...row.data };
         const result = await func(
           row.data[column.name],
           rowData,
+          formValues,
+          gridsContext,
           {
             query: async (sql: string, params: any[]) => {
               console.log('SQL:', sql, params);
