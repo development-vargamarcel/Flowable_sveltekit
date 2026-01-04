@@ -6,6 +6,10 @@ import com.demo.bpm.dto.FormGridDTO;
 import com.demo.bpm.dto.FieldConditionRuleDTO;
 import com.demo.bpm.dto.ProcessFieldLibraryDTO;
 import com.demo.bpm.dto.ProcessFormConfigDTO;
+import com.demo.bpm.entity.DocumentTypeDefinition;
+import com.demo.bpm.entity.ProcessConfig;
+import com.demo.bpm.repository.DocumentTypeRepository;
+import com.demo.bpm.repository.ProcessConfigRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -40,6 +45,8 @@ public class FormDefinitionService {
     private final RepositoryService repositoryService;
     private final TaskService taskService;
     private final ObjectMapper objectMapper;
+    private final ProcessConfigRepository processConfigRepository;
+    private final DocumentTypeRepository documentTypeRepository;
 
     /**
      * Get form definition for a specific task
@@ -404,6 +411,30 @@ public class FormDefinitionService {
 
             ProcessFieldLibraryDTO fieldLibrary = parseFieldLibrary(fieldLibraryJson);
             List<FieldConditionRuleDTO> conditionRules = parseConditionRules(conditionRulesJson);
+
+            // Enhance field library with Document Type fields if configured
+            org.flowable.engine.repository.ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
+                    .processDefinitionId(processDefinitionId)
+                    .singleResult();
+
+            if (definition != null) {
+                Optional<ProcessConfig> config = processConfigRepository.findByProcessDefinitionKey(definition.getKey());
+                if (config.isPresent() && config.get().getDocumentType() != null) {
+                    Optional<DocumentTypeDefinition> docType = documentTypeRepository.findByKey(config.get().getDocumentType());
+                    if (docType.isPresent() && docType.get().getSchemaJson() != null) {
+                        ProcessFieldLibraryDTO docLibrary = parseFieldLibrary(docType.get().getSchemaJson());
+                        // Merge document fields/grids into field library
+                        // We prepend them so they appear first if not overridden
+                        List<FormFieldDTO> mergedFields = new ArrayList<>(docLibrary.getFields());
+                        mergedFields.addAll(fieldLibrary.getFields());
+                        fieldLibrary.setFields(mergedFields);
+
+                        List<FormGridDTO> mergedGrids = new ArrayList<>(docLibrary.getGrids());
+                        mergedGrids.addAll(fieldLibrary.getGrids());
+                        fieldLibrary.setGrids(mergedGrids);
+                    }
+                }
+            }
 
             return ProcessFormConfigDTO.builder()
                     .processDefinitionId(processDefinitionId)

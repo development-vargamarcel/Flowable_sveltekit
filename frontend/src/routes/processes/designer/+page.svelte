@@ -24,6 +24,8 @@
   // Process metadata
   let processName = $state('my-process');
   let processDescription = $state('');
+  let documentTypes = $state<any[]>([]);
+  let selectedDocumentType = $state('');
 
   // UI state
   let isDeploying = $state(false);
@@ -483,6 +485,12 @@
 
             // Extract process variables from the loaded diagram
             extractProcessVariables();
+
+        // Extract document type from loaded process
+        const rootElement = modeler.get('canvas').getRootElement();
+        const businessObject = rootElement.businessObject;
+        selectedDocumentType = businessObject.get('flowable:documentType') || '';
+
           } catch (loadErr) {
             console.error('Error loading existing process:', loadErr);
             const errorMsg = loadErr instanceof Error ? loadErr.message : 'Unknown error';
@@ -519,6 +527,13 @@
 
       // Load process-level field library and condition rules
       loadProcessLevelData();
+
+      // Load document types
+      try {
+        documentTypes = await api.getDocumentTypes();
+      } catch (err) {
+        console.error('Failed to load document types', err);
+      }
 
       modelerReady = true;
     } catch (err) {
@@ -754,6 +769,17 @@
     formFields = [];
     formGrids = [];
     scriptCode = '';
+  }
+
+  function updateProcessDocumentType() {
+    if (!modeler) return;
+    const rootElement = modeler.get('canvas').getRootElement();
+    const modeling = modeler.get('modeling');
+
+    // We need to update the 'flowable:documentType' property on the business object
+    modeling.updateProperties(rootElement, {
+      'flowable:documentType': selectedDocumentType
+    });
   }
 
   function updateElementProperty(property: string, value: string | boolean) {
@@ -2016,6 +2042,23 @@
               class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder="Brief description of the process"
             />
+          </div>
+          <div>
+            <label for="processDocumentType" class="mb-1 block text-sm font-medium text-gray-700">
+              Document Type
+            </label>
+            <select
+               id="processDocumentType"
+               bind:value={selectedDocumentType}
+               onchange={updateProcessDocumentType}
+               class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">-- None --</option>
+              {#each documentTypes as docType}
+                <option value={docType.key}>{docType.name}</option>
+              {/each}
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Select a document structure to use with this process</p>
           </div>
         </div>
       </div>

@@ -337,7 +337,7 @@ public class BusinessTableService {
     // ==================== Combined Operations ====================
 
     /**
-     * Save all data (document + grids) for a process instance.
+     * Save all data (document + grids) for a process instance with default type.
      * Uses REQUIRES_NEW propagation to run in a separate transaction,
      * preventing rollback-only issues when called from other transactional methods.
      */
@@ -345,6 +345,20 @@ public class BusinessTableService {
     public void saveAllData(String processInstanceId, String businessKey,
                             String processDefKey, String processDefName,
                             Map<String, Object> variables, String userId) {
+        saveAllData(processInstanceId, businessKey, processDefKey, processDefName, DEFAULT_DOCUMENT_TYPE, variables, userId);
+    }
+
+    /**
+     * Save all data (document + grids) for a process instance with specific type.
+     * Uses REQUIRES_NEW propagation to run in a separate transaction,
+     * preventing rollback-only issues when called from other transactional methods.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveAllData(String processInstanceId, String businessKey,
+                            String processDefKey, String processDefName,
+                            String documentType, Map<String, Object> variables, String userId) {
+
+        String docType = documentType != null ? documentType : DEFAULT_DOCUMENT_TYPE;
 
         // Extract grid data from variables
         Map<String, List<Map<String, Object>>> grids = new HashMap<>();
@@ -371,11 +385,11 @@ public class BusinessTableService {
         }
 
         // Save document first
-        saveDocument(processInstanceId, businessKey, processDefKey, processDefName, documentVars, userId);
+        saveDocument(processInstanceId, businessKey, processDefKey, processDefName, docType, documentVars, userId);
 
         // Save grid data
         for (Map.Entry<String, List<Map<String, Object>>> entry : grids.entrySet()) {
-            saveGridRows(processInstanceId, processDefKey, entry.getKey(), entry.getValue());
+            saveGridRows(processInstanceId, processDefKey, docType, entry.getKey(), entry.getValue());
         }
     }
 

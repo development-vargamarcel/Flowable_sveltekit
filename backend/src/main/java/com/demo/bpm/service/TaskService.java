@@ -2,6 +2,8 @@ package com.demo.bpm.service;
 
 import com.demo.bpm.dto.DocumentDTO;
 import com.demo.bpm.dto.TaskDTO;
+import com.demo.bpm.entity.ProcessConfig;
+import com.demo.bpm.repository.ProcessConfigRepository;
 import com.demo.bpm.util.VariableStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ public class TaskService {
     private final RepositoryService repositoryService;
     private final HistoryService historyService;
     private final BusinessTableService businessTableService;
+    private final ProcessConfigRepository processConfigRepository;
 
     public List<TaskDTO> getAssignedTasks(String userId) {
         List<Task> tasks = flowableTaskService.createTaskQuery()
@@ -217,6 +220,9 @@ public class TaskService {
         // Persist to business tables if configured
         if (processDefKey != null && businessTableService.shouldPersistOnTaskComplete(processDefKey)) {
             try {
+                Optional<ProcessConfig> config = processConfigRepository.findByProcessDefinitionKey(processDefKey);
+                String documentType = config.map(ProcessConfig::getDocumentType).orElse(null);
+
                 // Save all submitted variables to business tables
                 // Note: System variables (starting with _) are stored in Flowable
                 // Business variables are stored only in document/grid_rows
@@ -226,6 +232,7 @@ public class TaskService {
                         businessKey,
                         processDefKey,
                         processDefName,
+                        documentType,
                         allVars,
                         userId
                 );

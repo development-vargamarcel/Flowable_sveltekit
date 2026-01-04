@@ -314,6 +314,8 @@ CREATE TABLE IF NOT EXISTS process_config (
     persist_on_task_complete BOOLEAN DEFAULT TRUE,
     persist_on_process_complete BOOLEAN DEFAULT TRUE,
 
+    document_type VARCHAR(100),
+
     -- Audit columns
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

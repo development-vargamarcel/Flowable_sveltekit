@@ -31,6 +31,9 @@ public class ProcessConfig {
     @Builder.Default
     private Boolean persistOnProcessComplete = true;
 
+    @Column(name = "document_type", length = 100)
+    private String documentType;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

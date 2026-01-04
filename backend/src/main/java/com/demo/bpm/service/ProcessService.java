@@ -2,9 +2,15 @@ package com.demo.bpm.service;
 
 import com.demo.bpm.dto.ProcessDTO;
 import com.demo.bpm.dto.ProcessInstanceDTO;
+import com.demo.bpm.entity.Document;
+import com.demo.bpm.entity.ProcessConfig;
+import com.demo.bpm.repository.DocumentRepository;
+import com.demo.bpm.repository.ProcessConfigRepository;
 import com.demo.bpm.util.VariableStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.flowable.bpmn.model.BpmnModel;
+import org.flowable.bpmn.model.ExtensionAttribute;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
@@ -21,6 +27,7 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,6 +38,9 @@ public class ProcessService {
     private final RuntimeService runtimeService;
     private final RepositoryService repositoryService;
     private final HistoryService historyService;
+    private final ProcessConfigRepository processConfigRepository;
+    private final DocumentRepository documentRepository;
+    private final BusinessTableService businessTableService;
 
     public List<ProcessDTO> getAvailableProcesses() {
         // Return ALL processes (all versions) if needed, but usually we just want active or latest
@@ -81,6 +91,22 @@ public class ProcessService {
 
         log.info("Started process {} with business key {} by user {}. System vars: {}, Total vars: {}",
                 processKey, finalBusinessKey, userId, systemVars.size(), allVars.size());
+
+        // Save business variables if provided
+        if (!allVars.isEmpty()) {
+            Optional<ProcessConfig> config = processConfigRepository.findByProcessDefinitionKey(processKey);
+            String documentType = config.map(ProcessConfig::getDocumentType).orElse(null);
+
+            businessTableService.saveAllData(
+                    instance.getId(),
+                    finalBusinessKey,
+                    processKey,
+                    instance.getProcessDefinitionName(),
+                    documentType,
+                    allVars,
+                    userId
+            );
+        }
 
         return getProcessInstance(instance.getId());
     }
@@ -179,6 +205,44 @@ public class ProcessService {
             ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
                     .deploymentId(deployment.getId())
                     .singleResult();
+
+            // Extract documentType from BPMN
+            BpmnModel bpmnModel = repositoryService.getBpmnModel(definition.getId());
+            org.flowable.bpmn.model.Process process = bpmnModel.getMainProcess();
+            String documentType = null;
+
+            if (process.getAttributes().containsKey("documentType")) {
+                List<ExtensionAttribute> attributes = process.getAttributes().get("documentType");
+                if (!attributes.isEmpty()) {
+                    documentType = attributes.get(0).getValue();
+                }
+            } else if (process.getAttributes().containsKey("flowable:documentType")) {
+                 List<ExtensionAttribute> attributes = process.getAttributes().get("flowable:documentType");
+                 if (!attributes.isEmpty()) {
+                     documentType = attributes.get(0).getValue();
+                 }
+            } else {
+                // Try to find attribute with namespace
+                 List<ExtensionAttribute> attributes = process.getAttributes().values().stream()
+                     .flatMap(List::stream)
+                     .filter(a -> "documentType".equals(a.getName()))
+                     .collect(Collectors.toList());
+                 if (!attributes.isEmpty()) {
+                     documentType = attributes.get(0).getValue();
+                 }
+            }
+
+            // Save/Update ProcessConfig
+            ProcessConfig config = processConfigRepository.findByProcessDefinitionKey(definition.getKey())
+                    .orElse(ProcessConfig.builder()
+                            .processDefinitionKey(definition.getKey())
+                            .build());
+
+            if (documentType != null && !documentType.isEmpty()) {
+                config.setDocumentType(documentType);
+                processConfigRepository.save(config);
+                log.info("Updated ProcessConfig for {} with documentType: {}", definition.getKey(), documentType);
+            }
 
             return convertToDTO(definition);
         } catch (Exception e) {
