@@ -62,11 +62,13 @@
   "dependencies": {
     "@lucide/svelte": "^0.562.0",
     "@sentry/sveltekit": "^10.32.1",
+    "@types/sortablejs": "^1.15.9",
     "bits-ui": "^1.0.0-next.81",
     "bpmn-js": "^18.9.1",
     "bpmn-js-differ": "^3.1.0",
     "bpmn-js-token-simulation": "^0.38.2",
     "clsx": "^2.1.1",
+    "sortablejs": "^1.15.6",
     "svelte-sonner": "^1.0.7",
     "tailwind-merge": "^3.4.0",
     "tailwind-variants": "^3.2.2",

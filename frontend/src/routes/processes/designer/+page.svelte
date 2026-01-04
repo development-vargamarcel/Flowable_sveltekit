@@ -224,6 +224,94 @@
   let fieldLibrary = $state<ProcessFieldLibrary>({ fields: [], grids: [] });
   let globalConditionRules = $state<FieldConditionRule[]>([]);
 
+
+  const saveFieldLibrary = () => {
+    if (!modeler) return;
+
+    try {
+      const elementRegistry = modeler.get('elementRegistry');
+      const modeling = modeler.get('modeling');
+
+      // Find the process element
+      const processElement = elementRegistry.find(
+        (element: any) => element.type === 'bpmn:Process'
+      );
+      if (!processElement) {
+        error = 'Could not find process element';
+        return;
+      }
+
+      // Convert field library to storable format
+      const libraryData = {
+        fields: fieldLibrary.fields.map((f) => ({
+          ...f,
+          options: f.options || [],
+          validation: f.validation || null
+        })),
+        grids: fieldLibrary.grids.map((g) => ({
+          ...g,
+          columns: g.columns.map((c) => ({
+            ...c,
+            options: c.options || [],
+            validation: c.validation || null
+          }))
+        }))
+      };
+
+      // Store as JSON attribute on process element
+      modeling.updateProperties(processElement, {
+        'flowable:fieldLibrary': JSON.stringify(libraryData)
+      });
+
+      // Update process variables
+      fieldLibrary.fields.forEach((field) => {
+        if (field.name && !processVariables.includes(field.name)) {
+          processVariables = [...processVariables, field.name];
+        }
+      });
+      fieldLibrary.grids.forEach((grid) => {
+        if (grid.name && !processVariables.includes(grid.name)) {
+          processVariables = [...processVariables, grid.name];
+        }
+      });
+
+      success = 'Field library saved successfully';
+      setTimeout(() => (success = ''), 3000);
+    } catch (err) {
+      console.error('Error saving field library:', err);
+      error = 'Failed to save field library';
+    }
+  };
+
+  const saveConditionRules = () => {
+    if (!modeler) return;
+
+    try {
+      const elementRegistry = modeler.get('elementRegistry');
+      const modeling = modeler.get('modeling');
+
+      // Find the process element
+      const processElement = elementRegistry.find(
+        (element: any) => element.type === 'bpmn:Process'
+      );
+      if (!processElement) {
+        error = 'Could not find process element';
+        return;
+      }
+
+      // Store as JSON attribute on process element
+      modeling.updateProperties(processElement, {
+        'flowable:conditionRules': JSON.stringify(globalConditionRules)
+      });
+
+      success = 'Condition rules saved successfully';
+      setTimeout(() => (success = ''), 3000);
+    } catch (err) {
+      console.error('Error saving condition rules:', err);
+      error = 'Failed to save condition rules';
+    }
+  };
+
   // Script Editor State
   let showScriptEditor = $state(false);
   let scriptCode = $state('');
@@ -238,6 +326,29 @@
   // Validation state
   let validationErrors = $state<string[]>([]);
   let validationWarnings = $state<string[]>([]);
+
+  // Undo/Redo state
+  let canUndo = $state(false);
+  let canRedo = $state(false);
+
+  function checkHistory() {
+    if (!modeler) return;
+    const commandStack = modeler.get('commandStack');
+    canUndo = commandStack.canUndo();
+    canRedo = commandStack.canRedo();
+  }
+
+  function handleUndo() {
+    if (modeler) {
+      modeler.get('commandStack').undo();
+    }
+  }
+
+  function handleRedo() {
+    if (modeler) {
+      modeler.get('commandStack').redo();
+    }
+  }
 
   // Available process variables for expression builder
   let processVariables = $state<string[]>([
@@ -491,8 +602,9 @@
       }
     });
 
-    // Set up command stack change handler for auto-saving drafts
+    // Set up command stack change handler for auto-saving drafts and updating history state
     eventBus.on('commandStack.changed', () => {
+      checkHistory();
       if (!isEditMode) {
         saveDraft();
       }
@@ -1677,94 +1789,7 @@
     showFormBuilder = false;
   }
 
-  // Save field library to process-level extension
-  function saveFieldLibrary() {
-    if (!modeler) return;
 
-    try {
-      const elementRegistry = modeler.get('elementRegistry');
-      const modeling = modeler.get('modeling');
-
-      // Find the process element
-      const processElement = elementRegistry.find(
-        (element: any) => element.type === 'bpmn:Process'
-      );
-      if (!processElement) {
-        error = 'Could not find process element';
-        return;
-      }
-
-      // Convert field library to storable format
-      const libraryData = {
-        fields: fieldLibrary.fields.map((f) => ({
-          ...f,
-          options: f.options || [],
-          validation: f.validation || null
-        })),
-        grids: fieldLibrary.grids.map((g) => ({
-          ...g,
-          columns: g.columns.map((c) => ({
-            ...c,
-            options: c.options || [],
-            validation: c.validation || null
-          }))
-        }))
-      };
-
-      // Store as JSON attribute on process element
-      modeling.updateProperties(processElement, {
-        'flowable:fieldLibrary': JSON.stringify(libraryData)
-      });
-
-      // Update process variables
-      fieldLibrary.fields.forEach((field) => {
-        if (field.name && !processVariables.includes(field.name)) {
-          processVariables = [...processVariables, field.name];
-        }
-      });
-      fieldLibrary.grids.forEach((grid) => {
-        if (grid.name && !processVariables.includes(grid.name)) {
-          processVariables = [...processVariables, grid.name];
-        }
-      });
-
-      success = 'Field library saved successfully';
-      setTimeout(() => (success = ''), 3000);
-    } catch (err) {
-      console.error('Error saving field library:', err);
-      error = 'Failed to save field library';
-    }
-  }
-
-  // Save condition rules to process-level extension
-  function saveConditionRules() {
-    if (!modeler) return;
-
-    try {
-      const elementRegistry = modeler.get('elementRegistry');
-      const modeling = modeler.get('modeling');
-
-      // Find the process element
-      const processElement = elementRegistry.find(
-        (element: any) => element.type === 'bpmn:Process'
-      );
-      if (!processElement) {
-        error = 'Could not find process element';
-        return;
-      }
-
-      // Store as JSON attribute on process element
-      modeling.updateProperties(processElement, {
-        'flowable:conditionRules': JSON.stringify(globalConditionRules)
-      });
-
-      success = 'Condition rules saved successfully';
-      setTimeout(() => (success = ''), 3000);
-    } catch (err) {
-      console.error('Error saving condition rules:', err);
-      error = 'Failed to save condition rules';
-    }
-  }
 
   // Load field library and condition rules from process element
   function loadProcessLevelData() {
@@ -1833,6 +1858,8 @@
     globalConditionRules = newRules;
     saveConditionRules();
   }
+
+
 
   function validateFormFields(): string[] {
     const errors: string[] = [];
@@ -2390,7 +2417,9 @@
   ];
 
   // Expanded field index for detailed editing
-  let expandedFieldIndex = $state<number | null>(null);
+  let expandedFieldIndex = $state(null);
+
+
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -2419,6 +2448,32 @@
                 Load Template
               </button>
             {/if}
+            <!-- Undo/Redo Controls -->
+            <div class="mr-2 flex items-center gap-1 border-r border-gray-200 pr-2">
+              <button
+                onclick={handleUndo}
+                disabled={!canUndo}
+                class="rounded p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                title="Undo (Ctrl+Z)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 7v6h6"></path>
+                  <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                </svg>
+              </button>
+              <button
+                onclick={handleRedo}
+                disabled={!canRedo}
+                class="rounded p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                title="Redo (Ctrl+Y)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 7v6h-6"></path>
+                  <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
+                </svg>
+              </button>
+            </div>
+
             <button
               onclick={() => (showPropertiesPanel = !showPropertiesPanel)}
               class="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"

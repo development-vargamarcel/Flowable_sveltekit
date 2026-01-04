@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { FormField, FormGrid, GridColumn, ProcessFieldLibrary } from '$lib/types';
 	import Modal from './Modal.svelte';
+	import Sortable from 'sortablejs';
+	import { complexDemoLibrary } from '$lib/utils/demo-data';
 
 	interface Props {
 		library: ProcessFieldLibrary;
@@ -83,7 +85,10 @@
 		{ value: 'radio', label: 'Radio Buttons' },
 		{ value: 'currency', label: 'Currency' },
 		{ value: 'percentage', label: 'Percentage' },
-		{ value: 'file', label: 'File Upload' }
+		{ value: 'currency', label: 'Currency' },
+		{ value: 'percentage', label: 'Percentage' },
+		{ value: 'file', label: 'File Upload' },
+		{ value: 'header', label: 'Section Header' }
 	];
 
 	const columnTypes = [
@@ -96,6 +101,32 @@
 
 	function generateId(prefix: string): string {
 		return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+	}
+
+	function sortableList(node: HTMLElement) {
+		const s = new Sortable(node, {
+			animation: 150,
+			handle: '.drag-handle',
+			ghostClass: 'bg-blue-50',
+			onEnd: (evt) => {
+				if (evt.oldIndex === undefined || evt.newIndex === undefined) return;
+				const newFields = [...library.fields];
+				const [moved] = newFields.splice(evt.oldIndex, 1);
+				newFields.splice(evt.newIndex, 0, moved);
+				onChange({ ...library, fields: newFields });
+			}
+		});
+		return {
+			destroy() {
+				s.destroy();
+			}
+		};
+	}
+
+	function loadDemoData() {
+		if (confirm('This will overwrite current fields with a complex demo layout. Continue?')) {
+			onChange(JSON.parse(JSON.stringify(complexDemoLibrary)));
+		}
 	}
 
 	// Field Management
@@ -430,7 +461,13 @@
   </div>
 
   {#if activeTab === 'fields'}
-    <div class="flex justify-end">
+    <div class="flex justify-between items-center mb-4">
+      <button
+        onclick={loadDemoData}
+        class="text-sm text-gray-600 hover:text-blue-600 underline"
+      >
+        Load Demo Layout
+      </button>
       <button
         onclick={handleAddField}
         class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -452,9 +489,12 @@
       </div>
     {:else}
       <div class="overflow-hidden rounded-md border border-gray-200 bg-white">
-        <ul class="divide-y divide-gray-200">
-          {#each library.fields as field}
-            <li class="flex items-center justify-between p-4 hover:bg-gray-50">
+        <ul class="divide-y divide-gray-200" use:sortableList>
+          {#each library.fields as field (field.id)}
+            <li class="flex items-center justify-between p-4 hover:bg-gray-50 group">
+              <div class="drag-handle mr-3 cursor-move text-gray-400 hover:text-gray-600">
+                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path></svg>
+              </div>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
                   <span class="font-medium text-gray-900">{field.label}</span>
@@ -707,6 +747,63 @@
           bind:value={fieldForm.placeholder}
           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         />
+      </div>
+    </div>
+
+    <!-- Conditional Logic & Visibility -->
+    <div class="border rounded-md p-4 bg-indigo-50 border-indigo-100">
+      <h4 class="text-sm font-medium text-indigo-900 mb-3">Conditional Logic</h4>
+      
+      <div class="space-y-4">
+        <div>
+           <label for="f_logic_type" class="block text-sm font-medium text-indigo-800">Logic Type</label>
+           <select
+             id="f_logic_type"
+             bind:value={fieldForm.logic.type}
+             class="mt-1 block w-full rounded-md border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white"
+           >
+             <option value="None">None</option>
+             <option value="Visibility">Visibility Rule (Show/Hide)</option>
+             <option value="Dependency">Content Dependency</option>
+           </select>
+        </div>
+
+        {#if fieldForm.logic.type !== 'None'}
+          <div>
+            <label for="f_logic_deps" class="block text-sm font-medium text-indigo-800">Dependent Fields (IDs)</label>
+            <div class="text-xs text-indigo-600 mb-1">Select fields that trigger this logic</div>
+             <select
+               multiple
+               id="f_logic_deps"
+               bind:value={fieldForm.logic.dependencies}
+               class="mt-1 block w-full rounded-md border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-32"
+             >
+                <!-- Filter out self to prevent circular dependency (basic check) -->
+               {#each library.fields.filter(f => f.id !== fieldForm.id) as f}
+                 <option value={f.name}>{f.label} ({f.name})</option>
+               {/each}
+             </select>
+             <div class="text-xs mt-1 text-gray-500">Hold Ctrl/Cmd to select multiple</div>
+          </div>
+
+          <div>
+            <label for="f_logic_content" class="block text-sm font-medium text-indigo-800">Expression (JavaScript)</label>
+            <div class="text-xs text-indigo-600 mb-1">
+              {#if fieldForm.logic.type === 'Visibility'}
+                Return true to show, false to hide. ex: <code class="bg-white px-1 rounded">projectType === 'client'</code>
+              {:else}
+                Return valid value. ex: <code class="bg-white px-1 rounded">department === 'it' ? 'Tech' : 'Gen'</code>
+              {/if}
+            </div>
+            <textarea
+              id="f_logic_content"
+              bind:value={fieldForm.logic.content}
+              rows="3"
+              class="mt-1 block w-full rounded-md border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
+              placeholder="e.g. projectType === 'client' && amount > 1000"
+            ></textarea>
+          </div>
+        {/if}
       </div>
     </div>
 

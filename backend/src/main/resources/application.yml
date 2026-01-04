@@ -48,6 +48,19 @@ spring:
   session:
     store-type: none
 
+  # Email Configuration
+  mail:
+    host: smtp.mailersend.net
+    port: 587
+    username: MS_uZIu1f@test-zkq340ek19xgd796.mlsender.net
+    password: mssp.ZJqz447.o65qngkror84wr12.idSQ797
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 # Flowable Configuration - Optimized for low memory environments
 flowable:
   database-schema-update: true

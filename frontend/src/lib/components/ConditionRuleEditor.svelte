@@ -25,13 +25,13 @@
 	let description = $state(rule?.description ?? '');
 	let enabled = $state(rule?.enabled ?? true);
 	let priority = $state(rule?.priority ?? 0);
-	let effect = $state<ConditionEffect>(rule?.effect ?? 'readonly');
-	let targetType = $state<ConditionTargetType>(rule?.target.type ?? 'all');
-	let selectedFields = $state<string[]>(rule?.target.fieldNames ?? []);
-	let selectedGrids = $state<string[]>(rule?.target.gridNames ?? []);
-	let selectedColumns = $state<{ gridName: string; columnNames: string[] }[]>(
-		rule?.target.columnTargets ?? []
-	);
+	let effect = $state(rule?.effect ?? 'readonly');
+	let targetType = $state(rule?.target.type ?? 'all');
+	let selectedFields = $state(rule?.target.fieldNames ?? []);
+	let selectedGrids = $state(rule?.target.gridNames ?? []);
+	
+	const defaultColumns = rule?.target.columnTargets ?? [];
+	let selectedColumns = $state(defaultColumns);
 
 	// Condition builder state
 	let useSimpleBuilder = $state(true);
@@ -39,15 +39,11 @@
 
 	// Simple builder fields
 	let conditionField = $state('');
-	let conditionOperator = $state<'==' | '!=' | '>' | '<' | '>=' | '<=' | 'isEmpty' | 'isNotEmpty'>(
-		'=='
-	);
+	let conditionOperator = $state('==');
 	let conditionValue = $state('');
-	let conditionLogic = $state<'single' | 'and' | 'or'>('single');
+	let conditionLogic = $state('single');
 	let secondConditionField = $state('');
-	let secondConditionOperator = $state<
-		'==' | '!=' | '>' | '<' | '>=' | '<=' | 'isEmpty' | 'isNotEmpty'
-	>('==');
+	let secondConditionOperator = $state('==');
 	let secondConditionValue = $state('');
 
 	// Parse existing condition into simple builder format

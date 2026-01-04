@@ -8,6 +8,9 @@
 	import EscalationBadge from '$lib/components/EscalationBadge.svelte';
 	import SLAStats from '$lib/components/SLAStats.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import DurationHistogram from '$lib/components/DurationHistogram.svelte';
+	import UserPerformanceWidget from '$lib/components/UserPerformanceWidget.svelte';
+	import BottleneckWidget from '$lib/components/BottleneckWidget.svelte';
 
 	let loading = $state(true);
 	let error = $state<ApiError | string | null>(null);
@@ -264,6 +267,17 @@
 				</div>
 			</div>
 		{/if}
+
+		    <!-- Row 3: Analytics Widgets -->
+    <div class="mb-8 grid gap-6 lg:grid-cols-2">
+      <DurationHistogram processDefinitionKey="" />
+      <UserPerformanceWidget />
+    </div>
+    
+    <!-- Row 4: Bottleneck Analysis -->
+    <div class="mb-8">
+      <BottleneckWidget />
+    </div>
 
 		<!-- Process Type Distribution -->
 		<div class="bg-white rounded-lg shadow p-4 mb-8">

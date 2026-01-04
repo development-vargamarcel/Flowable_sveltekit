@@ -406,6 +406,37 @@ export const api = {
     return fetchApi('/api/auth/me');
   },
 
+  // SLA Endpoints
+  async getSlaStats(): Promise<SlaStats> {
+    return fetchApi<SlaStats>('/api/sla/stats');
+  },
+
+  async refreshSlaCheck(): Promise<void> {
+    return fetchApi<void>('/api/sla/check', { method: 'POST' });
+  },
+
+  // Analytics Endpoints
+  async getProcessDurationAnalytics(processDefinitionKey?: string): Promise<{ label: string; count: number }[]> {
+    const query = processDefinitionKey ? `?processDefinitionKey=${processDefinitionKey}` : '';
+    return fetchApi(`api/analytics/process-duration${query}`);
+  },
+
+  async getUserPerformanceAnalytics(): Promise<{ userId: string; tasksCompleted: number; avgDurationHours: number }[]> {
+    return fetchApi('api/analytics/user-performance');
+  },
+
+  async getBottlenecks(): Promise<
+    Array<{
+      processDefinitionKey: string;
+      taskName: string;
+      avgDurationHours: number;
+      slowInstanceCount: number;
+      totalInstances: number;
+    }>
+  > {
+    return fetchApi('/api/analytics/bottlenecks');
+  },
+
   // Tasks
   async getTasks(): Promise<Task[]> {
     return fetchApi('/api/tasks');

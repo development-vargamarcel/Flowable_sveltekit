@@ -22,6 +22,9 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<List<Notification>> getNotifications(Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.ok(List.of());
+        }
         return ResponseEntity.ok(notificationService.getUserNotifications(authentication.getName()));
     }
 
@@ -34,6 +37,9 @@ public class NotificationController {
 
     @GetMapping("/unread-count")
     public ResponseEntity<Long> getUnreadCount(Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.ok(0L);
+        }
         return ResponseEntity.ok(notificationService.getUnreadCount(authentication.getName()));
     }
 
