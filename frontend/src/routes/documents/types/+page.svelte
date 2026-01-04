@@ -33,8 +33,6 @@
     } catch (err) {
       error = 'Failed to delete document type';
     }
-      error = 'Failed to delete document type';
-    }
   }
 
   async function handleLoadDemos() {
