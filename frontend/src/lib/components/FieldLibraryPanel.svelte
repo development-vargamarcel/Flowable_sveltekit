@@ -432,11 +432,7 @@
   {#if activeTab === 'fields'}
     <div class="flex justify-end">
       <button
-        onclick={() => {
-          editingField = null;
-          resetFieldForm();
-          showFieldEditor = true;
-        }}
+        onclick={handleAddField}
         class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
       >
         + Add Field
@@ -448,11 +444,7 @@
       <div class="text-center py-12 rounded-lg border-2 border-dashed border-gray-300">
         <p class="text-sm text-gray-500">No fields defined yet.</p>
         <button
-          onclick={() => {
-            editingField = null;
-            resetFieldForm();
-            showFieldEditor = true;
-          }}
+          onclick={handleAddField}
           class="mt-2 text-sm font-medium text-blue-600 hover:text-blue-500"
         >
           Add your first field
@@ -535,11 +527,7 @@
     <!-- Grids Tab -->
     <div class="flex justify-end">
       <button
-        onclick={() => {
-          editingGrid = null;
-          resetGridForm();
-          showGridEditor = true;
-        }}
+        onclick={handleAddGrid}
         class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
       >
         + Add Grid
@@ -550,11 +538,7 @@
       <div class="text-center py-12 rounded-lg border-2 border-dashed border-gray-300">
         <p class="text-sm text-gray-500">No data grids defined yet.</p>
         <button
-          onclick={() => {
-            editingGrid = null;
-            resetGridForm();
-            showGridEditor = true;
-          }}
+          onclick={handleAddGrid}
           class="mt-2 text-sm font-medium text-blue-600 hover:text-blue-500"
         >
           Add your first grid
@@ -605,16 +589,7 @@
                 <div class="mb-4 flex items-center justify-between">
                   <h5 class="text-sm font-medium text-gray-700">Columns</h5>
                   <button
-                    onclick={() => {
-                      editingColumn = null;
-                      resetColumnForm();
-                      // We need to store context for which grid (index) we are editing
-                      // Hacky way: store in transient state or pass through
-                      // Ideally we'd have normalized state or proper components
-                      // For now, we'll assume editingColumn stores gridIndex too
-                      showColumnEditor = true;
-                      editingColumn = { gridIndex: index, column: {} as GridColumn };
-                    }}
+                    onclick={() => handleAddColumn(index)}
                     class="text-xs font-medium text-blue-600 hover:text-blue-800"
                   >
                     + Add Column
