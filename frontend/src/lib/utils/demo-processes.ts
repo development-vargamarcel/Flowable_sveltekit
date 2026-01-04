@@ -807,76 +807,77 @@ execution.setVariable('hasHighPriceItem', hasHighPriceItem);
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
+  </definitions>`
   },
   {
     id: 'sla-demo',
     name: 'SLA Demonstration',
     description: 'Demonstrates timer boundary events and escalation paths',
     category: 'Advanced',
-    bpmn: `<? xml version="1.0" encoding="UTF-8" ?>
+    bpmn: `<?xml version="1.0" encoding="UTF-8"?>
       <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
-             xmlns: xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xmlns: flowable = "http://flowable.org/bpmn"
-             xmlns: bpmndi = "http://www.omg.org/spec/BPMN/20100524/DI"
-             xmlns: dc = "http://www.omg.org/spec/DD/20100524/DC"
-             xmlns: di = "http://www.omg.org/spec/DD/20100524/DI"
-             targetNamespace="http://demo.com/bpm" >
-    <process id="sla-demo" name = "SLA Demonstration" isExecutable="true" >
-    <startEvent id="start" name = "Start" />
-      <sequenceFlow id="flow1" sourceRef = "start" targetRef="taskWithSLA" />
-      <userTask id="taskWithSLA" name = "Task with SLA" flowable: candidateGroups = "users" >
-        <documentation>This task has a 1-minute timer attached</ documentation >
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="http://demo.com/bpm">
+    <process id="sla-demo" name="SLA Demonstration" isExecutable="true">
+    <startEvent id="start" name="Start"/>
+      <sequenceFlow id="flow1" sourceRef="start" targetRef="taskWithSLA"/>
+      <userTask id="taskWithSLA" name="Task with SLA" flowable:candidateGroups="users">
+        <documentation>This task has a 1-minute timer attached</documentation>
   </userTask>
-  < boundaryEvent id = "timerEvent" attachedToRef = "taskWithSLA" cancelActivity = "false" >
+  <boundaryEvent id="timerEvent" attachedToRef="taskWithSLA" cancelActivity="false">
   <timerEventDefinition>
-  <timeDuration>PT1M </timeDuration>
+  <timeDuration>PT1M</timeDuration>
   </timerEventDefinition>
   </boundaryEvent>
-  < sequenceFlow id = "flow2" sourceRef = "taskWithSLA" targetRef = "endNormal" />
-  <endEvent id="endNormal" name = "Completed on Time" />
-  <sequenceFlow id="flow3" sourceRef = "timerEvent" targetRef = "escalationTask" />
-  <userTask id="escalationTask" name = "Escalation Handler" flowable: candidateGroups = "managers" >
-  <documentation>Triggered by SLA breach </documentation>
+  <sequenceFlow id="flow2" sourceRef="taskWithSLA" targetRef="endNormal"/>
+  <endEvent id="endNormal" name="Completed on Time"/>
+  <sequenceFlow id="flow3" sourceRef="timerEvent" targetRef="escalationTask"/>
+  <userTask id="escalationTask" name="Escalation Handler" flowable:candidateGroups="managers">
+  <documentation>Triggered by SLA breach</documentation>
   </userTask>
-  < sequenceFlow id = "flow4" sourceRef = "escalationTask" targetRef = "endEscalated" />
-  <endEvent id="endEscalated" name = "Handled Escalation" />
+  <sequenceFlow id="flow4" sourceRef="escalationTask" targetRef="endEscalated"/>
+  <endEvent id="endEscalated" name="Handled Escalation"/>
   </process>
-  < bpmndi: BPMNDiagram id = "BPMNDiagram_sla-demo" >
-  <bpmndi: BPMNPlane id = "BPMNPlane_sla-demo" bpmnElement = "sla-demo" >
-  <bpmndi: BPMNShape id = "start_di" bpmnElement = "start" >
-  <dc: Bounds x = "100" y = "100" width = "36" height = "36" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_sla-demo">
+  <bpmndi:BPMNPlane id="BPMNPlane_sla-demo" bpmnElement="sla-demo">
+  <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+  <dc:Bounds x="100" y="100" width="36" height="36"/>
   </bpmndi:BPMNShape>
-  < bpmndi: BPMNShape id = "taskWithSLA_di" bpmnElement = "taskWithSLA" >
-  <dc: Bounds x = "200" y = "78" width = "100" height = "80" />
+  <bpmndi:BPMNShape id="taskWithSLA_di" bpmnElement="taskWithSLA">
+  <dc:Bounds x="200" y="78" width="100" height="80"/>
   </bpmndi:BPMNShape>
-  < bpmndi: BPMNShape id = "endNormal_di" bpmnElement = "endNormal" >
-  <dc: Bounds x = "400" y = "100" width = "36" height = "36" />
+  <bpmndi:BPMNShape id="endNormal_di" bpmnElement="endNormal">
+  <dc:Bounds x="400" y="100" width="36" height="36"/>
   </bpmndi:BPMNShape>
-  < bpmndi: BPMNShape id = "escalationTask_di" bpmnElement = "escalationTask" >
-  <dc: Bounds x = "350" y = "200" width = "100" height = "80" />
+  <bpmndi:BPMNShape id="escalationTask_di" bpmnElement="escalationTask">
+  <dc:Bounds x="350" y="200" width="100" height="80"/>
   </bpmndi:BPMNShape>
-  < bpmndi: BPMNShape id = "endEscalated_di" bpmnElement = "endEscalated" >
-  <dc: Bounds x = "500" y = "222" width = "36" height = "36" />
+  <bpmndi:BPMNShape id="endEscalated_di" bpmnElement="endEscalated">
+  <dc:Bounds x="500" y="222" width="36" height="36"/>
   </bpmndi:BPMNShape>
-  < bpmndi: BPMNShape id = "timerEvent_di" bpmnElement = "timerEvent" >
-  <dc: Bounds x = "250" y = "140" width = "30" height = "30" />
+  <bpmndi:BPMNShape id="timerEvent_di" bpmnElement="timerEvent">
+  <dc:Bounds x="250" y="140" width="30" height="30"/>
   </bpmndi:BPMNShape>
-  < bpmndi: BPMNEdge id = "flow1_di" bpmnElement = "flow1" >
-  <di: waypoint x = "136" y = "118" />
-  <di: waypoint x = "200" y = "118" />
+  <bpmndi:BPMNEdge id="flow1_di" bpmnElement="flow1">
+  <di:waypoint x="136" y="118"/>
+  <di:waypoint x="200" y="118"/>
   </bpmndi:BPMNEdge>
-  < bpmndi: BPMNEdge id = "flow2_di" bpmnElement = "flow2" >
-  <di: waypoint x = "300" y = "118" />
-  <di: waypoint x = "400" y = "118" />
+  <bpmndi:BPMNEdge id="flow2_di" bpmnElement="flow2">
+  <di:waypoint x="300" y="118"/>
+  <di:waypoint x="400" y="118"/>
   </bpmndi:BPMNEdge>
-  < bpmndi: BPMNEdge id = "flow3_di" bpmnElement = "flow3" >
-  <di: waypoint x = "265" y = "170" />
-  <di: waypoint x = "265" y = "240" />
-  <di: waypoint x = "350" y = "240" />
+  <bpmndi:BPMNEdge id="flow3_di" bpmnElement="flow3">
+  <di:waypoint x="265" y="170"/>
+  <di:waypoint x="265" y="240"/>
+  <di:waypoint x="350" y="240"/>
   </bpmndi:BPMNEdge>
-  < bpmndi: BPMNEdge id = "flow4_di" bpmnElement = "flow4" >
-  <di: waypoint x = "450" y = "240" />
-  <di: waypoint x = "500" y = "240" />
+  <bpmndi:BPMNEdge id="flow4_di" bpmnElement="flow4">
+  <di:waypoint x="450" y="240"/>
+  <di:waypoint x="500" y="240"/>
   </bpmndi:BPMNEdge>
   </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

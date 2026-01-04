@@ -12,6 +12,7 @@
   const { class: className, children, ...restProps }: Props = $props();
 </script>
 
+<!-- @ts-expect-error - HTMLTableCaptionElement props spreading type issue -->
 <caption class={cn('text-muted-foreground mt-4 text-sm', className)} {...restProps}>
   {#if children}
     {@render children()}

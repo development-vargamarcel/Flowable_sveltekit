@@ -1,8 +1,10 @@
 export interface User {
+  id?: string;
   username: string;
   displayName: string;
   email: string | null;
   roles: string[];
+  groups?: string[];
 }
 
 export interface Task {
@@ -31,8 +33,11 @@ export interface ProcessDefinition {
   id: string;
   key: string;
   name: string;
-  description: string | null;
+  description?: string | null;
   version: number;
+  category?: string | null;
+  suspended?: boolean;
+  deploymentId?: string;
 }
 
 export interface ProcessInstance {
@@ -183,15 +188,16 @@ export interface FormFieldValidation {
   max?: number;
   pattern?: string;
   patternMessage?: string;
+  message?: string; // General validation message
   customExpression?: string;
   customMessage?: string;
 }
 
 export interface FormElementLogic {
-  type: 'JS' | 'SQL';
-  content: string;
+  type: 'JS' | 'SQL' | 'Dependency' | 'Visibility';
+  content?: string;
   dependencies: string[];
-  autoCalculate: boolean;
+  autoCalculate?: boolean;
 }
 
 export interface FormFieldOption {
@@ -200,59 +206,58 @@ export interface FormFieldOption {
 }
 
 export interface FormField {
-  id: string;
+  id?: string;
   name: string;
   label: string;
   type: string;
-  required: boolean;
-  validation: FormFieldValidation | null;
-  options: FormFieldOption[] | null;
-  placeholder: string;
-  defaultValue: string;
-  defaultExpression: string;
-  tooltip: string;
-  readonly: boolean;
-  hidden: boolean;
+  required?: boolean;
+  validation?: FormFieldValidation | null;
+  options?: FormFieldOption[] | null;
+  placeholder?: string;
+  defaultValue?: string;
+  defaultExpression?: string;
+  tooltip?: string;
+  readonly?: boolean;
+  hidden?: boolean;
   logic?: FormElementLogic;
-  hiddenExpression: string;
-  readonlyExpression: string;
-  requiredExpression: string;
-  gridColumn: number;
-  gridRow: number;
-  gridWidth: number;
-  cssClass: string;
-  onChange: string;
-  onBlur: string;
+  hiddenExpression?: string;
+  readonlyExpression?: string;
+  requiredExpression?: string;
+  gridColumn?: number;
+  gridRow?: number;
+  gridWidth?: number;
+  cssClass?: string;
+  onChange?: string;
+  onBlur?: string;
 }
 
 export interface GridColumn {
-  id: string;
+  id?: string;
   name: string;
   label: string;
   type: string;
-  required: boolean;
-  placeholder: string;
-  options: string[] | null;
+  required?: boolean;
+  placeholder?: string;
+  options?: FormFieldOption[] | null;
   min?: number;
   max?: number;
   step?: number;
-  step?: number;
-  validation: FormFieldValidation | null;
+  validation?: FormFieldValidation | null;
   logic?: FormElementLogic;
 }
 
 export interface FormGrid {
-  id: string;
+  id?: string;
   name: string;
   label: string;
-  description: string;
-  minRows: number;
-  maxRows: number;
+  description?: string;
+  minRows?: number;
+  maxRows?: number;
   columns: GridColumn[];
-  gridColumn: number;
-  gridRow: number;
-  gridWidth: number;
-  cssClass: string;
+  gridColumn?: number;
+  gridRow?: number;
+  gridWidth?: number;
+  cssClass?: string;
 }
 
 export interface GridConfig {
@@ -296,9 +301,10 @@ export type ConditionTargetType = 'all' | 'field' | 'grid' | 'column';
  */
 export interface ConditionTarget {
   type: ConditionTargetType;
-  fieldNames?: string[];      // For type 'field': specific field names
-  gridNames?: string[];       // For type 'grid': specific grid names
-  columnTargets?: {           // For type 'column': grid name + column names
+  fieldNames?: string[]; // For type 'field': specific field names
+  gridNames?: string[]; // For type 'grid': specific grid names
+  columnTargets?: {
+    // For type 'column': grid name + column names
     gridName: string;
     columnNames: string[];
   }[];
@@ -309,28 +315,28 @@ export interface ConditionTarget {
  */
 export interface FieldConditionRule {
   id: string;
-  name: string;                 // Human-readable name
-  description?: string;         // Optional description
-  condition: string;            // Expression: "${amount > 1000}" or "amount > 1000"
-  effect: ConditionEffect;      // What happens when condition is true
-  target: ConditionTarget;      // What this rule affects
-  priority: number;             // Evaluation order (higher = first, but least access wins)
-  enabled: boolean;             // Whether the rule is active
+  name: string; // Human-readable name
+  description?: string; // Optional description
+  condition: string; // Expression: "${amount > 1000}" or "amount > 1000"
+  effect: ConditionEffect; // What happens when condition is true
+  target: ConditionTarget; // What this rule affects
+  priority: number; // Evaluation order (higher = first, but least access wins)
+  enabled: boolean; // Whether the rule is active
 }
 
 /**
  * Process-level field library - defines all fields/grids once per process
  */
 export interface ProcessFieldLibrary {
-  fields: FormField[];          // All fields available in this process
-  grids: FormGrid[];            // All grids available in this process
+  fields: FormField[]; // All fields available in this process
+  grids: FormGrid[]; // All grids available in this process
 }
 
 /**
  * Reference to a field from the library with optional task-specific overrides
  */
 export interface TaskFieldReference {
-  fieldName: string;            // Reference to field.name in library
+  fieldName: string; // Reference to field.name in library
   overrides?: Partial<FormField>; // Task-specific property overrides
 }
 
@@ -338,9 +344,10 @@ export interface TaskFieldReference {
  * Reference to a grid from the library with optional task-specific overrides
  */
 export interface TaskGridReference {
-  gridName: string;             // Reference to grid.name in library
+  gridName: string; // Reference to grid.name in library
   overrides?: Partial<FormGrid>; // Task-specific property overrides
-  columnOverrides?: {           // Per-column overrides
+  columnOverrides?: {
+    // Per-column overrides
     columnName: string;
     overrides: Partial<GridColumn>;
   }[];
@@ -350,13 +357,14 @@ export interface TaskGridReference {
  * Task-specific form configuration
  */
 export interface TaskFormConfig {
-  taskId: string;               // BPMN task element ID
+  taskId: string; // BPMN task element ID
   fieldRefs: TaskFieldReference[];
   gridRefs: TaskGridReference[];
-  taskConditions?: FieldConditionRule[];  // Task-level conditions (in addition to global)
+  taskConditions?: FieldConditionRule[]; // Task-level conditions (in addition to global)
   layout?: {
     gridConfig?: GridConfig;
-    fieldPositions?: {          // Override positions for this task
+    fieldPositions?: {
+      // Override positions for this task
       fieldName: string;
       gridColumn: number;
       gridRow: number;
@@ -395,7 +403,7 @@ export interface TaskFormWithConfig {
 export interface ComputedFieldState {
   isHidden: boolean;
   isReadonly: boolean;
-  appliedRules: string[];       // IDs of rules that affected this field
+  appliedRules: string[]; // IDs of rules that affected this field
 }
 
 /**
@@ -511,4 +519,59 @@ export interface TableDataResponse {
   size: number;
   totalRows: number;
   totalPages: number;
+}
+
+// ============================================
+// Pagination Types
+// ============================================
+
+/**
+ * Generic page response for paginated API results
+ */
+export interface Page<T> {
+  content: T[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      sorted: boolean;
+      unsorted: boolean;
+      empty: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  last: boolean;
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
+  sort: {
+    sorted: boolean;
+    unsorted: boolean;
+    empty: boolean;
+  };
+  first: boolean;
+  numberOfElements: number;
+  empty: boolean;
+}
+
+// ============================================
+// SLA Types
+// ============================================
+
+/**
+ * SLA statistics and metrics
+ */
+export interface SlaStats {
+  totalProcesses: number;
+  onTrack: number;
+  atRisk: number;
+  breached: number;
+  avgCompletionPercentage: number;
+  processesByStatus: {
+    status: string;
+    count: number;
+  }[];
 }

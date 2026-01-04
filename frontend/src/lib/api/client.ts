@@ -20,7 +20,8 @@ import type {
   GridRowDTO,
   SaveDocumentRequest,
   SaveGridRowsRequest,
-  Page
+  Page,
+  SlaStats
 } from '$lib/types';
 import { createLogger } from '$lib/utils/logger';
 import { backendStatus } from '$lib/stores/backendStatus';
@@ -416,12 +417,16 @@ export const api = {
   },
 
   // Analytics Endpoints
-  async getProcessDurationAnalytics(processDefinitionKey?: string): Promise<{ label: string; count: number }[]> {
+  async getProcessDurationAnalytics(
+    processDefinitionKey?: string
+  ): Promise<{ label: string; count: number }[]> {
     const query = processDefinitionKey ? `?processDefinitionKey=${processDefinitionKey}` : '';
     return fetchApi(`api/analytics/process-duration${query}`);
   },
 
-  async getUserPerformanceAnalytics(): Promise<{ userId: string; tasksCompleted: number; avgDurationHours: number }[]> {
+  async getUserPerformanceAnalytics(): Promise<
+    { userId: string; tasksCompleted: number; avgDurationHours: number }[]
+  > {
     return fetchApi('api/analytics/user-performance');
   },
 
@@ -633,7 +638,10 @@ export const api = {
     return fetchApi(`/api/processes/${processDefinitionId}/activate`, { method: 'PUT' });
   },
 
-  async updateProcessCategory(processDefinitionId: string, category: string): Promise<{ message: string }> {
+  async updateProcessCategory(
+    processDefinitionId: string,
+    category: string
+  ): Promise<{ message: string }> {
     return fetchApi(`/api/processes/${processDefinitionId}/category`, {
       method: 'PUT',
       body: JSON.stringify({ category })
