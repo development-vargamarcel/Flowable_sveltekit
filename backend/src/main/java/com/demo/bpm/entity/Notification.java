@@ -44,6 +44,8 @@ public class Notification {
         PROCESS_COMPLETED,
         PROCESS_REJECTED,
         MENTION,
-        SYSTEM
+        SYSTEM,
+        SLA_WARNING,
+        SLA_BREACH
     }
 }
