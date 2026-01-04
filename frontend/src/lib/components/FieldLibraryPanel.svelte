@@ -143,6 +143,8 @@
 		library.grids.forEach(g => {
 			suggestions.push({ label: `grids.${g.name}`, value: `grids.${g.name}`, type: 'grid', description: g.label });
 			suggestions.push({ label: `grids.${g.name}.selectedRow`, value: `grids.${g.name}.selectedRow`, type: 'grid', description: 'Selected row' });
+			suggestions.push({ label: `grids.${g.name}.selectedRows`, value: `grids.${g.name}.selectedRows`, type: 'grid', description: 'Selected rows (array)' });
+			suggestions.push({ label: `grids.${g.name}.selectedRows.length`, value: `grids.${g.name}.selectedRows.length`, type: 'grid', description: 'Count of selected' });
 			suggestions.push({ label: `grids.${g.name}.rows`, value: `grids.${g.name}.rows`, type: 'grid', description: 'All rows' });
 			suggestions.push({ label: `grids.${g.name}.sum`, value: `grids.${g.name}.sum('')`, type: 'function', description: 'Sum column' });
 			

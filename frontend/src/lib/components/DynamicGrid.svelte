@@ -23,7 +23,9 @@
     initialData?: Record<string, unknown>[];
     readonly?: boolean;
     columnStates?: Record<string, ComputedFieldState>;
+    enableMultiSelect?: boolean;
     onDataChange?: (data: Record<string, unknown>[]) => void;
+    onSelectionChange?: (selectedRows: Record<string, unknown>[]) => void;
   }
 
   const {
@@ -35,7 +37,9 @@
     initialData = [],
     readonly = false,
     columnStates = {},
-    onDataChange
+    enableMultiSelect = false,
+    onDataChange,
+    onSelectionChange
   }: Props = $props();
 
   // Helper to get column state (with fallback)
@@ -55,6 +59,41 @@
   let rows = $state<GridRow[]>([]);
   let dataLoadedFromProps = $state(false);
   let userHasMadeChanges = $state(false);
+  let selectedRowIds = $state<Set<string>>(new Set());
+
+  // Check if all rows are selected
+  const allSelected = $derived(rows.length > 0 && selectedRowIds.size === rows.length);
+  const someSelected = $derived(selectedRowIds.size > 0 && selectedRowIds.size < rows.length);
+
+  // Toggle row selection
+  function toggleRowSelection(rowId: string) {
+    const newSelected = new Set(selectedRowIds);
+    if (newSelected.has(rowId)) {
+      newSelected.delete(rowId);
+    } else {
+      newSelected.add(rowId);
+    }
+    selectedRowIds = newSelected;
+    notifySelectionChange();
+  }
+
+  // Toggle all rows selection
+  function toggleAllSelection() {
+    if (allSelected) {
+      selectedRowIds = new Set();
+    } else {
+      selectedRowIds = new Set(rows.map(r => r.id));
+    }
+    notifySelectionChange();
+  }
+
+  // Notify parent of selection changes
+  function notifySelectionChange() {
+    if (onSelectionChange) {
+      const selectedData = rows.filter(r => selectedRowIds.has(r.id)).map(r => r.data);
+      onSelectionChange(selectedData);
+    }
+  }
 
   // Column Dependency Map
   let dependencyMap = $state<Record<string, GridColumn[]>>({});
@@ -311,6 +350,14 @@
   export function hasEditingRows(): boolean {
     return rows.some((row) => row.isEditing);
   }
+
+  export function getSelectedRows(): Record<string, unknown>[] {
+    return rows.filter(r => selectedRowIds.has(r.id)).map(r => r.data);
+  }
+
+  export function clearSelection(): void {
+    selectedRowIds = new Set();
+  }
 </script>
 
 <div class="w-full">
@@ -328,6 +375,18 @@
       <Table.Root>
         <Table.Header>
           <Table.Row>
+            {#if enableMultiSelect}
+              <Table.Head class="w-10">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onchange={toggleAllSelection}
+                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  aria-label="Select all rows"
+                />
+              </Table.Head>
+            {/if}
             {#each visibleColumns as column}
               <Table.Head>
                 {column.label}
@@ -357,7 +416,18 @@
           {/if}
 
           {#each rows as row (row.id)}
-            <Table.Row>
+            <Table.Row class={selectedRowIds.has(row.id) ? 'bg-blue-50' : ''}>
+              {#if enableMultiSelect}
+                <Table.Cell class="w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedRowIds.has(row.id)}
+                    onchange={() => toggleRowSelection(row.id)}
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    aria-label="Select row"
+                  />
+                </Table.Cell>
+              {/if}
               {#each visibleColumns as column}
                 {@const colReadonly = isColumnReadonly(column.name)}
                 <Table.Cell>
