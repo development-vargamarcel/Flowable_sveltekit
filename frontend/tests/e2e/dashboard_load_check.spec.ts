@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { setupMockApi } from './helpers/mock-api';
+import { setupApiForTest } from './helpers/mock-api';
 
 test('login and monitor dashboard load', async ({ page }) => {
-  // Set a reasonable test timeout
-  test.setTimeout(60000); // 1 minute
+  // Set a reasonable test timeout (longer for real backend)
+  test.setTimeout(120000); // 2 minutes
 
-  // Setup mock API to simulate backend responses
-  await setupMockApi(page);
+  // Setup API - automatically detects if backend is available
+  // Uses mock API if backend is not running
+  const { useMock } = await setupApiForTest(page);
+  console.log(`Running test with ${useMock ? 'mock' : 'real'} API`);
 
   console.log('Starting login...');
   // Go to login page
@@ -36,7 +38,9 @@ test('login and monitor dashboard load', async ({ page }) => {
   const successLocator = page.locator('text=Active Processes by Type');
 
   // Wait for the dashboard content to load
-  await expect(successLocator).toBeVisible({ timeout: 30000 });
+  // Use longer timeout for real backend (may need to fetch data from DB)
+  const timeout = useMock ? 30000 : 60000;
+  await expect(successLocator).toBeVisible({ timeout });
   console.log('Dashboard loaded successfully.');
 
   // Verify no critical error messages are shown (checking for specific error patterns)

@@ -1,5 +1,50 @@
 import { Page } from '@playwright/test';
 
+/**
+ * Check if the backend is available by calling the health endpoint
+ */
+export async function isBackendAvailable(
+  baseUrl: string = 'http://localhost:8080'
+): Promise<boolean> {
+  try {
+    const response = await fetch(`${baseUrl}/actuator/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Setup API - either mock or real based on backend availability
+ * If USE_MOCK_API env is set, always use mocks
+ * If backend is available and USE_MOCK_API is not set, use real backend
+ */
+export async function setupApiForTest(
+  page: Page,
+  options: { forceMock?: boolean } = {}
+): Promise<{ useMock: boolean }> {
+  const forceMock = options.forceMock ?? process.env.USE_MOCK_API === 'true';
+
+  if (forceMock) {
+    await setupMockApi(page);
+    return { useMock: true };
+  }
+
+  const backendAvailable = await isBackendAvailable();
+
+  if (!backendAvailable) {
+    console.log('Backend not available, using mock API');
+    await setupMockApi(page);
+    return { useMock: true };
+  }
+
+  console.log('Backend available, using real API');
+  return { useMock: false };
+}
+
 // Mock user data
 export const mockUser = {
   id: 'eng.john',
