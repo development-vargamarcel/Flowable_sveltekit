@@ -18,6 +18,8 @@
 		taskConditionRules?: FieldConditionRule[];
 		processVariables?: Record<string, unknown>;
 		userContext?: UserContext;
+        // Task context for expression evaluation
+        task?: { id: string; name: string; taskDefinitionKey: string };
 	}
 
 	const {
@@ -31,7 +33,8 @@
 		conditionRules = [],
 		taskConditionRules = [],
 		processVariables = {},
-		userContext = { id: '', username: '', roles: [], groups: [] }
+		userContext = { id: '', username: '', roles: [], groups: [] },
+        task
 	}: Props = $props();
 
 	// Local form values - initialized in $effect
@@ -62,15 +65,20 @@
 		)
 	);
 
-	// Computed field and grid states based on condition rules
+	// Computed field and grid states based on condition rules AND visibility expressions
 	let computedFieldStates = $state<Record<string, ComputedFieldState>>({});
 	let computedGridStates = $state<Record<string, ComputedGridState>>({});
 	
 	// Logic Dependency Map: FieldName -> List of Fields that depend on it
+	// Also includes dependency for visibility expressions
 	let dependencyMap = $state<Record<string, FormField[]>>({});
 
 	$effect(() => {
-		// Build dependency map for auto-calculation
+		// Build dependency map for auto-calculation and visibility re-evaluation
+        // Since we don't parse the JS to know dependencies, we have to assume
+        // that any change might trigger re-evaluation of expressions.
+        // Or we could try to be smarter. For now, we will re-evaluate on any change.
+        // But for specific calculation dependencies defined in legacy logic, we keep the map.
 		const map: Record<string, FormField[]> = {};
 		for (const field of fields) {
 			if (field.logic && field.logic.dependencies) {
@@ -83,52 +91,79 @@
 		dependencyMap = map;
 	});
 
+    function safeEvaluate(expression: string, context: any): any {
+        try {
+            // Function signature: (value, form, grids, process, task, user) => result
+            const func = new Function('value', 'form', 'grids', 'process', 'task', 'user', expression);
+            return func(
+                context.value,
+                context.form,
+                context.grids,
+                context.process,
+                context.task,
+                context.user
+            );
+        } catch (e) {
+            console.warn('Expression evaluation failed:', expression, e);
+            return undefined;
+        }
+    }
+
 	async function executeFieldLogic(field: FormField) {
-		if (!field.logic || field.logic.type === 'None' || !field.logic.content) return;
+        // New calculation expression
+        if (field.calculationExpression) {
+             const result = safeEvaluate(field.calculationExpression, {
+                value: formValues[field.name],
+                form: formValues,
+                grids: gridsContext,
+                process: processVariables,
+                task: task,
+                user: userContext
+            });
 
-		console.log(`Executing logic for ${field.name} (${field.logic.type})`);
-
-		try {
-			if (field.logic.type === 'JS') {
-				// prepare safe-ish execution context
-				const contextValues = { ...formValues };
-
-				// dynamic function creation
-				// signature: (value, form, grids, db, lib) => result
-				const func = new Function('value', 'form', 'grids', 'db', 'lib', field.logic.content);
-
-				const dbMock = {
-					query: async (sql: string, params: any[]) => {
-						console.log('SQL Query:', sql, params);
-						return []; // Mock return
-					}
-				};
-
-				const libMock = {}; // Placeholder for function library
-
-				const result = await func(
-					formValues[field.name],
-					contextValues,
-					gridsContext,
-					dbMock,
-					libMock
-				);
-
-				if (result !== undefined) {
-					// Update the field with the result (avoiding direct recursion if possible)
-					if (formValues[field.name] !== result) {
-						handleFieldChange(field.name, result, true); // true = key for isAutomated
-					}
-				}
-			} else if (field.logic.type === 'SQL') {
-				// SQL Placeholder - would replace parameters and call API
-				console.log('SQL Logic not fully implemented for execution');
-			}
-		} catch (e) {
-			console.error(`Error executing logic for field ${field.name}:`, e);
-			fieldErrors[field.name] = `Logic Error: ${e.message}`;
+             if (result !== undefined && formValues[field.name] !== result) {
+                 handleFieldChange(field.name, result, true);
+             }
+        }
+        // Legacy logic support
+		else if (field.logic && field.logic.type !== 'None' && field.logic.content) {
+            try {
+                if (field.logic.type === 'JS') {
+                    const func = new Function('value', 'form', 'grids', 'db', 'lib', field.logic.content);
+                    const dbMock = { query: async () => [] };
+                    const libMock = {};
+                    const result = await func(
+                        formValues[field.name],
+                        { ...formValues },
+                        gridsContext,
+                        dbMock,
+                        libMock
+                    );
+                    if (result !== undefined && formValues[field.name] !== result) {
+                        handleFieldChange(field.name, result, true);
+                    }
+                }
+            } catch (e) {
+                console.error(`Error executing legacy logic for field ${field.name}:`, e);
+            }
 		}
 	}
+
+    // Evaluate Visibility Expressions
+    function evaluateVisibility(field: FormField): boolean {
+        if (!field.visibilityExpression) return !field.hidden;
+
+        const result = safeEvaluate(field.visibilityExpression, {
+            value: formValues[field.name],
+            form: formValues,
+            grids: gridsContext,
+            process: processVariables,
+            task: task,
+            user: userContext
+        });
+
+        return result === true;
+    }
 
 	// Create evaluation context that updates when form values change
 	function createEvaluationContext(): EvaluationContext {
@@ -141,14 +176,54 @@
 
 	// Compute field and grid states whenever form values, rules, or context change
 	$effect(() => {
-		const allRules = [...conditionRules, ...taskConditionRules];
-		if (allRules.length === 0) {
-			// No rules, use static field properties
-			computedFieldStates = {};
-			computedGridStates = {};
-			return;
-		}
+        // This effect runs whenever formValues changes.
+        // We use it to re-evaluate visibility and calculation for ALL fields that might have expressions.
 
+        // 1. Re-evaluate visibility expressions
+        const newComputedStates = { ...computedFieldStates };
+        let stateChanged = false;
+
+        for (const field of fields) {
+            // Priority: 1. Condition Rules (from ConditionStateComputer), 2. visibilityExpression, 3. Static hidden
+            // Currently ConditionStateComputer runs in its own effect and updates `computedFieldStates`.
+            // We need to merge that logic.
+            // Since ConditionStateComputer is derived from rules, let's let it run first (it's in another effect).
+            // But wait, the other effect depends on `formValues` too.
+            // Let's combine them or apply visibilityExpression on top.
+
+            // Actually, `computedFieldStates` is overwritten by the other effect.
+            // So we should probably integrate visibilityExpression logic inside `getFieldState` or update `computedFieldStates` here carefully.
+            // The cleanest way is to respect the ConditionRules as overrides, but use visibilityExpression as base visibility.
+
+            // However, the other effect is:
+            // $effect(() => { ... result = stateComputer.computeFormState(...) ... })
+            // If we write to computedFieldStates here, we might conflict.
+
+            // Let's create a derived state for "expression-based visibility" and merge it.
+        }
+
+        // 2. Run calculations
+        // We iterate all fields to see if they have calculation expressions that depend on changed values.
+        // Since we don't have a dependency graph for expressions, we should probably run all calculation expressions
+        // whenever formValues change. This is expensive but correct.
+        // To avoid infinite loops, we only update if value is different.
+
+        // We put this in a timeout to avoid synchronous loop with `handleFieldChange`
+        if (formInitialized) {
+             setTimeout(() => {
+                 for (const field of fields) {
+                     if (field.calculationExpression) {
+                         executeFieldLogic(field);
+                     }
+                 }
+             }, 0);
+        }
+	});
+
+    // We modify the existing effect for ConditionStateComputer to also account for visibilityExpressions if possible,
+    // or we wrap `getFieldState`.
+
+	$effect(() => {
 		const context = createEvaluationContext();
 		const stateComputer = new ConditionStateComputer(context, { formReadonly: readonly });
 		const result = stateComputer.computeFormState(fields, grids, conditionRules, taskConditionRules);
@@ -159,16 +234,32 @@
 
 	// Helper to get computed field state (with fallback to static properties)
 	function getFieldState(field: FormField): ComputedFieldState {
-		const computed = computedFieldStates[field.name];
-		if (computed) {
-			return computed;
-		}
-		// Fallback to static properties
-		return {
+		// Start with rule-based state
+        let state = computedFieldStates[field.name] || {
 			isHidden: field.hidden,
 			isReadonly: field.readonly || readonly,
 			appliedRules: []
 		};
+
+        // Apply Visibility Expression (Expression > Static, but Rule > Expression usually? Or Rule supplements?)
+        // Let's say Rule acts as an override/modifier.
+        // If no rule applied, check expression.
+        if (state.appliedRules.length === 0 && field.visibilityExpression) {
+            const isVisible = evaluateVisibility(field);
+            state = { ...state, isHidden: !isVisible };
+        } else if (field.visibilityExpression) {
+             // If rules applied, they might have set isHidden=true.
+             // If rules set isHidden=false (explicitly visible), we respect that.
+             // If rules didn't touch visibility (e.g. only readonly), we check expression.
+             // This is getting complex.
+             // Simple approach: Visibility Expression is the "base" visibility. Rules override it.
+             const baseVisible = evaluateVisibility(field);
+             if (!state.appliedRules.some(r => r.includes('hide') || r.includes('show'))) {
+                  state.isHidden = !baseVisible;
+             }
+        }
+
+		return state;
 	}
 
 	// Helper to get computed grid state (with fallback to static properties)
@@ -179,7 +270,7 @@
 		}
 		// Fallback: grid is visible and inherits form readonly
 		return {
-			isHidden: false,
+			isHidden: false, // TODO: Grid visibility expression
 			isReadonly: readonly,
 			columnStates: {},
 			appliedRules: []
@@ -234,7 +325,7 @@
 			fieldErrors = rest;
 		}
 
-		// Trigger dependencies
+		// Trigger legacy dependencies
 		if (!isAutomated) {
 			const dependents = dependencyMap[fieldName] || [];
 			for (const dep of dependents) {
@@ -265,6 +356,25 @@
 		if (value === undefined || value === null || value === '') {
 			return null;
 		}
+
+        // Custom Validation Expression
+        if (field.validationExpression) {
+            const isValidOrMsg = safeEvaluate(field.validationExpression, {
+                value: value,
+                form: formValues,
+                grids: gridsContext,
+                process: processVariables,
+                task: task,
+                user: userContext
+            });
+
+            if (isValidOrMsg === false) {
+                return field.validationMessage || `${field.label} is invalid`;
+            }
+            if (typeof isValidOrMsg === 'string') {
+                return isValidOrMsg;
+            }
+        }
 
 		const validation = field.validation;
 		if (!validation) return null;
@@ -646,6 +756,9 @@
 						gridsContext={gridsContext}
 						onDataChange={(data) => handleGridChange(grid.name, data)}
 						onSelectionChange={(selected) => handleGridSelectionChange(grid.name, selected)}
+                        processVariables={processVariables}
+                        userContext={userContext}
+                        task={task}
 					/>
 				</div>
 			{/if}

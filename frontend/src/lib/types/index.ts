@@ -219,6 +219,13 @@ export interface FormField {
   tooltip?: string;
   readonly?: boolean;
   hidden?: boolean;
+
+  // Advanced Logic
+  visibilityExpression?: string; // JS expression returning boolean
+  calculationExpression?: string; // JS expression returning value
+  validationExpression?: string; // JS expression returning boolean or string
+  validationMessage?: string; // Error message if validationExpression returns false
+
   logic?: FormElementLogic;
   hiddenExpression?: string;
   readonlyExpression?: string;
@@ -243,6 +250,13 @@ export interface GridColumn {
   max?: number;
   step?: number;
   validation?: FormFieldValidation | null;
+
+  // Advanced Logic
+  visibilityExpression?: string;
+  calculationExpression?: string;
+  validationExpression?: string;
+  validationMessage?: string;
+
   logic?: FormElementLogic;
 }
 
@@ -258,6 +272,8 @@ export interface FormGrid {
   gridRow?: number;
   gridWidth?: number;
   cssClass?: string;
+
+  visibilityExpression?: string;
 }
 
 export interface GridConfig {

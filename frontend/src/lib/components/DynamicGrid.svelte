@@ -26,6 +26,9 @@
     enableMultiSelect?: boolean;
     formValues?: Record<string, unknown>;
     gridsContext?: Record<string, any>;
+    processVariables?: Record<string, unknown>;
+    userContext?: any;
+    task?: any;
     onDataChange?: (data: Record<string, unknown>[]) => void;
     onSelectionChange?: (selectedRows: Record<string, unknown>[]) => void;
   }
@@ -42,22 +45,63 @@
     enableMultiSelect = false,
     formValues = {},
     gridsContext = {},
+    processVariables = {},
+    userContext = {},
+    task = null,
     onDataChange,
     onSelectionChange
   }: Props = $props();
 
+  // Helper to safely evaluate expressions
+  function safeEvaluate(expression: string, context: any): any {
+     try {
+         const func = new Function('value', 'row', 'form', 'grids', 'process', 'task', 'user', expression);
+         return func(
+             context.value,
+             context.row,
+             context.form,
+             context.grids,
+             context.process,
+             context.task,
+             context.user
+         );
+     } catch (e) {
+         console.warn('Grid expression evaluation failed:', expression, e);
+         return undefined;
+     }
+  }
+
   // Helper to get column state (with fallback)
-  function getColumnState(columnName: string): ComputedFieldState {
-    return columnStates[columnName] || { isHidden: false, isReadonly: readonly, appliedRules: [] };
+  function getColumnState(column: GridColumn, rowData?: Record<string, unknown>): ComputedFieldState {
+    let state = columnStates[column.name] || { isHidden: false, isReadonly: readonly, appliedRules: [] };
+
+    if (column.visibilityExpression) {
+        // We try to evaluate without row first for column-level visibility
+        const isVisible = safeEvaluate(column.visibilityExpression, {
+            value: null,
+            row: {}, // Empty row context
+            form: formValues,
+            grids: gridsContext,
+            process: processVariables,
+            task: task,
+            user: userContext
+        });
+
+        if (isVisible === false) {
+            state = { ...state, isHidden: true };
+        }
+    }
+
+    return state;
   }
 
   // Get visible columns (filter out hidden ones)
-  const visibleColumns = $derived(columns.filter((col) => !getColumnState(col.name).isHidden));
+  const visibleColumns = $derived(columns.filter((col) => !getColumnState(col).isHidden));
 
   // Check if a column is readonly (grid readonly OR column-specific readonly)
-  function isColumnReadonly(columnName: string): boolean {
+  function isColumnReadonly(column: GridColumn): boolean {
     if (readonly) return true;
-    return getColumnState(columnName).isReadonly;
+    return getColumnState(column).isReadonly;
   }
 
   let rows = $state<GridRow[]>([]);
@@ -116,57 +160,96 @@
   });
 
   async function executeColumnLogic(row: GridRow, column: GridColumn) {
-    if (!column.logic || column.logic.type === 'None' || !column.logic.content) return;
-
-    try {
-      if (column.logic.type === 'JS') {
-        const func = new Function('value', 'row', 'form', 'grids', 'db', 'lib', column.logic.content);
-
-        const rowData = { ...row.data };
-        const result = await func(
-          row.data[column.name],
-          rowData,
-          formValues,
-          gridsContext,
-          {
-            query: async (sql: string, params: any[]) => {
-              console.log('SQL:', sql, params);
-              return [];
-            }
-          },
-          {}
-        );
+    // New Calculation Expression
+    if (column.calculationExpression) {
+        const result = safeEvaluate(column.calculationExpression, {
+            value: row.data[column.name],
+            row: row.data,
+            form: formValues,
+            grids: gridsContext,
+            process: processVariables,
+            task: task,
+            user: userContext
+        });
 
         if (result !== undefined && row.data[column.name] !== result) {
-          handleCellChange(row, column.name, result, true);
+            handleCellChange(row, column.name, result, true);
         }
+    }
+    // Legacy Logic
+    else if (column.logic && column.logic.type !== 'None' && column.logic.content) {
+      try {
+        if (column.logic.type === 'JS') {
+          const func = new Function('value', 'row', 'form', 'grids', 'db', 'lib', column.logic.content);
+
+          const rowData = { ...row.data };
+          const result = await func(
+            row.data[column.name],
+            rowData,
+            formValues,
+            gridsContext,
+            {
+              query: async (sql: string, params: any[]) => {
+                console.log('SQL:', sql, params);
+                return [];
+              }
+            },
+            {}
+          );
+
+          if (result !== undefined && row.data[column.name] !== result) {
+            handleCellChange(row, column.name, result, true);
+          }
+        }
+      } catch (e) {
+        console.error(`Error executing logic for column ${column.name}:`, e);
+        row.errors[column.name] = `Logic Error: ${e.message}`;
       }
-    } catch (e) {
-      console.error(`Error executing logic for column ${column.name}:`, e);
-      row.errors[column.name] = `Logic Error: ${e.message}`;
     }
   }
 
+  // Re-run calculations when dependencies change (formValues or other columns)
+  $effect(() => {
+     if (formValues && rows.length > 0) {
+         setTimeout(() => {
+             rows.forEach(row => {
+                 columns.forEach(col => {
+                     if (col.calculationExpression) {
+                         executeColumnLogic(row, col);
+                     }
+                 });
+             });
+         }, 0);
+     }
+  });
+
   function handleCellChange(row: GridRow, columnName: string, value: unknown, isAutomated = false) {
+    // Avoid infinite loops
+    if (row.data[columnName] === value) return;
+
     row.data[columnName] = value;
 
     if (!isAutomated) {
       userHasMadeChanges = true;
       // Trigger dependencies (row-level)
+      // 1. Legacy deps
       const dependents = dependencyMap[columnName] || [];
       for (const dep of dependents) {
         if (dep.logic?.autoCalculate) {
           setTimeout(() => executeColumnLogic(row, dep), 0);
         }
       }
+      // 2. New calc expressions - we check all columns in the row that have calc expressions
+      columns.forEach(col => {
+          if (col.calculationExpression && col.name !== columnName) {
+              setTimeout(() => executeColumnLogic(row, col), 0);
+          }
+      });
     }
   }
 
   // Initialize rows from initialData when data becomes available
-  // This handles both immediate and late-arriving data (e.g., when parent's formValues is populated asynchronously)
   $effect(() => {
-    // Only load data from props once, when it first becomes available
-    // Also skip if user has already made changes (prevents infinite loop when parent echoes back our changes)
     if (!dataLoadedFromProps && !userHasMadeChanges && initialData.length > 0) {
       rows = initialData.map((data) => ({
         id: crypto.randomUUID(),
@@ -178,8 +261,6 @@
     }
   });
 
-  // Helper function to notify parent of data changes
-  // Called explicitly after user actions to avoid reactive loops
   function notifyDataChange() {
     if (onDataChange) {
       onDataChange(rows.map((row) => row.data));
@@ -213,7 +294,7 @@
     rows = rows.map((row) => (row.id === rowId ? { ...row, isEditing: true, errors: {} } : row));
   }
 
-  function validateColumn(column: GridColumn, value: unknown): string | null {
+  function validateColumn(column: GridColumn, value: unknown, row: GridRow): string | null {
     // Check required
     if (column.required && (value === undefined || value === null || value === '')) {
       return `${column.label} is required`;
@@ -222,6 +303,26 @@
     // Skip validation if empty and not required
     if (value === undefined || value === null || value === '') {
       return null;
+    }
+
+    // Custom Validation
+    if (column.validationExpression) {
+        const isValidOrMsg = safeEvaluate(column.validationExpression, {
+            value: value,
+            row: row.data,
+            form: formValues,
+            grids: gridsContext,
+            process: processVariables,
+            task: task,
+            user: userContext
+        });
+
+        if (isValidOrMsg === false) {
+            return column.validationMessage || `${column.label} is invalid`;
+        }
+        if (typeof isValidOrMsg === 'string') {
+            return isValidOrMsg;
+        }
     }
 
     const validation = column.validation;
@@ -273,7 +374,7 @@
 
     // Only validate visible columns
     for (const col of visibleColumns) {
-      const error = validateColumn(col, row.data[col.name]);
+      const error = validateColumn(col, row.data[col.name], row);
       if (error) {
         errors[col.name] = error;
         isValid = false;
@@ -399,7 +500,7 @@
                 {#if column.required}
                   <span class="text-destructive">*</span>
                 {/if}
-                {#if isColumnReadonly(column.name) && !readonly}
+                {#if isColumnReadonly(column) && !readonly}
                   <span class="text-muted-foreground text-xs ml-1">(read-only)</span>
                 {/if}
               </Table.Head>
@@ -435,7 +536,7 @@
                 </Table.Cell>
               {/if}
               {#each visibleColumns as column}
-                {@const colReadonly = isColumnReadonly(column.name)}
+                {@const colReadonly = isColumnReadonly(column)}
                 <Table.Cell>
                   {#if row.isEditing && !readonly && !colReadonly}
                     <div class="space-y-1">
