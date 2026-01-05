@@ -5,7 +5,7 @@
   import { Input } from '$lib/components/ui/input';
   import { Textarea } from '$lib/components/ui/textarea';
   import * as Select from '$lib/components/ui/select';
-  import { Plus, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown, MoreHorizontal, Download } from 'lucide-svelte';
+  import { Plus, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown, MoreHorizontal } from '@lucide/svelte';
 
   interface GridRow {
     id: string;
@@ -158,7 +158,7 @@
 
   // Pagination State
   let currentPage = $state(1);
-  let currentPageSize = $state(pageSize);
+  const currentPageSize = $derived(pageSize);
 
   // Sorting State
   let sortColumn = $state<string | null>(null);
@@ -185,7 +185,7 @@
   // Note: We don't implement full grouping rendering in the table body yet (complex layout change),
   // but we can sort by group column first to simulate grouping structure.
   const processedRows = $derived.by(() => {
-      let result = [...rows];
+      const result = [...rows];
 
       // 1. Grouping (Implicit Sort)
       if (enableGrouping && groupByColumn) {
@@ -597,7 +597,7 @@
     handleCellChange(row, columnName, value ?? '');
   }
 
-  function handleImport(event: Event) {
+  function _handleImport(event: Event) {
       // Mock import for now - would normally parse CSV
       const input = event.target as HTMLInputElement;
       if (input.files?.length) {
@@ -605,7 +605,7 @@
       }
   }
 
-  function handleExport() {
+  function _handleExport() {
       // Mock export
       const csvContent = "data:text/csv;charset=utf-8,"
           + columns.map(c => c.label).join(",") + "\n"
