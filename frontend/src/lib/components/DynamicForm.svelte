@@ -74,23 +74,49 @@
 	
 	// Logic Dependency Map: FieldName -> List of Fields that depend on it
 	// Also includes dependency for visibility expressions
-	let dependencyMap = $state<Record<string, FormField[]>>({});
+	let dependencyMap = $state<Record<string, (FormField | FormGrid)[]>>({});
+
+	function parseDependencies(expression: string): string[] {
+		if (!expression) return [];
+		const regex = /form\.([a-zA-Z0-9_]+)|grids\.([a-zA-Z0-9_]+)/g;
+		const matches = [...expression.matchAll(regex)];
+		const deps = new Set<string>();
+		for (const match of matches) {
+			if (match[1]) deps.add(match[1]);
+			if (match[2]) deps.add(match[2]);
+		}
+		return Array.from(deps);
+	}
 
 	$effect(() => {
-		// Build dependency map for auto-calculation and visibility re-evaluation
-        // Since we don't parse the JS to know dependencies, we have to assume
-        // that any change might trigger re-evaluation of expressions.
-        // Or we could try to be smarter. For now, we will re-evaluate on any change.
-        // But for specific calculation dependencies defined in legacy logic, we keep the map.
-		const map: Record<string, FormField[]> = {};
+		const map: Record<string, (FormField | FormGrid)[]> = {};
 		for (const field of fields) {
-			if (field.logic && field.logic.dependencies) {
-				for (const dep of field.logic.dependencies) {
+			const expressions = [
+				field.visibilityExpression,
+				field.calculationExpression,
+				field.validationExpression,
+				field.hiddenExpression,
+				field.readonlyExpression,
+				field.requiredExpression
+			].filter(Boolean) as string[];
+
+			for (const expression of expressions) {
+				const deps = parseDependencies(expression);
+				for (const dep of deps) {
 					if (!map[dep]) map[dep] = [];
 					map[dep].push(field);
 				}
 			}
 		}
+        for (const grid of grids) {
+            if (grid.visibilityExpression) {
+                const deps = parseDependencies(grid.visibilityExpression);
+                for (const dep of deps) {
+                    if (!map[dep]) map[dep] = [];
+                    map[dep].push(grid);
+                }
+            }
+        }
 		dependencyMap = map;
 	});
 
@@ -128,28 +154,6 @@
                  handleFieldChange(field.name, result, true);
              }
         }
-        // Legacy logic support
-		else if (field.logic && field.logic.type !== 'None' && field.logic.content) {
-            try {
-                if (field.logic.type === 'JS') {
-                    const func = new Function('value', 'form', 'grids', 'db', 'lib', field.logic.content);
-                    const dbMock = { query: async () => [] };
-                    const libMock = {};
-                    const result = await func(
-                        formValues[field.name],
-                        { ...formValues },
-                        gridsContext,
-                        dbMock,
-                        libMock
-                    );
-                    if (result !== undefined && formValues[field.name] !== result) {
-                        handleFieldChange(field.name, result, true);
-                    }
-                }
-            } catch (e) {
-                console.error(`Error executing legacy logic for field ${field.name}:`, e);
-            }
-		}
 	}
 
     // Evaluate Visibility Expressions
@@ -228,15 +232,6 @@
         // To avoid infinite loops, we only update if value is different.
 
         // We put this in a timeout to avoid synchronous loop with `handleFieldChange`
-        if (formInitialized) {
-             setTimeout(() => {
-                 for (const field of fields) {
-                     if (field.calculationExpression) {
-                         executeFieldLogic(field);
-                     }
-                 }
-             }, 0);
-        }
 	});
 
     // We modify the existing effect for ConditionStateComputer to also account for visibilityExpressions if possible,
@@ -350,14 +345,13 @@
 			fieldErrors = rest;
 		}
 
-		// Trigger legacy dependencies
+		// Trigger dependencies
 		if (!isAutomated) {
 			const dependents = dependencyMap[fieldName] || [];
 			for (const dep of dependents) {
-				if (dep.logic?.autoCalculate) {
-					// Small delay to allow state propagation or use async
-					setTimeout(() => executeFieldLogic(dep), 0);
-				}
+                if ('calculationExpression' in dep) {
+				    setTimeout(() => executeFieldLogic(dep), 0);
+                }
 			}
 		}
 	}

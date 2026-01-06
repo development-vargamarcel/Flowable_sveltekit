@@ -238,7 +238,6 @@ export interface FormField {
   validationExpression?: string; // JS expression returning boolean or string
   validationMessage?: string; // Error message if validationExpression returns false
 
-  logic?: FormElementLogic;
   hiddenExpression?: string;
   readonlyExpression?: string;
   requiredExpression?: string;
@@ -268,8 +267,6 @@ export interface GridColumn {
   calculationExpression?: string;
   validationExpression?: string;
   validationMessage?: string;
-
-  logic?: FormElementLogic;
 }
 
 export interface FormGrid {
