@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: bpm-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=flowable
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d flowable"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bpm-network
+
   backend:
     build:
       context: ./backend
@@ -11,6 +30,12 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8080
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/flowable
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
@@ -39,3 +64,6 @@ services:
 networks:
   bpm-network:
     driver: bridge
+
+volumes:
+  postgres-data:

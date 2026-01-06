@@ -33,7 +33,9 @@ test('login and monitor dashboard load', async ({ page }) => {
 
   // Potential error messages
   // "Failed to load dashboard"
-  const errorLocator = page.locator('.bg-red-50'); // The error container class
+  const errorLocator = page.locator('.bg-red-50').filter({
+    hasNotText: /Overdue Tasks|Breached SLA/
+  });
 
   // Success indicator
   // "Active Processes by Type" or "Workflow Dashboard" (header is always there, need content)
