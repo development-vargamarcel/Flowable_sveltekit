@@ -44,6 +44,11 @@ public class ProcessController {
         return ResponseEntity.ok(processes);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ProcessDTO> getProcessById(@PathVariable String id) {
+        return ResponseEntity.ok(processService.getProcessById(id));
+    }
+
     @PostMapping("/{processKey}/start")
     public ResponseEntity<?> startProcess(
             @PathVariable String processKey,

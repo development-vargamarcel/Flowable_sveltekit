@@ -1,6 +1,7 @@
 package com.demo.bpm.service;
 
 import com.demo.bpm.dto.UserDTO;
+import com.demo.bpm.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.flowable.engine.IdentityService;
 import org.flowable.idm.api.User;
@@ -47,5 +48,17 @@ public class UserService {
                         .email(user.getEmail())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    public UserDTO getUserById(String userId) {
+        User user = identityService.createUserQuery().userId(userId).singleResult();
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        return UserDTO.builder()
+                .username(user.getId())
+                .displayName(user.getFirstName() + " " + user.getLastName())
+                .email(user.getEmail())
+                .build();
     }
 }

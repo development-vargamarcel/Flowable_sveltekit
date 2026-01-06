@@ -4,6 +4,7 @@ import com.demo.bpm.dto.ProcessDTO;
 import com.demo.bpm.dto.ProcessInstanceDTO;
 import com.demo.bpm.entity.Document;
 import com.demo.bpm.entity.ProcessConfig;
+import com.demo.bpm.exception.ResourceNotFoundException;
 import com.demo.bpm.repository.DocumentRepository;
 import com.demo.bpm.repository.ProcessConfigRepository;
 import com.demo.bpm.util.VariableStorageUtil;
@@ -53,6 +54,18 @@ public class ProcessService {
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+    }
+
+    public ProcessDTO getProcessById(String processDefinitionId) {
+        ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery()
+                .processDefinitionId(processDefinitionId)
+                .singleResult();
+
+        if (processDefinition == null) {
+            throw new ResourceNotFoundException("Process not found with id: " + processDefinitionId);
+        }
+
+        return convertToDTO(processDefinition);
     }
 
     // New method to get ALL definitions including older versions

@@ -4,6 +4,7 @@ import com.demo.bpm.dto.DocumentDTO;
 import com.demo.bpm.dto.TaskDTO;
 import com.demo.bpm.entity.ProcessConfig;
 import com.demo.bpm.repository.ProcessConfigRepository;
+import com.demo.bpm.service.helpers.TaskQueryHelper;
 import com.demo.bpm.util.VariableStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,41 +35,18 @@ public class TaskService {
     private final HistoryService historyService;
     private final BusinessTableService businessTableService;
     private final ProcessConfigRepository processConfigRepository;
+    private final TaskQueryHelper taskQueryHelper;
 
     public List<TaskDTO> getAssignedTasks(String userId) {
-        List<Task> tasks = flowableTaskService.createTaskQuery()
-                .taskAssignee(userId)
-                .orderByTaskPriority().desc()
-                .orderByTaskCreateTime().desc()
-                .list();
-
-        return tasks.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        return getTasks(flowableTaskService.createTaskQuery().taskAssignee(userId));
     }
 
     public List<TaskDTO> getClaimableTasks(String userId) {
-        List<Task> tasks = flowableTaskService.createTaskQuery()
-                .taskCandidateUser(userId)
-                .orderByTaskPriority().desc()
-                .orderByTaskCreateTime().desc()
-                .list();
-
-        return tasks.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        return getTasks(flowableTaskService.createTaskQuery().taskCandidateUser(userId));
     }
 
     public List<TaskDTO> getGroupTasks(String userId) {
-        List<Task> tasks = flowableTaskService.createTaskQuery()
-                .taskCandidateOrAssigned(userId)
-                .orderByTaskPriority().desc()
-                .orderByTaskCreateTime().desc()
-                .list();
-
-        return tasks.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        return getTasks(flowableTaskService.createTaskQuery().taskCandidateOrAssigned(userId));
     }
 
     public TaskDTO getTaskById(String taskId) {
@@ -256,41 +234,15 @@ public class TaskService {
     private TaskDTO convertToDTO(Task task) {
         // Get merged variables from both Flowable (system vars) and document tables (business data)
         Map<String, Object> variables = getMergedVariables(task.getProcessInstanceId());
+        return taskQueryHelper.convertToDTO(task, variables);
+    }
 
-        ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
-                .processInstanceId(task.getProcessInstanceId())
-                .singleResult();
-
-        String businessKey = processInstance != null ? processInstance.getBusinessKey() : null;
-
-        ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery()
-                .processDefinitionId(task.getProcessDefinitionId())
-                .singleResult();
-
-        String processName = processDefinition != null ? processDefinition.getName() : task.getProcessDefinitionId();
-        String processKey = processDefinition != null ? processDefinition.getKey() : null;
-
-        return TaskDTO.builder()
-                .id(task.getId())
-                .name(task.getName())
-                .description(task.getDescription())
-                .processInstanceId(task.getProcessInstanceId())
-                .processDefinitionKey(processKey)
-                .processName(processName)
-                .assignee(task.getAssignee())
-                .owner(task.getOwner())
-                .createTime(task.getCreateTime().toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime())
-                .dueDate(task.getDueDate() != null
-                        ? task.getDueDate().toInstant()
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDateTime()
-                        : null)
-                .priority(task.getPriority())
-                .formKey(task.getFormKey())
-                .variables(variables)
-                .businessKey(businessKey)
-                .build();
+    private List<TaskDTO> getTasks(org.flowable.task.api.TaskQuery query) {
+        return query.orderByTaskPriority().desc()
+                .orderByTaskCreateTime().desc()
+                .list()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 }
