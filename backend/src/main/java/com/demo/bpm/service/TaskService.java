@@ -83,6 +83,15 @@ public class TaskService {
         return convertToDTO(task);
     }
 
+    public Map<String, Object> getTaskDetails(String taskId) {
+        TaskDTO task = getTaskById(taskId);
+        Map<String, Object> variables = getTaskVariables(taskId);
+        Map<String, Object> taskDetails = new HashMap<>();
+        taskDetails.put("task", task);
+        taskDetails.put("variables", variables);
+        return taskDetails;
+    }
+
     /**
      * Get all variables for a task, merging:
      * 1. System variables from Flowable (variables starting with _)

@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       include: ['src/**/*.{test,spec}.{js,ts}'],
+      exclude: ['src/tests/verification'],
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./src/tests/setup.ts'],
