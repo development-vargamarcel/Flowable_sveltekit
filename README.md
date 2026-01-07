@@ -102,7 +102,7 @@ npm run dev
 | Component | Technology |
 |-----------|------------|
 | Backend | Java 17, Spring Boot 3.2, Flowable 7.0 |
-| Database | H2 (embedded, in-memory) |
+| Database | PostgreSQL |
 | Frontend | SvelteKit 2.x, Svelte 5, Tailwind CSS |
 | Build | Maven, Vite, Node.js 20 |
 | Container | Docker, Docker Compose |

@@ -1,5 +1,5 @@
--- Business Tables Schema for Variable Storage
--- This file is executed on application startup
+-- Business Tables Schema for PostgreSQL
+-- This file is executed on application startup when the 'postgresql' profile is active
 
 -- ============================================
 -- 1. DOCUMENT TABLE - Multiple documents per process (one per type)
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS document (
     varchar_29 TEXT,
     varchar_30 TEXT,
 
-    -- 30 FLOAT columns
+    -- 30 FLOAT columns (DOUBLE PRECISION for precision)
     float_1 DOUBLE PRECISION,
     float_2 DOUBLE PRECISION,
     float_3 DOUBLE PRECISION,
@@ -83,56 +83,46 @@ CREATE TABLE IF NOT EXISTS document (
     float_30 DOUBLE PRECISION,
 
     -- 30 DATETIME columns
-    datetime_1 TIMESTAMP,
-    datetime_2 TIMESTAMP,
-    datetime_3 TIMESTAMP,
-    datetime_4 TIMESTAMP,
-    datetime_5 TIMESTAMP,
-    datetime_6 TIMESTAMP,
-    datetime_7 TIMESTAMP,
-    datetime_8 TIMESTAMP,
-    datetime_9 TIMESTAMP,
-    datetime_10 TIMESTAMP,
-    datetime_11 TIMESTAMP,
-    datetime_12 TIMESTAMP,
-    datetime_13 TIMESTAMP,
-    datetime_14 TIMESTAMP,
-    datetime_15 TIMESTAMP,
-    datetime_16 TIMESTAMP,
-    datetime_17 TIMESTAMP,
-    datetime_18 TIMESTAMP,
-    datetime_19 TIMESTAMP,
-    datetime_20 TIMESTAMP,
-    datetime_21 TIMESTAMP,
-    datetime_22 TIMESTAMP,
-    datetime_23 TIMESTAMP,
-    datetime_24 TIMESTAMP,
-    datetime_25 TIMESTAMP,
-    datetime_26 TIMESTAMP,
-    datetime_27 TIMESTAMP,
-    datetime_28 TIMESTAMP,
-    datetime_29 TIMESTAMP,
-    datetime_30 TIMESTAMP,
+    datetime_1 TIMESTAMP WITH TIME ZONE,
+    datetime_2 TIMESTAMP WITH TIME ZONE,
+    datetime_3 TIMESTAMP WITH TIME ZONE,
+    datetime_4 TIMESTAMP WITH TIME ZONE,
+    datetime_5 TIMESTAMP WITH TIME ZONE,
+    datetime_6 TIMESTAMP WITH TIME ZONE,
+    datetime_7 TIMESTAMP WITH TIME ZONE,
+    datetime_8 TIMESTAMP WITH TIME ZONE,
+    datetime_9 TIMESTAMP WITH TIME ZONE,
+    datetime_10 TIMESTAMP WITH TIME ZONE,
+    datetime_11 TIMESTAMP WITH TIME ZONE,
+    datetime_12 TIMESTAMP WITH TIME ZONE,
+    datetime_13 TIMESTAMP WITH TIME ZONE,
+    datetime_14 TIMESTAMP WITH TIME ZONE,
+    datetime_15 TIMESTAMP WITH TIME ZONE,
+    datetime_16 TIMESTAMP WITH TIME ZONE,
+    datetime_17 TIMESTAMP WITH TIME ZONE,
+    datetime_18 TIMESTAMP WITH TIME ZONE,
+    datetime_19 TIMESTAMP WITH TIME ZONE,
+    datetime_20 TIMESTAMP WITH TIME ZONE,
+    datetime_21 TIMESTAMP WITH TIME ZONE,
+    datetime_22 TIMESTAMP WITH TIME ZONE,
+    datetime_23 TIMESTAMP WITH TIME ZONE,
+    datetime_24 TIMESTAMP WITH TIME ZONE,
+    datetime_25 TIMESTAMP WITH TIME ZONE,
+    datetime_26 TIMESTAMP WITH TIME ZONE,
+    datetime_27 TIMESTAMP WITH TIME ZONE,
+    datetime_28 TIMESTAMP WITH TIME ZONE,
+    datetime_29 TIMESTAMP WITH TIME ZONE,
+    datetime_30 TIMESTAMP WITH TIME ZONE,
 
     -- Audit columns
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(255),
     updated_by VARCHAR(255),
 
     -- Unique constraint: one document per type per process
     CONSTRAINT uk_document_process_type UNIQUE (process_instance_id, type)
 );
-
--- Ensure columns exist for existing tables (handles schema migration)
-ALTER TABLE document ADD COLUMN IF NOT EXISTS type VARCHAR(100) NOT NULL DEFAULT 'main';
-ALTER TABLE document ADD COLUMN IF NOT EXISTS business_key VARCHAR(255);
-ALTER TABLE document ADD COLUMN IF NOT EXISTS process_definition_key VARCHAR(255);
-ALTER TABLE document ADD COLUMN IF NOT EXISTS process_definition_name VARCHAR(255);
-
--- Drop and recreate unique constraint to include type column (if not already present)
-ALTER TABLE document DROP CONSTRAINT IF EXISTS uk_document_process_type;
-ALTER TABLE document ADD CONSTRAINT uk_document_process_type UNIQUE (process_instance_id, type);
 
 CREATE INDEX IF NOT EXISTS idx_document_process_instance ON document(process_instance_id);
 CREATE INDEX IF NOT EXISTS idx_document_type ON document(type);
@@ -221,40 +211,40 @@ CREATE TABLE IF NOT EXISTS grid_rows (
     float_30 DOUBLE PRECISION,
 
     -- 30 DATETIME columns
-    datetime_1 TIMESTAMP,
-    datetime_2 TIMESTAMP,
-    datetime_3 TIMESTAMP,
-    datetime_4 TIMESTAMP,
-    datetime_5 TIMESTAMP,
-    datetime_6 TIMESTAMP,
-    datetime_7 TIMESTAMP,
-    datetime_8 TIMESTAMP,
-    datetime_9 TIMESTAMP,
-    datetime_10 TIMESTAMP,
-    datetime_11 TIMESTAMP,
-    datetime_12 TIMESTAMP,
-    datetime_13 TIMESTAMP,
-    datetime_14 TIMESTAMP,
-    datetime_15 TIMESTAMP,
-    datetime_16 TIMESTAMP,
-    datetime_17 TIMESTAMP,
-    datetime_18 TIMESTAMP,
-    datetime_19 TIMESTAMP,
-    datetime_20 TIMESTAMP,
-    datetime_21 TIMESTAMP,
-    datetime_22 TIMESTAMP,
-    datetime_23 TIMESTAMP,
-    datetime_24 TIMESTAMP,
-    datetime_25 TIMESTAMP,
-    datetime_26 TIMESTAMP,
-    datetime_27 TIMESTAMP,
-    datetime_28 TIMESTAMP,
-    datetime_29 TIMESTAMP,
-    datetime_30 TIMESTAMP,
+    datetime_1 TIMESTAMP WITH TIME ZONE,
+    datetime_2 TIMESTAMP WITH TIME ZONE,
+    datetime_3 TIMESTAMP WITH TIME ZONE,
+    datetime_4 TIMESTAMP WITH TIME ZONE,
+    datetime_5 TIMESTAMP WITH TIME ZONE,
+    datetime_6 TIMESTAMP WITH TIME ZONE,
+    datetime_7 TIMESTAMP WITH TIME ZONE,
+    datetime_8 TIMESTAMP WITH TIME ZONE,
+    datetime_9 TIMESTAMP WITH TIME ZONE,
+    datetime_10 TIMESTAMP WITH TIME ZONE,
+    datetime_11 TIMESTAMP WITH TIME ZONE,
+    datetime_12 TIMESTAMP WITH TIME ZONE,
+    datetime_13 TIMESTAMP WITH TIME ZONE,
+    datetime_14 TIMESTAMP WITH TIME ZONE,
+    datetime_15 TIMESTAMP WITH TIME ZONE,
+    datetime_16 TIMESTAMP WITH TIME ZONE,
+    datetime_17 TIMESTAMP WITH TIME ZONE,
+    datetime_18 TIMESTAMP WITH TIME ZONE,
+    datetime_19 TIMESTAMP WITH TIME ZONE,
+    datetime_20 TIMESTAMP WITH TIME ZONE,
+    datetime_21 TIMESTAMP WITH TIME ZONE,
+    datetime_22 TIMESTAMP WITH TIME ZONE,
+    datetime_23 TIMESTAMP WITH TIME ZONE,
+    datetime_24 TIMESTAMP WITH TIME ZONE,
+    datetime_25 TIMESTAMP WITH TIME ZONE,
+    datetime_26 TIMESTAMP WITH TIME ZONE,
+    datetime_27 TIMESTAMP WITH TIME ZONE,
+    datetime_28 TIMESTAMP WITH TIME ZONE,
+    datetime_29 TIMESTAMP WITH TIME ZONE,
+    datetime_30 TIMESTAMP WITH TIME ZONE,
 
     -- Audit columns
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- Foreign key constraint
     CONSTRAINT fk_grid_rows_document FOREIGN KEY (document_id) REFERENCES document(id) ON DELETE CASCADE
@@ -285,18 +275,11 @@ CREATE TABLE IF NOT EXISTS column_mapping (
     column_name VARCHAR(20) NOT NULL,          -- e.g., 'varchar_7', 'float_12', 'datetime_3'
 
     -- Metadata
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- Unique constraint: one mapping per field per scope (includes document_type)
     CONSTRAINT uk_column_mapping UNIQUE (scope_type, process_definition_key, document_type, grid_name, field_name)
 );
-
--- Ensure columns exist for existing column_mapping tables (handles schema migration)
-ALTER TABLE column_mapping ADD COLUMN IF NOT EXISTS document_type VARCHAR(100);
-
--- Drop and recreate unique constraint to include document_type column (if not already present)
-ALTER TABLE column_mapping DROP CONSTRAINT IF EXISTS uk_column_mapping;
-ALTER TABLE column_mapping ADD CONSTRAINT uk_column_mapping UNIQUE (scope_type, process_definition_key, document_type, grid_name, field_name);
 
 CREATE INDEX IF NOT EXISTS idx_column_mapping_process ON column_mapping(process_definition_key);
 CREATE INDEX IF NOT EXISTS idx_column_mapping_document_type ON column_mapping(document_type);
@@ -314,12 +297,15 @@ CREATE TABLE IF NOT EXISTS process_config (
     persist_on_task_complete BOOLEAN DEFAULT TRUE,
     persist_on_process_complete BOOLEAN DEFAULT TRUE,
 
+    document_type VARCHAR(100),
+
     -- Audit columns
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_process_config_key ON process_config(process_definition_key);
+
 
 -- ============================================
 -- 5. DOCUMENT_TYPE_DEFINITION TABLE - Definitions for reusable document types
@@ -330,8 +316,8 @@ CREATE TABLE IF NOT EXISTS document_type_definition (
     name VARCHAR(255) NOT NULL,
     description VARCHAR(1000),
     schema_json TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_document_type_def_key ON document_type_definition(key_id);
