@@ -1,0 +1,20 @@
+{
+  "name": "BPM Demo Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "backend",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [8080, 3000, 5432],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "svelte.svelte-vscode",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "tailwindcss.vscode-intellisense"
+      ]
+    }
+  },
+  "postCreateCommand": "npm install --prefix frontend && mvn clean install -DskipTests -f backend/pom.xml",
+  "remoteUser": "vscode"
+}
