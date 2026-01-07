@@ -44,16 +44,10 @@
         {#if authStore.isAuthenticated}
           <div class="hidden sm:ml-8 sm:flex sm:space-x-4">
             <a
-              href="/"
-              class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
-            >
-              Home
-            </a>
-            <a
               href="/dashboard"
               class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
             >
-              Workflow Dashboard
+              Dashboard
             </a>
             <a
               href="/tasks"
@@ -107,16 +101,10 @@
     <div class="sm:hidden border-t border-gray-200">
       <div class="flex space-x-1 px-2 py-2">
         <a
-          href="/"
-          class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md"
-        >
-          Home
-        </a>
-        <a
           href="/dashboard"
           class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md"
         >
-          Workflows
+          Dashboard
         </a>
         <a
           href="/tasks"
@@ -128,19 +116,19 @@
           href="/processes"
           class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md"
         >
-          Start
+          Start a Process
         </a>
         <a
           href="/database"
           class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md"
         >
-          DB
+          Database
         </a>
         <a
           href="/documents/types"
           class="flex-1 text-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md"
         >
-          Doc Types
+          Documents
         </a>
       </div>
     </div>
