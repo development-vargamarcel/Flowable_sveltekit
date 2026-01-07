@@ -122,40 +122,6 @@ logging:
     com.zaxxer.hikari: INFO
 
 ---
-# ============================================
-# H2 Profile (Development - Default)
-# ============================================
-spring:
-  config:
-    activate:
-      on-profile: h2
-
-  datasource:
-    url: jdbc:h2:file:./data/flowabledb;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-    # HikariCP connection pool settings - reduced for low memory environments
-    hikari:
-      # Explicitly set driver class name for HikariCP
-      driver-class-name: org.h2.Driver
-      minimum-idle: 1
-      maximum-pool-size: 3
-      idle-timeout: 30000
-      connection-timeout: 20000
-      max-lifetime: 60000
-      pool-name: FlowableHikariPool
-
-  # Run H2 schema on startup
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema.sql
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 
 ---
 # ============================================
