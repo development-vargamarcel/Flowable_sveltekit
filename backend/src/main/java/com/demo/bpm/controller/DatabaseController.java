@@ -1,5 +1,6 @@
 package com.demo.bpm.controller;
 
+import com.demo.bpm.config.DataSeeder;
 import com.demo.bpm.service.DatabaseService;
 import com.demo.bpm.service.DatabaseService.TableData;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class DatabaseController {
 
     private final DatabaseService databaseService;
+    private final DataSeeder dataSeeder;
 
     /**
      * List all tables in the database.
@@ -74,6 +76,16 @@ public class DatabaseController {
             log.error("Error fetching table data", e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    /**
+     * Trigger the database seeder.
+     */
+    @PostMapping("/seed")
+    public ResponseEntity<Void> seedDatabase() {
+        log.info("Triggering database seeder");
+        dataSeeder.seedAllData();
+        return ResponseEntity.ok().build();
     }
 
     /**

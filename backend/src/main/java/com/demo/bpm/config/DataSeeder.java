@@ -22,9 +22,13 @@ public class DataSeeder {
     @Bean
     public CommandLineRunner seedData() {
         return args -> {
-            seedDocumentTypes();
-            seedProcessCategories();
+            seedAllData();
         };
+    }
+
+    public void seedAllData() {
+        seedDocumentTypes();
+        seedProcessCategories();
     }
 
     private void seedDocumentTypes() {
@@ -176,12 +180,8 @@ public class DataSeeder {
         // Categorize known demo processes
         try {
             processService.getAllProcessDefinitions().forEach(process -> {
-                if (process.getKey().toLowerCase().contains("expense")) {
-                    processService.updateProcessDefinitionCategory(process.getId(), "Finance");
-                } else if (process.getKey().toLowerCase().contains("leave")) {
-                    processService.updateProcessDefinitionCategory(process.getId(), "HR");
-                } else if (process.getKey().toLowerCase().contains("task")) {
-                    processService.updateProcessDefinitionCategory(process.getId(), "General");
+                if (process.getKey().toLowerCase().contains("advanced")) {
+                    processService.updateProcessDefinitionCategory(process.getId(), "Advanced");
                 }
             });
             log.info("Process categories seeded.");

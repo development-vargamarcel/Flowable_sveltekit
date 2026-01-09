@@ -32,19 +32,14 @@ export const navigationSchema: NavigationItem[] = [
 		]
 	},
 	{
-		title: 'Content Management',
-		href: '#',
+		title: 'Database',
+		href: '/database',
 		icon: Database,
 		children: [
 			{
-				title: 'Database Tables',
-				href: '/database',
+				title: 'Seed',
+				href: '/database/seed',
 				icon: Database
-			},
-			{
-				title: 'Document Types',
-				href: '/documents/types',
-				icon: FileText
 			}
 		]
 	}
