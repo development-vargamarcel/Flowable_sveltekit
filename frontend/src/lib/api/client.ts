@@ -727,14 +727,14 @@ export const api = {
     const params = new URLSearchParams();
     params.append('page', page.toString());
     params.append('size', size.toString());
-    return fetchApi(`/api/business/processes/${processInstanceId}/documents?${params.toString()}`);
+    return fetchApi(`/api/business/processes/${processInstanceId}/document-types?${params.toString()}`);
   },
 
   /**
    * Get a specific document by type
    */
   async getDocument(processInstanceId: string, documentType: string): Promise<DocumentDTO> {
-    return fetchApi(`/api/business/processes/${processInstanceId}/documents/${documentType}`);
+    return fetchApi(`/api/business/processes/${processInstanceId}/document-types/${documentType}`);
   },
 
   /**
@@ -745,7 +745,7 @@ export const api = {
     documentType: string,
     request: SaveDocumentRequest
   ): Promise<DocumentDTO> {
-    return fetchApi(`/api/business/processes/${processInstanceId}/documents/${documentType}`, {
+    return fetchApi(`/api/business/processes/${processInstanceId}/document-types/${documentType}`, {
       method: 'POST',
       body: JSON.stringify(request)
     });
@@ -765,7 +765,7 @@ export const api = {
     params.append('page', page.toString());
     params.append('size', size.toString());
     return fetchApi(
-      `/api/business/processes/${processInstanceId}/documents/${documentType}/grids/${gridName}?${params.toString()}`
+      `/api/business/processes/${processInstanceId}/document-types/${documentType}/grids/${gridName}?${params.toString()}`
     );
   },
 
@@ -779,7 +779,7 @@ export const api = {
     request: SaveGridRowsRequest
   ): Promise<Page<GridRowDTO>> {
     return fetchApi(
-      `/api/business/processes/${processInstanceId}/documents/${documentType}/grids/${gridName}`,
+      `/api/business/processes/${processInstanceId}/document-types/${documentType}/grids/${gridName}`,
       {
         method: 'POST',
         body: JSON.stringify(request)
@@ -796,7 +796,7 @@ export const api = {
     gridName: string
   ): Promise<void> {
     await fetchApi(
-      `/api/business/processes/${processInstanceId}/documents/${documentType}/grids/${gridName}`,
+      `/api/business/processes/${processInstanceId}/document-types/${documentType}/grids/${gridName}`,
       {
         method: 'DELETE'
       }
@@ -815,7 +815,7 @@ export const api = {
     params.append('page', page.toString());
     params.append('size', size.toString());
     return fetchApi(
-      `/api/business/documents/all/by-business-key/${businessKey}?${params.toString()}`
+      `/api/business/document-types/all/by-business-key/${businessKey}?${params.toString()}`
     );
   },
 

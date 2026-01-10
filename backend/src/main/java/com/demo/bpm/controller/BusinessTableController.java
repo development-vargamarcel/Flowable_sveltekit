@@ -35,7 +35,7 @@ public class BusinessTableController {
     /**
      * Get all documents for a process instance.
      */
-    @GetMapping("/processes/{processInstanceId}/documents")
+    @GetMapping("/processes/{processInstanceId}/document-types")
     public ResponseEntity<Page<DocumentDTO>> getAllDocuments(
             @PathVariable String processInstanceId,
             @RequestParam(defaultValue = "0") int page,
@@ -48,7 +48,7 @@ public class BusinessTableController {
     /**
      * Get specific document by process instance ID and type.
      */
-    @GetMapping("/processes/{processInstanceId}/documents/{type}")
+    @GetMapping("/processes/{processInstanceId}/document-types/{type}")
     public ResponseEntity<DocumentDTO> getDocument(
             @PathVariable String processInstanceId,
             @PathVariable String type) {
@@ -61,7 +61,7 @@ public class BusinessTableController {
     /**
      * Save document data with type.
      */
-    @PostMapping("/processes/{processInstanceId}/documents/{type}")
+    @PostMapping("/processes/{processInstanceId}/document-types/{type}")
     public ResponseEntity<DocumentDTO> saveDocumentWithType(
             @PathVariable String processInstanceId,
             @PathVariable String type,
@@ -85,7 +85,7 @@ public class BusinessTableController {
     /**
      * Get document by process instance ID (legacy - returns main type).
      */
-    @GetMapping("/documents/{processInstanceId}")
+    @GetMapping("/document-types/{processInstanceId}")
     public ResponseEntity<DocumentDTO> getDocumentByProcessInstanceId(
             @PathVariable String processInstanceId) {
 
@@ -97,7 +97,7 @@ public class BusinessTableController {
     /**
      * Get document by business key (legacy - returns main type).
      */
-    @GetMapping("/documents/by-business-key/{businessKey}")
+    @GetMapping("/document-types/by-business-key/{businessKey}")
     public ResponseEntity<DocumentDTO> getDocumentByBusinessKey(
             @PathVariable String businessKey) {
 
@@ -109,7 +109,7 @@ public class BusinessTableController {
     /**
      * Get all documents by business key.
      */
-    @GetMapping("/documents/all/by-business-key/{businessKey}")
+    @GetMapping("/document-types/all/by-business-key/{businessKey}")
     public ResponseEntity<Page<DocumentDTO>> getAllDocumentsByBusinessKey(
             @PathVariable String businessKey,
             @RequestParam(defaultValue = "0") int page,
@@ -122,7 +122,7 @@ public class BusinessTableController {
     /**
      * Save document data (legacy - saves as main type).
      */
-    @PostMapping("/documents")
+    @PostMapping("/document-types")
     public ResponseEntity<DocumentDTO> saveDocument(@RequestBody SaveDocumentRequest request) {
         businessTableService.saveDocument(
                 request.getProcessInstanceId(),
@@ -196,7 +196,7 @@ public class BusinessTableController {
     /**
      * Get grid rows for a process instance, document type, and grid name.
      */
-    @GetMapping("/processes/{processInstanceId}/documents/{type}/grids/{gridName}")
+    @GetMapping("/processes/{processInstanceId}/document-types/{type}/grids/{gridName}")
     public ResponseEntity<Page<GridRowDTO>> getGridRowsWithType(
             @PathVariable String processInstanceId,
             @PathVariable String type,
@@ -211,7 +211,7 @@ public class BusinessTableController {
     /**
      * Save grid rows with document type.
      */
-    @PostMapping("/processes/{processInstanceId}/documents/{type}/grids/{gridName}")
+    @PostMapping("/processes/{processInstanceId}/document-types/{type}/grids/{gridName}")
     public ResponseEntity<Page<GridRowDTO>> saveGridRowsWithType(
             @PathVariable String processInstanceId,
             @PathVariable String type,
@@ -233,7 +233,7 @@ public class BusinessTableController {
     /**
      * Delete grid rows with document type.
      */
-    @DeleteMapping("/processes/{processInstanceId}/documents/{type}/grids/{gridName}")
+    @DeleteMapping("/processes/{processInstanceId}/document-types/{type}/grids/{gridName}")
     public ResponseEntity<Void> deleteGridRowsWithType(
             @PathVariable String processInstanceId,
             @PathVariable String type,
@@ -246,7 +246,7 @@ public class BusinessTableController {
     /**
      * Get grid rows for a process instance and grid name (legacy - uses main type).
      */
-    @GetMapping("/documents/{processInstanceId}/grids/{gridName}")
+    @GetMapping("/document-types/{processInstanceId}/grids/{gridName}")
     public ResponseEntity<Page<GridRowDTO>> getGridRows(
             @PathVariable String processInstanceId,
             @PathVariable String gridName,
@@ -260,7 +260,7 @@ public class BusinessTableController {
     /**
      * Save grid rows (legacy - uses main type).
      */
-    @PostMapping("/documents/{processInstanceId}/grids/{gridName}")
+    @PostMapping("/document-types/{processInstanceId}/grids/{gridName}")
     public ResponseEntity<Page<GridRowDTO>> saveGridRows(
             @PathVariable String processInstanceId,
             @PathVariable String gridName,
@@ -282,7 +282,7 @@ public class BusinessTableController {
     /**
      * Delete grid rows for a specific grid (legacy - uses main type).
      */
-    @DeleteMapping("/documents/{processInstanceId}/grids/{gridName}")
+    @DeleteMapping("/document-types/{processInstanceId}/grids/{gridName}")
     public ResponseEntity<Void> deleteGridRows(
             @PathVariable String processInstanceId,
             @PathVariable String gridName,

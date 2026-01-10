@@ -85,7 +85,7 @@
           Load Demo Content
         </button>
         <a
-          href="/documents/types/designer"
+          href="/document-types/types/designer"
           class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           + Create Document Type
@@ -115,7 +115,7 @@
 
             <div class="flex justify-end gap-2">
               <a
-                href={`/documents/types/designer?key=${docType.key}`}
+                href={`/document-types/types/designer?key=${docType.key}`}
                 class="rounded bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-200"
               >
                 Edit

@@ -28,7 +28,7 @@ def run(playwright):
         # expect(page.get_by_text("Dashboard")).to_be_visible()
 
         print("Navigating to Document Types...")
-        page.goto("http://localhost:3000/documents/types")
+        page.goto("http://localhost:3000/document-types/types")
         page.wait_for_load_state("networkidle")
 
         # Verify Document Types page loaded
