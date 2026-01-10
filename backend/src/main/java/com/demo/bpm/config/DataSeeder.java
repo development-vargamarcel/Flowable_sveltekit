@@ -2,7 +2,6 @@ package com.demo.bpm.config;
 
 import com.demo.bpm.entity.DocumentTypeDefinition;
 import com.demo.bpm.service.DocumentTypeService;
-import com.demo.bpm.service.ProcessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -17,7 +16,6 @@ import java.util.List;
 public class DataSeeder {
 
     private final DocumentTypeService documentTypeService;
-    private final ProcessService processService;
 
     @Bean
     public CommandLineRunner seedData() {
@@ -28,7 +26,6 @@ public class DataSeeder {
 
     public void seedAllData() {
         seedDocumentTypes();
-        seedProcessCategories();
     }
 
     private void seedDocumentTypes() {
@@ -176,17 +173,4 @@ public class DataSeeder {
         }
     }
 
-    private void seedProcessCategories() {
-        // Categorize known demo processes
-        try {
-            processService.getAllProcessDefinitions().forEach(process -> {
-                if (process.getKey().toLowerCase().contains("advanced")) {
-                    processService.updateProcessDefinitionCategory(process.getId(), "Advanced");
-                }
-            });
-            log.info("Process categories seeded.");
-        } catch (Exception e) {
-            log.warn("Failed to seed process categories: {}", e.getMessage());
-        }
-    }
 }
