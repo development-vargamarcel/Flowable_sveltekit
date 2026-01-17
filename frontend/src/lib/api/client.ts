@@ -407,15 +407,6 @@ export const api = {
     return fetchApi('/api/auth/me');
   },
 
-  // SLA Endpoints
-  async getSlaStats(): Promise<SlaStats> {
-    return fetchApi<SlaStats>('/api/sla/stats');
-  },
-
-  async refreshSlaCheck(): Promise<void> {
-    return fetchApi<void>('/api/sla/check', { method: 'POST' });
-  },
-
   // Analytics Endpoints
   async getProcessDurationAnalytics(
     processDefinitionKey?: string
@@ -847,6 +838,10 @@ export const api = {
   },
 
   // ==================== SLA Operations ====================
+  async getSlaStats(): Promise<SlaStats> {
+    return fetchApi<SlaStats>('/api/slas/stats');
+  },
+
   async createOrUpdateSLA(
     name: string,
     targetKey: string,
