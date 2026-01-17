@@ -673,10 +673,12 @@
 							<p class="text-xs text-gray-500 mt-1">{field.tooltip}</p>
 						{/if}
 					{:else}
-						<label for={`field-${field.name}`} class="block text-sm font-medium text-gray-700 mb-1">
-							{field.label}
-							{#if field.required}<span class="text-red-500">*</span>{/if}
-						</label>
+						{#if field.type !== 'header'}
+							<label for={`field-${field.name}`} class="block text-sm font-medium text-gray-700 mb-1">
+								{field.label}
+								{#if field.required}<span class="text-red-500">*</span>{/if}
+							</label>
+						{/if}
 
 						{#if field.type === 'textarea'}
                             {#if field.richText}
@@ -849,6 +851,10 @@
 							<div class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-600">
 								{value ?? field.defaultExpression ?? '-'}
 							</div>
+						{:else if field.type === 'header'}
+							<h3 class={field.cssClass ? '' : 'text-lg font-semibold text-gray-900 border-b pb-2 mb-2'}>
+								{field.label}
+							</h3>
 						{:else}
 							<input
 								id={`field-${field.name}`}
