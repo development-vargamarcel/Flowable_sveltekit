@@ -1,5 +1,6 @@
 package com.demo.bpm.controller;
 
+import com.demo.bpm.dto.SlaStatsDTO;
 import com.demo.bpm.entity.SLA;
 import com.demo.bpm.service.SLAService;
 import lombok.RequiredArgsConstructor;
@@ -32,5 +33,10 @@ public class SLAController {
     public ResponseEntity<Void> checkBreaches() {
         slaService.checkSLABreaches();
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<SlaStatsDTO> getStats() {
+        return ResponseEntity.ok(slaService.getSLAStats());
     }
 }

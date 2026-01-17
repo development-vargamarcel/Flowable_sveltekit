@@ -1,5 +1,6 @@
 package com.demo.bpm.service;
 
+import com.demo.bpm.dto.SlaStatsDTO;
 import com.demo.bpm.entity.Notification;
 import com.demo.bpm.entity.SLA;
 import com.demo.bpm.repository.SLARepository;
@@ -14,9 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +39,62 @@ public class SLAService {
         sla.setDuration(duration);
         sla.setWarningThresholdPercentage(warningThreshold);
         slaRepository.save(sla);
+    }
+
+    @Transactional(readOnly = true)
+    public SlaStatsDTO getSLAStats() {
+        List<Task> tasks = taskService.createTaskQuery().active().list();
+        List<SLA> slas = slaRepository.findAll();
+        Map<String, SLA> taskSlaMap = slas.stream()
+            .filter(sla -> sla.getTargetType() == SLA.SLATargetType.TASK)
+            .collect(Collectors.toMap(SLA::getTargetKey, sla -> sla, (s1, s2) -> s1)); // Handle duplicate keys safely
+
+        long onTrack = 0;
+        long atRisk = 0;
+        long breached = 0;
+        double totalPercentage = 0;
+        long tasksWithSla = 0;
+
+        for (Task task : tasks) {
+            SLA sla = taskSlaMap.get(task.getTaskDefinitionKey());
+            if (sla != null) {
+                tasksWithSla++;
+                Date createDate = task.getCreateTime();
+                if (createDate != null) {
+                    LocalDateTime created = LocalDateTime.ofInstant(createDate.toInstant(), ZoneId.systemDefault());
+                    LocalDateTime now = LocalDateTime.now();
+                    Duration elapsed = Duration.between(created, now);
+                    Duration limit = sla.getDuration();
+
+                    double percentage = (double) elapsed.toMillis() / limit.toMillis() * 100;
+                    totalPercentage += percentage;
+
+                    if (elapsed.compareTo(limit) > 0) {
+                        breached++;
+                    } else if (sla.getWarningThresholdPercentage() != null && percentage >= sla.getWarningThresholdPercentage()) {
+                        atRisk++;
+                    } else {
+                        onTrack++;
+                    }
+                }
+            }
+        }
+
+        double avg = tasksWithSla > 0 ? totalPercentage / tasksWithSla : 0;
+
+        List<SlaStatsDTO.StatusCount> breakdown = new ArrayList<>();
+        breakdown.add(SlaStatsDTO.StatusCount.builder().status("On Track").count(onTrack).build());
+        breakdown.add(SlaStatsDTO.StatusCount.builder().status("At Risk").count(atRisk).build());
+        breakdown.add(SlaStatsDTO.StatusCount.builder().status("Breached").count(breached).build());
+
+        return SlaStatsDTO.builder()
+                .totalProcesses(tasksWithSla)
+                .onTrack(onTrack)
+                .atRisk(atRisk)
+                .breached(breached)
+                .avgCompletionPercentage(avg)
+                .processesByStatus(breakdown)
+                .build();
     }
 
     @Scheduled(fixedRate = 300000) // Check every 5 minutes
