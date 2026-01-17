@@ -7,6 +7,7 @@
 	import { api } from '$lib/api/client';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
+	import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
 	import BackendStartingBanner from '$lib/components/BackendStartingBanner.svelte';
 
 	const { children } = $props();
@@ -52,6 +53,7 @@
 	{:else}
 		{#if authStore.isAuthenticated}
 			<Navbar />
+			<Breadcrumbs />
 		{/if}
 		<main class="flex-1">
 			{@render children()}
