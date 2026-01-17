@@ -7,27 +7,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.flowable.engine.HistoryService;
-import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
-import org.flowable.engine.history.HistoricActivityInstance;
-import org.flowable.engine.history.HistoricProcessInstance;
-import org.flowable.engine.repository.ProcessDefinition;
-import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
-import org.flowable.task.api.history.HistoricTaskInstance;
-import org.flowable.variable.api.history.HistoricVariableInstance;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -36,8 +23,6 @@ public class WorkflowService {
 
     private final RuntimeService runtimeService;
     private final TaskService taskService;
-    private final HistoryService historyService;
-    private final RepositoryService repositoryService;
     private final ObjectMapper objectMapper;
 
     private static final Map<String, String[]> ESCALATION_HIERARCHY = Map.of(
@@ -52,13 +37,6 @@ public class WorkflowService {
             "DIRECTOR", new String[]{"MANAGER"},
             "MANAGER", new String[]{"SUPERVISOR"},
             "SUPERVISOR", new String[]{}
-    );
-
-    private static final Map<String, String> LEVEL_TO_GROUP = Map.of(
-            "SUPERVISOR", "supervisors",
-            "MANAGER", "managers",
-            "DIRECTOR", "directors",
-            "EXECUTIVE", "executives"
     );
 
     @Transactional
@@ -220,279 +198,6 @@ public class WorkflowService {
         return Arrays.asList(DE_ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{}));
     }
 
-    public WorkflowHistoryDTO getWorkflowHistory(String processInstanceId) {
-        // First try active process
-        ProcessInstance activeInstance = runtimeService.createProcessInstanceQuery()
-                .processInstanceId(processInstanceId)
-                .singleResult();
-
-        Map<String, Object> variables;
-        String status;
-        LocalDateTime startTime;
-        LocalDateTime endTime = null;
-        String processDefKey;
-        String processDefName;
-        String businessKey;
-        String startUserId;
-        Long durationInMillis = null;
-
-        if (activeInstance != null) {
-            variables = runtimeService.getVariables(processInstanceId);
-            status = "ACTIVE";
-            startTime = activeInstance.getStartTime().toInstant()
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime();
-            processDefKey = activeInstance.getProcessDefinitionKey();
-            businessKey = activeInstance.getBusinessKey();
-
-            ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
-                    .processDefinitionId(activeInstance.getProcessDefinitionId())
-                    .singleResult();
-            processDefName = definition != null ? definition.getName() : null;
-            startUserId = (String) variables.get("startedBy");
-        } else {
-            // Check history
-            HistoricProcessInstance historicInstance = historyService.createHistoricProcessInstanceQuery()
-                    .processInstanceId(processInstanceId)
-                    .singleResult();
-
-            if (historicInstance == null) {
-                throw new ResourceNotFoundException("Process instance not found: " + processInstanceId);
-            }
-
-            List<HistoricVariableInstance> historicVars = historyService.createHistoricVariableInstanceQuery()
-                    .processInstanceId(processInstanceId)
-                    .list();
-
-            variables = new HashMap<>();
-            for (HistoricVariableInstance var : historicVars) {
-                variables.put(var.getVariableName(), var.getValue());
-            }
-
-            status = historicInstance.getEndTime() != null ? "COMPLETED" : "ACTIVE";
-            startTime = historicInstance.getStartTime().toInstant()
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime();
-            if (historicInstance.getEndTime() != null) {
-                endTime = historicInstance.getEndTime().toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime();
-                durationInMillis = historicInstance.getDurationInMillis();
-            }
-            processDefKey = historicInstance.getProcessDefinitionKey();
-            processDefName = historicInstance.getProcessDefinitionName();
-            businessKey = historicInstance.getBusinessKey();
-            startUserId = historicInstance.getStartUserId();
-        }
-
-        // Get current task info
-        String currentTaskId = null;
-        String currentTaskName = null;
-        String currentAssignee = null;
-        List<Task> currentTasks = taskService.createTaskQuery()
-                .processInstanceId(processInstanceId)
-                .list();
-        if (!currentTasks.isEmpty()) {
-            Task currentTask = currentTasks.get(0);
-            currentTaskId = currentTask.getId();
-            currentTaskName = currentTask.getName();
-            currentAssignee = currentTask.getAssignee();
-        }
-
-        // Get task history
-        List<TaskHistoryDTO> taskHistory = getTaskHistory(processInstanceId);
-
-        // Get escalation history
-        List<EscalationDTO> escalationHistory = getEscalationHistory(variables);
-
-        // Get approvals
-        List<ApprovalDTO> approvals = getApprovalHistory(processInstanceId, variables);
-
-        return WorkflowHistoryDTO.builder()
-                .processInstanceId(processInstanceId)
-                .processDefinitionKey(processDefKey)
-                .processDefinitionName(processDefName)
-                .businessKey(businessKey)
-                .status(status)
-                .initiatorId(startUserId)
-                .initiatorName((String) variables.get("employeeName"))
-                .startTime(startTime)
-                .endTime(endTime)
-                .durationInMillis(durationInMillis)
-                .currentTaskId(currentTaskId)
-                .currentTaskName(currentTaskName)
-                .currentAssignee(currentAssignee)
-                .currentLevel((String) variables.getOrDefault("currentLevel", "SUPERVISOR"))
-                .escalationCount(((Number) variables.getOrDefault("escalationCount", 0)).intValue())
-                .variables(variables)
-                .taskHistory(taskHistory)
-                .escalationHistory(escalationHistory)
-                .approvals(approvals)
-                .build();
-    }
-
-    public List<TaskHistoryDTO> getTaskHistory(String processInstanceId) {
-        return historyService.createHistoricTaskInstanceQuery()
-                .processInstanceId(processInstanceId)
-                .orderByHistoricTaskInstanceEndTime().asc()
-                .list()
-                .stream()
-                .map(this::convertToTaskHistoryDTO)
-                .collect(Collectors.toList());
-    }
-
-    public DashboardDTO getDashboard(String userId, Pageable pageable, String status, String type) {
-        // Get counts for stats
-        long totalActive = runtimeService.createProcessInstanceQuery().count();
-        long totalCompleted = historyService.createHistoricProcessInstanceQuery().finished().count();
-        long totalPending = taskService.createTaskQuery().count();
-        long myTasks = taskService.createTaskQuery().taskCandidateOrAssigned(userId).count();
-        long myProcesses = runtimeService.createProcessInstanceQuery().variableValueEquals("startedBy", userId).count();
-        long pendingEscalations = runtimeService.createProcessInstanceQuery().variableValueGreaterThan("escalationCount", 0).count();
-
-        // Get paginated lists for display
-        List<ProcessInstance> activeProcessesForDisplay = runtimeService.createProcessInstanceQuery()
-                .orderByStartTime().desc()
-                .listPage((int) pageable.getOffset(), pageable.getPageSize());
-
-        List<HistoricProcessInstance> completedProcesses = historyService.createHistoricProcessInstanceQuery()
-                .finished()
-                .orderByProcessInstanceEndTime().desc()
-                .listPage((int) pageable.getOffset(), pageable.getPageSize());
-
-        // Calculate average completion time from a sample of recent completed processes
-        long avgCompletionTimeHours = 0;
-        if (!completedProcesses.isEmpty()) {
-            long totalMillis = completedProcesses.stream()
-                    .filter(p -> p.getDurationInMillis() != null)
-                    .mapToLong(HistoricProcessInstance::getDurationInMillis)
-                    .sum();
-            if (completedProcesses.size() > 0) {
-                avgCompletionTimeHours = totalMillis / (completedProcesses.size() * 3600000);
-            }
-        }
-
-        // For activeByType, query a smaller sample for representative distribution
-        // 100 is enough to get process type distribution without performance impact
-        List<ProcessInstance> activeProcessesForGrouping = runtimeService.createProcessInstanceQuery()
-                .orderByStartTime().desc()
-                .listPage(0, 100);
-        Map<String, Long> activeByType = activeProcessesForGrouping.stream()
-                .collect(Collectors.groupingBy(ProcessInstance::getProcessDefinitionKey, Collectors.counting()));
-
-        // Group by status
-        Map<String, Long> byStatus = new HashMap<>();
-        byStatus.put("ACTIVE", totalActive);
-        byStatus.put("COMPLETED", totalCompleted);
-        byStatus.put("PENDING", totalPending);
-
-        // Get recent completed DTOs
-        Page<WorkflowHistoryDTO> recentCompleted = new PageImpl<>(completedProcesses.stream()
-                .map(hp -> getWorkflowHistory(hp.getId()))
-                .collect(Collectors.toList()), pageable, totalCompleted);
-
-        // Get active with details from the paginated list
-        Page<WorkflowHistoryDTO> activeWithDetails = new PageImpl<>(activeProcessesForDisplay.stream()
-                .map(ap -> getWorkflowHistory(ap.getId()))
-                .collect(Collectors.toList()), pageable, totalActive);
-
-        // Get user's pending approvals with pagination
-        List<Task> userTasks = taskService.createTaskQuery()
-                .taskCandidateOrAssigned(userId)
-                .orderByTaskCreateTime().desc()
-                .listPage((int) pageable.getOffset(), pageable.getPageSize());
-
-        Page<WorkflowHistoryDTO> myPendingApprovals = new PageImpl<>(userTasks.stream()
-                .map(t -> getWorkflowHistory(t.getProcessInstanceId()))
-                .distinct()
-                .collect(Collectors.toList()), pageable, myTasks);
-
-        // Escalation metrics - use efficient count-based approach to avoid N+1 queries
-        // Instead of iterating through all processes, we use the already-calculated counts
-        // and sample a small subset for detailed escalation level breakdown
-        long activeEscalatedProcesses = pendingEscalations;
-        long totalEscalations = pendingEscalations; // Approximation based on escalated count
-        long totalDeEscalations = 0;
-        Map<String, Long> escalationsByLevel = new HashMap<>();
-
-        // Only sample a small number of escalated processes for level breakdown
-        // This avoids the N+1 query problem while still providing useful metrics
-        List<ProcessInstance> escalatedSample = runtimeService.createProcessInstanceQuery()
-                .variableValueGreaterThan("escalationCount", 0)
-                .orderByStartTime().desc()
-                .listPage(0, 50);
-
-        for (ProcessInstance pi : escalatedSample) {
-            try {
-                Object levelObj = runtimeService.getVariable(pi.getId(), "currentLevel");
-                if (levelObj != null) {
-                    String currentLevel = levelObj.toString();
-                    escalationsByLevel.merge(currentLevel, 1L, Long::sum);
-                }
-            } catch (Exception e) {
-                log.debug("Could not get currentLevel for process {}: {}", pi.getId(), e.getMessage());
-            }
-        }
-
-        DashboardDTO.DashboardStats stats = DashboardDTO.DashboardStats.builder()
-                .totalActive(totalActive)
-                .totalCompleted(totalCompleted)
-                .totalPending(totalPending)
-                .myTasks(myTasks)
-                .myProcesses(myProcesses)
-                .pendingEscalations(pendingEscalations)
-                .avgCompletionTimeHours(avgCompletionTimeHours)
-                .build();
-
-        DashboardDTO.EscalationMetrics escalationMetrics = DashboardDTO.EscalationMetrics.builder()
-                .totalEscalations(totalEscalations)
-                .totalDeEscalations(totalDeEscalations)
-                .activeEscalatedProcesses(activeEscalatedProcesses)
-                .escalationsByLevel(escalationsByLevel)
-                .build();
-
-        return DashboardDTO.builder()
-                .stats(stats)
-                .activeByType(activeByType)
-                .byStatus(byStatus)
-                .recentCompleted(recentCompleted)
-                .activeProcesses(activeWithDetails)
-                .myPendingApprovals(myPendingApprovals)
-                .escalationMetrics(escalationMetrics)
-                .build();
-    }
-
-    public List<WorkflowHistoryDTO> getAllProcesses(String status, String processType, int page, int size) {
-        List<WorkflowHistoryDTO> result = new ArrayList<>();
-
-        if ("ACTIVE".equals(status) || status == null) {
-            List<ProcessInstance> activeList = runtimeService.createProcessInstanceQuery()
-                    .orderByStartTime().desc()
-                    .listPage(page * size, size);
-
-            for (ProcessInstance pi : activeList) {
-                if (processType == null || processType.equals(pi.getProcessDefinitionKey())) {
-                    result.add(getWorkflowHistory(pi.getId()));
-                }
-            }
-        }
-
-        if ("COMPLETED".equals(status) || status == null) {
-            List<HistoricProcessInstance> historicList = historyService.createHistoricProcessInstanceQuery()
-                    .finished()
-                    .orderByProcessInstanceEndTime().desc()
-                    .listPage(page * size, size);
-
-            for (HistoricProcessInstance hpi : historicList) {
-                if (processType == null || processType.equals(hpi.getProcessDefinitionKey())) {
-                    result.add(getWorkflowHistory(hpi.getId()));
-                }
-            }
-        }
-
-        return result;
-    }
-
     @Transactional
     public void handoffTask(String taskId, String toUserId, String reason, String fromUserId) {
         Task task = taskService.createTaskQuery()
@@ -581,39 +286,6 @@ public class WorkflowService {
     }
 
     // Helper methods
-    private TaskHistoryDTO convertToTaskHistoryDTO(HistoricTaskInstance task) {
-        Map<String, Object> variables = new HashMap<>();
-        List<HistoricVariableInstance> taskVars = historyService.createHistoricVariableInstanceQuery()
-                .taskId(task.getId())
-                .list();
-        for (HistoricVariableInstance var : taskVars) {
-            variables.put(var.getVariableName(), var.getValue());
-        }
-
-        return TaskHistoryDTO.builder()
-                .id(task.getId())
-                .taskDefinitionKey(task.getTaskDefinitionKey())
-                .name(task.getName())
-                .description(task.getDescription())
-                .processInstanceId(task.getProcessInstanceId())
-                .assignee(task.getAssignee())
-                .owner(task.getOwner())
-                .createTime(task.getCreateTime().toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime())
-                .claimTime(task.getClaimTime() != null ?
-                        task.getClaimTime().toInstant()
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDateTime() : null)
-                .endTime(task.getEndTime() != null ?
-                        task.getEndTime().toInstant()
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDateTime() : null)
-                .durationInMillis(task.getDurationInMillis())
-                .deleteReason(task.getDeleteReason())
-                .variables(variables)
-                .build();
-    }
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> getEscalationHistoryList(Map<String, Object> variables) {
@@ -664,39 +336,6 @@ public class WorkflowService {
         } catch (JsonProcessingException e) {
             return new ArrayList<>();
         }
-    }
-
-    private List<EscalationDTO> getEscalationHistory(Map<String, Object> variables) {
-        return getEscalationHistoryList(variables).stream()
-                .map(map -> EscalationDTO.builder()
-                        .id((String) map.get("id"))
-                        .taskId((String) map.get("taskId"))
-                        .fromLevel((String) map.get("fromLevel"))
-                        .toLevel((String) map.get("toLevel"))
-                        .fromUserId((String) map.get("fromUserId"))
-                        .reason((String) map.get("reason"))
-                        .type((String) map.get("type"))
-                        .timestamp(LocalDateTime.parse((String) map.get("timestamp")))
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    private List<ApprovalDTO> getApprovalHistory(String processInstanceId, Map<String, Object> variables) {
-        return getApprovalHistoryList(variables).stream()
-                .map(map -> ApprovalDTO.builder()
-                        .id((String) map.get("id"))
-                        .processInstanceId(processInstanceId)
-                        .taskId((String) map.get("taskId"))
-                        .taskName((String) map.get("taskName"))
-                        .approverId((String) map.get("approverId"))
-                        .approverLevel((String) map.get("approverLevel"))
-                        .decision((String) map.get("decision"))
-                        .comments((String) map.get("comments"))
-                        .timestamp(LocalDateTime.parse((String) map.get("timestamp")))
-                        .stepOrder(((Number) map.getOrDefault("stepOrder", 0)).intValue())
-                        .isRequired(true)
-                        .build())
-                .collect(Collectors.toList());
     }
 
     private String serializeList(List<Map<String, Object>> list) {

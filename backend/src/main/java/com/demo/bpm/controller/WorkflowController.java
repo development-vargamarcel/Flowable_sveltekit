@@ -1,6 +1,8 @@
 package com.demo.bpm.controller;
 
 import com.demo.bpm.dto.*;
+import com.demo.bpm.service.DashboardService;
+import com.demo.bpm.service.WorkflowHistoryService;
 import com.demo.bpm.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,8 @@ import java.util.Map;
 public class WorkflowController {
 
     private final WorkflowService workflowService;
+    private final WorkflowHistoryService workflowHistoryService;
+    private final DashboardService dashboardService;
 
     // ==================== Dashboard ====================
 
@@ -32,7 +36,7 @@ public class WorkflowController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String type) {
         Pageable pageable = PageRequest.of(page, size);
-        DashboardDTO dashboard = workflowService.getDashboard(userDetails.getUsername(), pageable, status, type);
+        DashboardDTO dashboard = dashboardService.getDashboard(userDetails.getUsername(), pageable, status, type);
         return ResponseEntity.ok(dashboard);
     }
 
@@ -44,20 +48,20 @@ public class WorkflowController {
             @RequestParam(required = false) String processType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        List<WorkflowHistoryDTO> processes = workflowService.getAllProcesses(status, processType, page, size);
+        List<WorkflowHistoryDTO> processes = workflowHistoryService.getAllProcesses(status, processType, page, size);
         return ResponseEntity.ok(processes);
     }
 
     @GetMapping("/processes/{processInstanceId}")
     public ResponseEntity<WorkflowHistoryDTO> getProcessHistory(@PathVariable String processInstanceId) {
-        WorkflowHistoryDTO history = workflowService.getWorkflowHistory(processInstanceId);
+        WorkflowHistoryDTO history = workflowHistoryService.getWorkflowHistory(processInstanceId);
         return ResponseEntity.ok(history);
     }
 
     @GetMapping("/processes/{processInstanceId}/tasks")
     public ResponseEntity<List<TaskHistoryDTO>> getProcessTaskHistory(
             @PathVariable String processInstanceId) {
-        List<TaskHistoryDTO> taskHistory = workflowService.getTaskHistory(processInstanceId);
+        List<TaskHistoryDTO> taskHistory = workflowHistoryService.getTaskHistory(processInstanceId);
         return ResponseEntity.ok(taskHistory);
     }
 
