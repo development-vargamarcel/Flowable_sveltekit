@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
+    resolve: {
+      conditions: mode === 'test' ? ['browser'] : undefined
+    },
     test: {
       include: ['src/**/*.{test,spec}.{js,ts}'],
       exclude: ['src/tests/verification'],
