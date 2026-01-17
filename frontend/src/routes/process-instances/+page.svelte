@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { ProcessInstance } from '$lib/types';
-	import { apiClient } from '$lib/api/client';
+	import { api } from '$lib/api/client';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
@@ -11,8 +11,8 @@
 
 	onMount(async () => {
 		try {
-			const response = await apiClient.get('/api/processes/my-processes');
-			instances = response.data.content;
+			const page = await api.getMyProcesses();
+			instances = page.content;
 		} catch (error) {
 			toast.error('Failed to fetch process instances.');
 			console.error(error);
@@ -45,7 +45,7 @@
 							<TableCell>{instance.id}</TableCell>
 							<TableCell>{instance.processDefinitionId}</TableCell>
 							<TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
-							<TableCell>{instance.isEnded ? 'Ended' : 'Active'}</TableCell>
+							<TableCell>{instance.ended ? 'Ended' : 'Active'}</TableCell>
 						</TableRow>
 					{/each}
 				</TableBody>

@@ -5,13 +5,22 @@
   import { Input } from '$lib/components/ui/input';
   import { Textarea } from '$lib/components/ui/textarea';
   import * as Select from '$lib/components/ui/select';
-  import { Plus, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ChevronsUpDown, MoreHorizontal } from '@lucide/svelte';
+  import { Plus, ChevronLeft, ChevronRight, ChevronDown, ArrowUp, ArrowDown, ChevronsUpDown, MoreHorizontal } from '@lucide/svelte';
 
   interface GridRow {
     id: string;
     data: Record<string, unknown>;
     isEditing: boolean;
     errors: Record<string, string | null>;
+  }
+
+  interface GridItem {
+      type: 'group' | 'row';
+      id: string;
+      name?: string; // For group
+      count?: number; // For group
+      row?: GridRow; // For row
+      isContinuation?: boolean; // Visual flag for continuation header
   }
 
   interface Props {
@@ -164,6 +173,19 @@
   let sortColumn = $state<string | null>(null);
   let sortDirection = $state<'asc' | 'desc'>('asc');
 
+  // Grouping State
+  let collapsedGroups = $state(new Set<string>());
+
+  function toggleGroup(group: string) {
+      const newSet = new Set(collapsedGroups);
+      if (newSet.has(group)) {
+          newSet.delete(group);
+      } else {
+          newSet.add(group);
+      }
+      collapsedGroups = newSet;
+  }
+
   // Toggle sorting
   function toggleSort(columnName: string) {
       if (!enableSorting) return;
@@ -181,25 +203,38 @@
       }
   }
 
-  // Derived: Processed Rows (Sorted & Grouped logic preparation)
-  // Note: We don't implement full grouping rendering in the table body yet (complex layout change),
-  // but we can sort by group column first to simulate grouping structure.
+  // Derived: Processed Rows (Sorted)
   const processedRows = $derived.by(() => {
       const result = [...rows];
 
-      // 1. Grouping (Implicit Sort)
       if (enableGrouping && groupByColumn) {
-          // If sorting is active, we let explicit sort take precedence or secondary?
-          // Usually grouping forces primary sort on group column.
+          // Primary Sort: Group Column
           result.sort((a, b) => {
-              const valA = String(a.data[groupByColumn] || '');
-              const valB = String(b.data[groupByColumn] || '');
-              return valA.localeCompare(valB);
-          });
-      }
+              const gA = String(a.data[groupByColumn] || '');
+              const gB = String(b.data[groupByColumn] || '');
+              const cmp = gA.localeCompare(gB);
 
-      // 2. Sorting (Explicit)
-      if (sortColumn) {
+              if (cmp !== 0) return cmp;
+
+              // Secondary Sort: Explicit Column
+              if (sortColumn) {
+                  const valA = a.data[sortColumn] as any;
+                  const valB = b.data[sortColumn] as any;
+                  if (valA === valB) return 0;
+
+                  if (typeof valA === 'number' && typeof valB === 'number') {
+                      return sortDirection === 'asc' ? valA - valB : valB - valA;
+                  }
+
+                  const strA = String(valA || '');
+                  const strB = String(valB || '');
+                  return sortDirection === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+              }
+
+              return 0;
+          });
+      } else if (sortColumn) {
+          // Explicit Sort Only
           result.sort((a, b) => {
               const valA = a.data[sortColumn!] as any;
               const valB = b.data[sortColumn!] as any;
@@ -221,15 +256,71 @@
       return result;
   });
 
-  // Derived: Paginated Rows
-  const paginatedRows = $derived.by(() => {
-      if (!enablePagination) return processedRows;
+  // Derived: Flat Items (Groups + Rows)
+  const flatItems = $derived.by(() => {
+      if (!enableGrouping || !groupByColumn) {
+          return processedRows.map(r => ({ type: 'row', id: r.id, row: r } as GridItem));
+      }
 
-      const startIndex = (currentPage - 1) * currentPageSize;
-      return processedRows.slice(startIndex, startIndex + currentPageSize);
+      const items: GridItem[] = [];
+      let currentGroup: string | null = null;
+
+      // Calculate group counts
+      const counts = new Map<string, number>();
+      for (const r of processedRows) {
+          const g = String(r.data[groupByColumn] || 'Uncategorized');
+          counts.set(g, (counts.get(g) || 0) + 1);
+      }
+
+      for (const r of processedRows) {
+          const g = String(r.data[groupByColumn] || 'Uncategorized');
+
+          if (g !== currentGroup) {
+              currentGroup = g;
+              items.push({
+                  type: 'group',
+                  id: `group-${g}`,
+                  name: g,
+                  count: counts.get(g) || 0
+              });
+          }
+
+          if (!collapsedGroups.has(g)) {
+              items.push({ type: 'row', id: r.id, row: r });
+          }
+      }
+      return items;
   });
 
-  const totalPages = $derived(enablePagination ? Math.ceil(processedRows.length / currentPageSize) : 1);
+  // Derived: Paginated Items
+  const paginatedItems = $derived.by(() => {
+      if (!enablePagination) return flatItems;
+
+      const startIndex = (currentPage - 1) * currentPageSize;
+      return flatItems.slice(startIndex, startIndex + currentPageSize);
+  });
+
+  // Derived: Display Items (with continuation headers)
+  const displayItems = $derived.by(() => {
+      const items = [...paginatedItems];
+      if (items.length > 0 && items[0].type === 'row' && enableGrouping && groupByColumn) {
+           const row = items[0].row!;
+           const g = String(row.data[groupByColumn] || 'Uncategorized');
+           // Prepend a continuation header
+           items.unshift({
+               type: 'group',
+               id: `group-cont-${g}`,
+               name: g,
+               isContinuation: true
+           } as any);
+      }
+      return items;
+  });
+
+  // Derived: Paginated Rows (for selection logic)
+  const paginatedRows = $derived(paginatedItems.filter(i => i.type === 'row').map(i => i.row!));
+
+  const totalPages = $derived(enablePagination ? Math.ceil(flatItems.length / currentPageSize) : 1);
 
   // Check if all rows (on current page) are selected
   const allPageSelected = $derived.by(() => {
@@ -424,7 +515,7 @@
 
     // Jump to last page if pagination enabled
     if (enablePagination) {
-        currentPage = Math.ceil(rows.length / currentPageSize) || 1;
+        currentPage = Math.ceil(flatItems.length / currentPageSize) || 1;
     }
 
     userHasMadeChanges = true;
@@ -721,7 +812,7 @@
           </Table.Row>
         </Table.Header>
         <Table.Body>
-          {#if paginatedRows.length === 0}
+          {#if displayItems.length === 0}
             <Table.Row>
               <Table.Cell
                 colspan={visibleColumns.length + (readonly && !enableRowActions ? 0 : 1) + (enableMultiSelect ? 1 : 0)}
@@ -736,144 +827,162 @@
             </Table.Row>
           {/if}
 
-          {#each paginatedRows as row, i (row.id)}
-            {#if enableGrouping && groupByColumn && (i === 0 || processedRows[processedRows.indexOf(row) - 1]?.data[groupByColumn] !== row.data[groupByColumn])}
+          {#each displayItems as item (item.id)}
+            {#if item.type === 'group'}
                 <!-- Group Header -->
-                <Table.Row class="bg-gray-100">
-                    <Table.Cell colspan={visibleColumns.length + (readonly && !enableRowActions ? 0 : 1) + (enableMultiSelect ? 1 : 0)} class="font-bold text-gray-700 py-1">
-                        {row.data[groupByColumn] || 'Uncategorized'}
+                <Table.Row class="bg-gray-100 hover:bg-gray-200 cursor-pointer" onclick={() => toggleGroup(item.name || '')}>
+                    <Table.Cell colspan={visibleColumns.length + (readonly && !enableRowActions ? 0 : 1) + (enableMultiSelect ? 1 : 0)} class="py-2">
+                        <div class="flex items-center font-bold text-gray-700">
+                             {#if collapsedGroups.has(item.name || '')}
+                                <ChevronRight class="w-4 h-4 mr-2" />
+                             {:else}
+                                <ChevronDown class="w-4 h-4 mr-2" />
+                             {/if}
+
+                             {item.name || 'Uncategorized'}
+
+                             {#if item.count !== undefined}
+                                <span class="text-xs text-muted-foreground ml-2 font-normal">({item.count} items)</span>
+                             {/if}
+
+                             {#if item.isContinuation}
+                                <span class="text-xs text-muted-foreground ml-2 font-normal italic">(continued)</span>
+                             {/if}
+                        </div>
                     </Table.Cell>
                 </Table.Row>
-            {/if}
-
-            <Table.Row class={selectedRowIds.has(row.id) ? 'bg-blue-50' : ''}>
-              {#if enableMultiSelect}
-                <Table.Cell class="w-10">
-                  <input
-                    type="checkbox"
-                    checked={selectedRowIds.has(row.id)}
-                    onchange={() => toggleRowSelection(row.id)}
-                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    aria-label="Select row"
-                  />
-                </Table.Cell>
-              {/if}
-              {#each visibleColumns as column}
-                {@const colReadonly = isColumnReadonly(column)}
-                <Table.Cell>
-                  {#if row.isEditing && !readonly && !colReadonly}
-                    <div class="space-y-1">
-                      {#if column.type === 'select'}
-                        <Select.Root
-                          type="single"
-                          value={String(row.data[column.name] ?? '')}
-                          onValueChange={(v) => handleSelectChange(row, column.name, v)}
-                        >
-                          <Select.Trigger
+            {:else}
+                {@const row = item.row!}
+                <Table.Row class="{selectedRowIds.has(row.id) ? 'bg-blue-50' : ''}">
+                {#if enableMultiSelect}
+                    <Table.Cell class="w-10">
+                    <input
+                        type="checkbox"
+                        checked={selectedRowIds.has(row.id)}
+                        onchange={() => toggleRowSelection(row.id)}
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label="Select row"
+                    />
+                    </Table.Cell>
+                {/if}
+                {#each visibleColumns as column, colIndex}
+                    {@const colReadonly = isColumnReadonly(column)}
+                    <!-- Add left padding to first column if grouped to simulate indentation -->
+                    <Table.Cell class="{enableGrouping && groupByColumn && colIndex === 0 ? 'pl-8' : ''}">
+                    {#if row.isEditing && !readonly && !colReadonly}
+                        <div class="space-y-1">
+                        {#if column.type === 'select'}
+                            <Select.Root
+                            type="single"
+                            value={String(row.data[column.name] ?? '')}
+                            onValueChange={(v) => handleSelectChange(row, column.name, v)}
+                            >
+                            <Select.Trigger
+                                class={row.errors[column.name] ? 'border-destructive' : ''}
+                            >
+                                <span class="block truncate">
+                                {row.data[column.name] || 'Select...'}
+                                </span>
+                            </Select.Trigger>
+                            <Select.Content>
+                                {#each column.options || [] as option}
+                                <Select.Item value={option.value} label={option.label} />
+                                {/each}
+                            </Select.Content>
+                            </Select.Root>
+                        {:else if column.type === 'textarea'}
+                            <Textarea
+                            bind:value={
+                                () => String(row.data[column.name] ?? ''),
+                                (v) => handleCellChange(row, column.name, v)
+                            }
+                            rows={2}
+                            placeholder={column.placeholder}
                             class={row.errors[column.name] ? 'border-destructive' : ''}
-                          >
-                            <span class="block truncate">
-                              {row.data[column.name] || 'Select...'}
-                            </span>
-                          </Select.Trigger>
-                          <Select.Content>
-                            {#each column.options || [] as option}
-                              <Select.Item value={option.value} label={option.label} />
-                            {/each}
-                          </Select.Content>
-                        </Select.Root>
-                      {:else if column.type === 'textarea'}
-                        <Textarea
-                          bind:value={
-                            () => String(row.data[column.name] ?? ''),
-                            (v) => handleCellChange(row, column.name, v)
-                          }
-                          rows={2}
-                          placeholder={column.placeholder}
-                          class={row.errors[column.name] ? 'border-destructive' : ''}
-                        />
-                      {:else if column.type === 'number'}
-                        <Input
-                          type="number"
-                          value={row.data[column.name] !== null &&
-                          row.data[column.name] !== undefined
-                            ? String(row.data[column.name])
-                            : ''}
-                          oninput={(e) => {
-                            const val = e.currentTarget.value;
-                            handleCellChange(row, column.name, val === '' ? null : Number(val));
-                          }}
-                          min={column.min}
-                          max={column.max}
-                          step={column.step}
-                          placeholder={column.placeholder}
-                          class={row.errors[column.name] ? 'border-destructive' : ''}
-                        />
-                      {:else if column.type === 'date'}
-                        <Input
-                          type="date"
-                          value={String(row.data[column.name] ?? '')}
-                          oninput={(e) => handleCellChange(row, column.name, e.currentTarget.value)}
-                          class={row.errors[column.name] ? 'border-destructive' : ''}
-                        />
-                      {:else}
-                        <Input
-                          type="text"
-                          value={String(row.data[column.name] ?? '')}
-                          oninput={(e) => handleCellChange(row, column.name, e.currentTarget.value)}
-                          placeholder={column.placeholder}
-                          class={row.errors[column.name] ? 'border-destructive' : ''}
-                        />
-                      {/if}
-                      {#if row.errors[column.name]}
-                        <p class="text-xs text-destructive">{row.errors[column.name]}</p>
-                      {/if}
-                    </div>
-                  {:else}
-                    <span class="text-sm {colReadonly ? 'text-muted-foreground' : ''}">
-                      {getRowValue(row, column.name) || '-'}
-                    </span>
-                  {/if}
-                </Table.Cell>
-              {/each}
-              {#if !readonly || enableRowActions}
-                <Table.Cell class="text-right">
-                  <div class="flex justify-end gap-2">
-                    {#if row.isEditing}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => saveRow(row.id)}
-                        class="text-green-600 hover:text-green-700 hover:bg-green-50"
-                      >
-                        Save
-                      </Button>
-                      <Button variant="ghost" size="sm" onclick={() => cancelEdit(row.id)}>
-                        Cancel
-                      </Button>
+                            />
+                        {:else if column.type === 'number'}
+                            <Input
+                            type="number"
+                            value={row.data[column.name] !== null &&
+                            row.data[column.name] !== undefined
+                                ? String(row.data[column.name])
+                                : ''}
+                            oninput={(e) => {
+                                const val = e.currentTarget.value;
+                                handleCellChange(row, column.name, val === '' ? null : Number(val));
+                            }}
+                            min={column.min}
+                            max={column.max}
+                            step={column.step}
+                            placeholder={column.placeholder}
+                            class={row.errors[column.name] ? 'border-destructive' : ''}
+                            />
+                        {:else if column.type === 'date'}
+                            <Input
+                            type="date"
+                            value={String(row.data[column.name] ?? '')}
+                            oninput={(e) => handleCellChange(row, column.name, e.currentTarget.value)}
+                            class={row.errors[column.name] ? 'border-destructive' : ''}
+                            />
+                        {:else}
+                            <Input
+                            type="text"
+                            value={String(row.data[column.name] ?? '')}
+                            oninput={(e) => handleCellChange(row, column.name, e.currentTarget.value)}
+                            placeholder={column.placeholder}
+                            class={row.errors[column.name] ? 'border-destructive' : ''}
+                            />
+                        {/if}
+                        {#if row.errors[column.name]}
+                            <p class="text-xs text-destructive">{row.errors[column.name]}</p>
+                        {/if}
+                        </div>
                     {:else}
-                      {#if !readonly}
-                          <Button variant="ghost" size="sm" onclick={() => editRow(row.id)}>Edit</Button>
-                          <Button
+                        <span class="text-sm {colReadonly ? 'text-muted-foreground' : ''}">
+                        {getRowValue(row, column.name) || '-'}
+                        </span>
+                    {/if}
+                    </Table.Cell>
+                {/each}
+                {#if !readonly || enableRowActions}
+                    <Table.Cell class="text-right">
+                    <div class="flex justify-end gap-2">
+                        {#if row.isEditing}
+                        <Button
                             variant="ghost"
                             size="sm"
-                            onclick={() => deleteRow(row.id)}
-                            disabled={minRows > 0 && rows.length <= minRows}
-                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            Delete
-                          </Button>
-                      {/if}
-                      {#if enableRowActions}
-                          <Button variant="ghost" size="icon" title="More Actions">
-                              <MoreHorizontal class="h-4 w-4" />
-                          </Button>
-                      {/if}
-                    {/if}
-                  </div>
-                </Table.Cell>
-              {/if}
-            </Table.Row>
+                            onclick={() => saveRow(row.id)}
+                            class="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                            Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onclick={() => cancelEdit(row.id)}>
+                            Cancel
+                        </Button>
+                        {:else}
+                        {#if !readonly}
+                            <Button variant="ghost" size="sm" onclick={() => editRow(row.id)}>Edit</Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onclick={() => deleteRow(row.id)}
+                                disabled={minRows > 0 && rows.length <= minRows}
+                                class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                                Delete
+                            </Button>
+                        {/if}
+                        {#if enableRowActions}
+                            <Button variant="ghost" size="icon" title="More Actions">
+                                <MoreHorizontal class="h-4 w-4" />
+                            </Button>
+                        {/if}
+                        {/if}
+                    </div>
+                    </Table.Cell>
+                {/if}
+                </Table.Row>
+            {/if}
           {/each}
         </Table.Body>
       </Table.Root>
