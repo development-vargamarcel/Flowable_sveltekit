@@ -304,10 +304,10 @@
 		<div class="border-b border-gray-200 mb-6">
 			<nav class="flex space-x-8">
 				{#each [
-					{ id: 'all', label: 'All Processes', count: dashboard.activeProcesses.length + dashboard.recentCompleted.length },
-					{ id: 'active', label: 'Active', count: dashboard.activeProcesses.length },
-					{ id: 'completed', label: 'Completed', count: dashboard.recentCompleted.length },
-					{ id: 'my-approvals', label: 'My Pending Approvals', count: dashboard.myPendingApprovals.length }
+					{ id: 'all', label: 'All Processes', count: dashboard.activeProcesses.totalElements + dashboard.recentCompleted.totalElements },
+					{ id: 'active', label: 'Active', count: dashboard.activeProcesses.totalElements },
+					{ id: 'completed', label: 'Completed', count: dashboard.recentCompleted.totalElements },
+					{ id: 'my-approvals', label: 'My Pending Approvals', count: dashboard.myPendingApprovals.totalElements }
 				] as tab}
 					<button
 						onclick={() => { activeTab = tab.id as typeof activeTab; }}

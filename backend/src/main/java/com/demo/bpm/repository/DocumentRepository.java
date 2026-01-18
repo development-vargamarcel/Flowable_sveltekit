@@ -24,8 +24,6 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     // Find all documents by business key
     Page<Document> findByBusinessKey(String businessKey, Pageable pageable);
 
-    List<Document> findByProcessDefinitionKey(String processDefinitionKey);
-
     boolean existsByProcessInstanceIdAndType(String processInstanceId, String type);
 
     // Delete all documents for a process instance

@@ -23,13 +23,8 @@ function createNotificationStore() {
     if (!browser) return;
     loading = true;
     try {
-      // Assuming api client has been updated, if not we'll need to update it
-      // For now we'll fetch directly or assume api extension
-      const res = await fetch('/api/notifications');
-      if (res.ok) {
-        notifications = await res.json();
-        updateUnreadCount();
-      }
+      notifications = await api.getNotifications();
+      updateUnreadCount();
     } catch (err) {
       console.error('Failed to load notifications', err);
       error = 'Failed to load notifications';
@@ -50,7 +45,7 @@ function createNotificationStore() {
       updateUnreadCount();
 
       try {
-        await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+        await api.markNotificationAsRead(id);
       } catch (err) {
         console.error('Failed to mark notification as read', err);
         // Revert on error
@@ -67,7 +62,7 @@ function createNotificationStore() {
     updateUnreadCount();
 
     try {
-      await fetch('/api/notifications/read-all', { method: 'POST' });
+      await api.markAllNotificationsAsRead();
     } catch (err) {
       console.error('Failed to mark all as read', err);
       // Revert
