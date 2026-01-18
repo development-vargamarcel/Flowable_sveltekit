@@ -2,6 +2,8 @@
 	import type { WorkflowHistory } from '$lib/types';
 	import ProcessTimeline from './ProcessTimeline.svelte';
 	import Modal from './Modal.svelte';
+	import { formatDate, formatDuration } from '$lib/utils';
+	import { Badge } from '$lib/components/ui/badge';
 
 	interface Props {
 		process: WorkflowHistory | null;
@@ -10,34 +12,44 @@
 
 	const { process, onClose }: Props = $props();
 
-	function getStatusColor(status: string): string {
+	function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
 		switch (status) {
 			case 'ACTIVE':
-				return 'bg-blue-100 text-blue-800';
+				return 'default'; // Blue-ish in many themes or use a custom one
 			case 'COMPLETED':
-				return 'bg-green-100 text-green-800';
-			case 'SUSPENDED':
-				return 'bg-yellow-100 text-yellow-800';
+				return 'secondary'; // Green-ish often
 			case 'TERMINATED':
-				return 'bg-red-100 text-red-800';
+				return 'destructive';
 			default:
-				return 'bg-gray-100 text-gray-800';
+				return 'outline';
 		}
 	}
 
-	function formatDate(dateStr: string): string {
-		return new Date(dateStr).toLocaleString();
+	function getStatusClass(status: string): string {
+		switch (status) {
+			case 'ACTIVE':
+				return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
+			case 'COMPLETED':
+				return 'bg-green-100 text-green-800 hover:bg-green-200';
+			case 'SUSPENDED':
+				return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
+			case 'TERMINATED':
+				return 'bg-red-100 text-red-800 hover:bg-red-200';
+			default:
+				return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+		}
 	}
 
-	function formatDuration(millis: number | null): string {
-		if (!millis) return 'N/A';
-		const hours = Math.floor(millis / 3600000);
-		const minutes = Math.floor((millis % 3600000) / 60000);
-		if (hours > 24) {
-			const days = Math.floor(hours / 24);
-			return `${days}d ${hours % 24}h`;
-		}
-		return `${hours}h ${minutes}m`;
+	function getApprovalColor(decision: string): string {
+		if (decision === 'APPROVED') return 'bg-green-100 text-green-600';
+		if (decision === 'REJECTED') return 'bg-red-100 text-red-600';
+		return 'bg-amber-100 text-amber-600';
+	}
+
+	function getApprovalBadgeClass(decision: string): string {
+		if (decision === 'APPROVED') return 'bg-green-100 text-green-700';
+		if (decision === 'REJECTED') return 'bg-red-100 text-red-700';
+		return 'bg-amber-100 text-amber-700';
 	}
 </script>
 
@@ -57,11 +69,9 @@
 			<div class="bg-gray-50 rounded-lg p-3">
 				<div class="text-xs text-gray-500 uppercase">Status</div>
 				<div class="mt-1">
-					<span
-						class="px-2 py-1 rounded-full text-sm font-medium {getStatusColor(process.status)}"
-					>
+					<Badge class={getStatusClass(process.status)}>
 						{process.status}
-					</span>
+					</Badge>
 				</div>
 			</div>
 			<div class="bg-gray-50 rounded-lg p-3">
@@ -98,11 +108,7 @@
 							<div class="flex items-center gap-3">
 								<span
 									class="w-8 h-8 flex items-center justify-center rounded-full
-                                    {approval.decision === 'APPROVED'
-										? 'bg-green-100 text-green-600'
-										: approval.decision === 'REJECTED'
-											? 'bg-red-100 text-red-600'
-											: 'bg-amber-100 text-amber-600'}"
+                                    {getApprovalColor(approval.decision)}"
 								>
 									{approval.stepOrder}
 								</span>
@@ -116,11 +122,7 @@
 							<div class="text-right">
 								<span
 									class="px-2 py-1 rounded text-xs font-medium
-                                    {approval.decision === 'APPROVED'
-										? 'bg-green-100 text-green-700'
-										: approval.decision === 'REJECTED'
-											? 'bg-red-100 text-red-700'
-											: 'bg-amber-100 text-amber-700'}"
+                                    {getApprovalBadgeClass(approval.decision)}"
 								>
 									{approval.decision}
 								</span>

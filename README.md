@@ -56,6 +56,32 @@ npm run dev
 # App available at http://localhost:5173
 ```
 
+### Environment Variables
+
+The application uses an `.env` file for configuration. Copy `.env.example` to `.env` and adjust as needed.
+
+**Key Variables:**
+- `POSTGRES_DB`: Database name (default: `flowable`)
+- `POSTGRES_USER`: Database user (default: `postgres`)
+- `POSTGRES_PASSWORD`: Database password
+- `SPRING_MAIL_HOST`: SMTP host for emails
+- `SPRING_MAIL_USERNAME`: SMTP username
+- `SPRING_MAIL_PASSWORD`: SMTP password
+
+### Testing
+
+**Backend Tests:**
+```bash
+cd backend
+./mvnw test
+```
+
+**Frontend Verification:**
+```bash
+cd frontend
+npm run test
+```
+
 ## Project Structure
 
 ```

@@ -88,4 +88,24 @@ class WorkflowServiceTest {
         // Execute & Verify
         assertThrows(RuntimeException.class, () -> workflowService.escalateTask(taskId, request, userId));
     }
+
+    @Test
+    void escalateTask_whenAlreadyAtTopLevel_shouldThrowException() {
+        // Setup
+        String taskId = "task1";
+        EscalationRequest request = new EscalationRequest();
+        request.setReason("Test");
+        String userId = "executive1";
+
+        Task task = mock(Task.class);
+        when(task.getProcessInstanceId()).thenReturn("proc1");
+
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+
+        when(runtimeService.getVariables("proc1")).thenReturn(Map.of("currentLevel", "EXECUTIVE"));
+
+        // Execute & Verify
+        assertThrows(RuntimeException.class, () -> workflowService.escalateTask(taskId, request, userId));
+    }
 }

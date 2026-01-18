@@ -1,5 +1,6 @@
 package com.demo.bpm.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,7 +11,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EscalationRequest {
+    @NotBlank(message = "Reason is required")
     private String reason;
+
     private String targetUserId; // Optional: specific user to escalate to
     private String targetLevel; // Optional: specific level to escalate to (SUPERVISOR, MANAGER, DIRECTOR, EXECUTIVE)
     private String comments;

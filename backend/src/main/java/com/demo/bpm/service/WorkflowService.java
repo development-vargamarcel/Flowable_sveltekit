@@ -2,6 +2,7 @@ package com.demo.bpm.service;
 
 import com.demo.bpm.dto.*;
 import com.demo.bpm.exception.ResourceNotFoundException;
+import com.demo.bpm.util.EscalationUtils;
 import com.demo.bpm.util.WorkflowVariableUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,43 +25,20 @@ public class WorkflowService {
     private final TaskService taskService;
     private final ObjectMapper objectMapper;
 
-    private static final Map<String, String[]> ESCALATION_HIERARCHY = Map.of(
-            "SUPERVISOR", new String[]{"MANAGER"},
-            "MANAGER", new String[]{"DIRECTOR"},
-            "DIRECTOR", new String[]{"EXECUTIVE"},
-            "EXECUTIVE", new String[]{}
-    );
-
-    private static final Map<String, String[]> DE_ESCALATION_HIERARCHY = Map.of(
-            "EXECUTIVE", new String[]{"DIRECTOR"},
-            "DIRECTOR", new String[]{"MANAGER"},
-            "MANAGER", new String[]{"SUPERVISOR"},
-            "SUPERVISOR", new String[]{}
-    );
-
     @Transactional
     public EscalationDTO escalateTask(String taskId, EscalationRequest request, String userId) {
-        Task task = taskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new ResourceNotFoundException("Task not found: " + taskId);
-        }
+        Task task = getTaskOrThrow(taskId);
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
         String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
-        String[] nextLevels = ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{});
-        if (nextLevels.length == 0) {
-            throw new RuntimeException("Cannot escalate beyond " + currentLevel);
+        String targetLevel = request.getTargetLevel();
+        if (targetLevel == null) {
+            targetLevel = EscalationUtils.getDefaultNextLevel(currentLevel);
         }
 
-        String targetLevel = request.getTargetLevel() != null ? request.getTargetLevel() : nextLevels[0];
-
-        // Validate target level is in hierarchy
-        if (!Arrays.asList(nextLevels).contains(targetLevel)) {
-            throw new RuntimeException("Invalid escalation target: " + targetLevel);
+        if (!EscalationUtils.canEscalate(currentLevel, targetLevel)) {
+             throw new RuntimeException("Invalid escalation from " + currentLevel + " to " + targetLevel);
         }
 
         // Record escalation in history
@@ -108,23 +86,19 @@ public class WorkflowService {
 
     @Transactional
     public EscalationDTO deEscalateTask(String taskId, EscalationRequest request, String userId) {
-        Task task = taskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
+        Task task = getTaskOrThrow(taskId);
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
         String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
-        String[] prevLevels = DE_ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{});
-        if (prevLevels.length == 0) {
-            throw new RuntimeException("Cannot de-escalate below " + currentLevel);
+        String targetLevel = request.getTargetLevel();
+        if (targetLevel == null) {
+            targetLevel = EscalationUtils.getDefaultPreviousLevel(currentLevel);
         }
 
-        String targetLevel = request.getTargetLevel() != null ? request.getTargetLevel() : prevLevels[0];
+        if (!EscalationUtils.canDeEscalate(currentLevel, targetLevel)) {
+            throw new RuntimeException("Invalid de-escalation from " + currentLevel + " to " + targetLevel);
+        }
 
         // Record de-escalation in history
         List<Map<String, Object>> escalationHistory = WorkflowVariableUtils.getListVariable(variables, "escalationHistory", objectMapper);
@@ -168,33 +142,31 @@ public class WorkflowService {
     }
 
     public List<String> getEscalationOptions(String taskId) {
-        Task task = taskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
+        Task task = getTaskOrThrow(taskId);
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
         String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
-        return Arrays.asList(ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{}));
+        return EscalationUtils.getNextLevels(currentLevel);
     }
 
     public List<String> getDeEscalationOptions(String taskId) {
-        Task task = taskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
+        Task task = getTaskOrThrow(taskId);
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
         String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
-        return Arrays.asList(DE_ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{}));
+        return EscalationUtils.getPreviousLevels(currentLevel);
+    }
+
+    private Task getTaskOrThrow(String taskId) {
+        Task task = taskService.createTaskQuery()
+                .taskId(taskId)
+                .singleResult();
+        if (task == null) {
+            throw new ResourceNotFoundException("Task not found: " + taskId);
+        }
+        return task;
     }
 
     @Transactional
