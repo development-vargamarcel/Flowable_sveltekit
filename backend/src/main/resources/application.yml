@@ -50,10 +50,10 @@ spring:
 
   # Email Configuration
   mail:
-    host: smtp.mailersend.net
-    port: 587
-    username: MS_uZIu1f@test-zkq340ek19xgd796.mlsender.net
-    password: mssp.ZJqz447.o65qngkror84wr12.idSQ797
+    host: ${SPRING_MAIL_HOST:smtp.mailersend.net}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:MS_uZIu1f@test-zkq340ek19xgd796.mlsender.net}
+    password: ${SPRING_MAIL_PASSWORD:mssp.ZJqz447.o65qngkror84wr12.idSQ797}
     properties:
       mail:
         smtp:

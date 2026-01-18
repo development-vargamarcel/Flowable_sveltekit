@@ -138,6 +138,7 @@ public class ProcessService {
 
             return ProcessInstanceDTO.builder()
                     .id(instance.getId())
+                    .processDefinitionId(instance.getProcessDefinitionId())
                     .processDefinitionKey(instance.getProcessDefinitionKey())
                     .processDefinitionName(definition != null ? definition.getName() : null)
                     .businessKey(instance.getBusinessKey())
@@ -161,6 +162,7 @@ public class ProcessService {
 
         return ProcessInstanceDTO.builder()
                 .id(historicInstance.getId())
+                .processDefinitionId(historicInstance.getProcessDefinitionId())
                 .processDefinitionKey(historicInstance.getProcessDefinitionKey())
                 .processDefinitionName(historicInstance.getProcessDefinitionName())
                 .businessKey(historicInstance.getBusinessKey())

@@ -10,6 +10,7 @@ import java.util.Map;
 @Builder
 public class ProcessInstanceDTO {
     private String id;
+    private String processDefinitionId;
     private String processDefinitionKey;
     private String processDefinitionName;
     private String businessKey;
