@@ -25,6 +25,8 @@ import type {
 } from '$lib/types';
 import { createLogger } from '$lib/utils/logger';
 import { backendStatus } from '$lib/stores/backendStatus';
+import { toast } from 'svelte-sonner';
+import { browser } from '$app/environment';
 
 // In production, use relative URLs (empty string) so nginx can proxy /api/* to backend
 // In development, use localhost:8080 for direct backend access
@@ -306,6 +308,16 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
         // Mark backend as ready if we got a response (even an error)
         backendStatus.setReady();
 
+        if (browser && response.status >= 500) {
+          const msg =
+            (errorBody?.message as string) ||
+            (errorBody?.error as string) ||
+            'An unexpected error occurred on the server.';
+          toast.error(`Server Error (${response.status})`, {
+            description: msg
+          });
+        }
+
         throw parseErrorResponse(response.status, response.statusText, errorBody, rawText);
       }
 
@@ -350,19 +362,26 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
           error.message.includes('fetch') || error.message.includes('network');
         log.error('Network error occurred', error, { url, method });
         backendStatus.setError('Connection failed');
-        throw new ApiError(
-          'Connection failed',
-          0,
-          'Network Error',
-          isConnectionRefused
-            ? `Unable to connect to ${url}. The server may be down or there may be a network issue.`
-            : `Network error: ${error.message}`
-        );
+
+        const message = isConnectionRefused
+          ? `Unable to connect to ${url}. The server may be down or there may be a network issue.`
+          : `Network error: ${error.message}`;
+
+        if (browser) {
+          toast.error('Connection Failed', { description: message });
+        }
+
+        throw new ApiError('Connection failed', 0, 'Network Error', message);
       }
 
       // Handle other errors
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       log.error('Unexpected error', error, { url, method });
+
+      if (browser) {
+        toast.error('Unexpected Error', { description: errorMessage });
+      }
+
       throw new ApiError(
         'Request failed',
         0,
