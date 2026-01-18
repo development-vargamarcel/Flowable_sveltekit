@@ -7,7 +7,7 @@
 		onClose: () => void;
 		children: Snippet;
 		footer?: Snippet;
-		maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+		maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
 	}
 
 	const { open, title, onClose, children, footer, maxWidth = 'md' }: Props = $props();
@@ -16,7 +16,11 @@
 		sm: 'max-w-sm',
 		md: 'max-w-md',
 		lg: 'max-w-lg',
-		xl: 'max-w-xl'
+		xl: 'max-w-xl',
+		'2xl': 'max-w-2xl',
+		'3xl': 'max-w-3xl',
+		'4xl': 'max-w-4xl',
+		full: 'max-w-full'
 	};
 
 	function handleBackdropClick(e: MouseEvent) {
@@ -44,8 +48,12 @@
 		aria-labelledby="modal-title"
 		tabindex="-1"
 	>
-		<div class="bg-white rounded-lg shadow-xl w-full {widthClasses[maxWidth]} p-6">
-			<div class="flex items-center justify-between mb-4">
+		<div
+			class="bg-white rounded-lg shadow-xl w-full {widthClasses[
+				maxWidth
+			]} p-6 max-h-[90vh] overflow-y-auto"
+		>
+			<div class="sticky top-0 bg-white z-10 flex items-center justify-between mb-4 border-b pb-4">
 				<h3 id="modal-title" class="text-lg font-bold text-gray-900">{title}</h3>
 				<button
 					onclick={onClose}
@@ -53,7 +61,12 @@
 					aria-label="Close modal"
 				>
 					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						/>
 					</svg>
 				</button>
 			</div>
@@ -63,7 +76,7 @@
 			</div>
 
 			{#if footer}
-				<div class="flex gap-3 mt-6">
+				<div class="flex gap-3 mt-6 pt-4 border-t">
 					{@render footer()}
 				</div>
 			{/if}
