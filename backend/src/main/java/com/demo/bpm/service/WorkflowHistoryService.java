@@ -2,8 +2,7 @@ package com.demo.bpm.service;
 
 import com.demo.bpm.dto.*;
 import com.demo.bpm.exception.ResourceNotFoundException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.demo.bpm.util.WorkflowVariableUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -137,8 +136,8 @@ public class WorkflowHistoryService {
                 .currentTaskId(currentTaskId)
                 .currentTaskName(currentTaskName)
                 .currentAssignee(currentAssignee)
-                .currentLevel((String) variables.getOrDefault("currentLevel", "SUPERVISOR"))
-                .escalationCount(((Number) variables.getOrDefault("escalationCount", 0)).intValue())
+                .currentLevel(WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR"))
+                .escalationCount(WorkflowVariableUtils.getIntVariable(variables, "escalationCount", 0))
                 .variables(variables)
                 .taskHistory(taskHistory)
                 .escalationHistory(escalationHistory)
@@ -228,42 +227,8 @@ public class WorkflowHistoryService {
                 .build();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getEscalationHistoryList(Map<String, Object> variables) {
-        Object historyObj = variables.get("escalationHistory");
-        if (historyObj == null) {
-            return new ArrayList<>();
-        }
-        if (historyObj instanceof List) {
-            return new ArrayList<>((List<Map<String, Object>>) historyObj);
-        }
-        try {
-            return objectMapper.readValue((String) historyObj,
-                    new TypeReference<List<Map<String, Object>>>() {});
-        } catch (JsonProcessingException e) {
-            return new ArrayList<>();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getApprovalHistoryList(Map<String, Object> variables) {
-        Object historyObj = variables.get("approvalHistory");
-        if (historyObj == null) {
-            return new ArrayList<>();
-        }
-        if (historyObj instanceof List) {
-            return new ArrayList<>((List<Map<String, Object>>) historyObj);
-        }
-        try {
-            return objectMapper.readValue((String) historyObj,
-                    new TypeReference<List<Map<String, Object>>>() {});
-        } catch (JsonProcessingException e) {
-            return new ArrayList<>();
-        }
-    }
-
     private List<EscalationDTO> getEscalationHistory(Map<String, Object> variables) {
-        return getEscalationHistoryList(variables).stream()
+        return WorkflowVariableUtils.getListVariable(variables, "escalationHistory", objectMapper).stream()
                 .map(map -> EscalationDTO.builder()
                         .id((String) map.get("id"))
                         .taskId((String) map.get("taskId"))
@@ -278,7 +243,7 @@ public class WorkflowHistoryService {
     }
 
     private List<ApprovalDTO> getApprovalHistory(String processInstanceId, Map<String, Object> variables) {
-        return getApprovalHistoryList(variables).stream()
+        return WorkflowVariableUtils.getListVariable(variables, "approvalHistory", objectMapper).stream()
                 .map(map -> ApprovalDTO.builder()
                         .id((String) map.get("id"))
                         .processInstanceId(processInstanceId)
