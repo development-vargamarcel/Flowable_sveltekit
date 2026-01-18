@@ -210,6 +210,7 @@
       readonlyExpression: string;
       requiredExpression: string;
       calculationExpression: string;
+      visibilityExpression?: string;
       gridColumn: number;
       gridRow: number;
       gridWidth: number;
@@ -235,8 +236,8 @@
     if (!modeler) return;
 
     try {
-      const elementRegistry = modeler.get('elementRegistry');
-      const modeling = modeler.get('modeling');
+      const elementRegistry = modeler.get('elementRegistry') as any;
+      const modeling = modeler.get('modeling') as any;
 
       // Find the process element
       const processElement = elementRegistry.find(
@@ -293,8 +294,8 @@
     if (!modeler) return;
 
     try {
-      const elementRegistry = modeler.get('elementRegistry');
-      const modeling = modeler.get('modeling');
+      const elementRegistry = modeler.get('elementRegistry') as any;
+      const modeling = modeler.get('modeling') as any;
 
       // Find the process element
       const processElement = elementRegistry.find(
@@ -350,20 +351,20 @@
 
   function checkHistory() {
     if (!modeler) return;
-    const commandStack = modeler.get('commandStack');
+    const commandStack = modeler.get('commandStack') as any;
     canUndo = commandStack.canUndo();
     canRedo = commandStack.canRedo();
   }
 
   function handleUndo() {
     if (modeler) {
-      modeler.get('commandStack').undo();
+      (modeler.get('commandStack') as any).undo();
     }
   }
 
   function handleRedo() {
     if (modeler) {
-      modeler.get('commandStack').redo();
+      (modeler.get('commandStack') as any).redo();
     }
   }
 
@@ -547,7 +548,7 @@
       await modeler.importXML(template.bpmn);
       processName = template.id;
       processDescription = template.description;
-      const canvas = modeler.get('canvas');
+      const canvas = modeler.get('canvas') as any;
       canvas.zoom('fit-viewport');
       showTemplateModal = false;
       selectedTemplate = null;
@@ -580,7 +581,7 @@
     });
 
     // Set up selection change handler for properties panel
-    const eventBus = modeler.get('eventBus');
+    const eventBus = modeler.get('eventBus') as any;
 
     eventBus.on('selection.changed', async (e: any) => {
       const selection = e.newSelection;
@@ -612,7 +613,7 @@
     eventBus.on('shape.added', (e: any) => {
       // Auto-select newly added elements
       if (e.element && e.element.type !== 'bpmn:Process' && e.element.type !== 'label') {
-        const selection = modeler?.get('selection');
+        const selection = modeler?.get('selection') as any;
         if (selection) {
           selection.select(e.element);
         }
@@ -656,7 +657,7 @@
             extractProcessVariables();
 
             // Extract document type from loaded process
-            const rootElement = modeler.get('canvas').getRootElement();
+            const rootElement = (modeler.get('canvas') as any).getRootElement();
             const businessObject = rootElement.businessObject;
             selectedDocumentType = businessObject.get('flowable:documentType') || '';
           } catch (loadErr) {
@@ -690,7 +691,7 @@
         }
       }
 
-      const canvas = modeler.get('canvas');
+      const canvas = modeler.get('canvas') as any;
       canvas.zoom('fit-viewport');
 
       // Load process-level field library and condition rules
@@ -709,19 +710,13 @@
       error = 'Failed to initialize the process modeler. Please refresh the page.';
     }
 
-    return () => {
-      if (modeler) {
-        modeler.destroy();
-      }
-      // Clean up draft save timeout
-      if (draftSaveTimeout) {
-        clearTimeout(draftSaveTimeout);
-      }
-    };
   });
 
   // Additional cleanup on component destroy
   onDestroy(() => {
+    if (modeler) {
+      modeler.destroy();
+    }
     if (draftSaveTimeout) {
       clearTimeout(draftSaveTimeout);
     }
@@ -965,8 +960,8 @@
       loopCardinality: '',
       collection: '',
       elementVariable: '',
-      elementVariable: '',
       completionCondition: '',
+      documentType: '',
       timeDate: '',
       timeDuration: '',
       timeCycle: ''
@@ -1309,8 +1304,8 @@
 
   function updateProcessDocumentType() {
     if (!modeler) return;
-    const rootElement = modeler.get('canvas').getRootElement();
-    const modeling = modeler.get('modeling');
+    const rootElement = (modeler.get('canvas') as any).getRootElement();
+    const modeling = modeler.get('modeling') as any;
 
     // We need to update the 'flowable:documentType' property on the business object
     modeling.updateProperties(rootElement, {
@@ -1324,8 +1319,8 @@
     isUpdatingProperty = true;
 
     try {
-      const modeling = modeler.get('modeling');
-      const moddle = modeler.get('moddle');
+      const modeling = modeler.get('modeling') as any;
+      const moddle = modeler.get('moddle') as any;
       const businessObject = selectedElement.businessObject;
 
       // Update local state immediately for responsive UI
@@ -1407,8 +1402,8 @@
   function updateMultiInstanceType(type: string) {
     if (!modeler || !selectedElement) return;
 
-    const modeling = modeler.get('modeling');
-    const moddle = modeler.get('moddle');
+    const modeling = modeler.get('modeling') as any;
+    const moddle = modeler.get('moddle') as any;
     const businessObject = selectedElement.businessObject;
 
     if (type === 'none') {
@@ -1424,8 +1419,8 @@
   function updateMultiInstanceProperty(property: string, value: string) {
     if (!modeler || !selectedElement) return;
 
-    const modeling = modeler.get('modeling');
-    const moddle = modeler.get('moddle');
+    const modeling = modeler.get('modeling') as any;
+    const moddle = modeler.get('moddle') as any;
     const businessObject = selectedElement.businessObject;
     let loopCharacteristics = businessObject.loopCharacteristics;
 
@@ -1459,8 +1454,8 @@
   function updateTimerDefinition(property: string, value: string) {
     if (!modeler || !selectedElement) return;
 
-    const modeling = modeler.get('modeling');
-    const moddle = modeler.get('moddle');
+    const modeling = modeler.get('modeling') as any;
+    const moddle = modeler.get('moddle') as any;
     const businessObject = selectedElement.businessObject;
     const eventDefinitions = businessObject.eventDefinitions;
 
@@ -1483,7 +1478,7 @@
   function extractProcessVariables() {
     if (!modeler) return;
 
-    const elementRegistry = modeler.get('elementRegistry');
+    const elementRegistry = modeler.get('elementRegistry') as any;
     const variables = new Set<string>(['initiator']);
 
     elementRegistry.forEach((element: any) => {
@@ -1787,7 +1782,7 @@
       return;
     }
 
-    const modeling = modeler.get('modeling');
+    const modeling = modeler.get('modeling') as any;
     const formGridsJson = JSON.stringify(formGrids);
 
     // Store form grids as a custom attribute
@@ -1833,7 +1828,7 @@
       return;
     }
 
-    const modeling = modeler.get('modeling');
+    const modeling = modeler.get('modeling') as any;
 
     // Include grid configuration in the saved data
     const fieldsToSave = formFields.map((field, index) => ({
@@ -1867,7 +1862,7 @@
     if (!modeler) return;
 
     try {
-      const elementRegistry = modeler.get('elementRegistry');
+      const elementRegistry = modeler.get('elementRegistry') as any;
       const processElement = elementRegistry.find(
         (element: any) => element.type === 'bpmn:Process'
       );
@@ -2076,7 +2071,7 @@
 
     const errors: string[] = [];
     const warnings: string[] = [];
-    const elementRegistry = modeler.get('elementRegistry');
+    const elementRegistry = modeler.get('elementRegistry') as any;
 
     // Refresh variables list
     extractProcessVariables();
@@ -2469,7 +2464,7 @@
       }
 
       await modeler.importXML(text);
-      const canvas = modeler.get('canvas');
+      const canvas = modeler.get('canvas') as any;
       canvas.zoom('fit-viewport');
 
       // Extract process name from imported file
@@ -2555,7 +2550,7 @@
   ];
 
   // Expanded field index for detailed editing
-  let expandedFieldIndex = $state(null);
+  let expandedFieldIndex = $state<number | null>(null);
 
 
 </script>
@@ -3140,7 +3135,7 @@
                           value={elementProperties.loopCardinality}
                           oninput={(e) =>
                             updateElementProperty('loopCardinality', e.currentTarget.value)}
-                          placeholder="3 or ${count}"
+                          placeholder={'3 or ${count}'}
                           class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
                         />
                       </div>
@@ -3154,7 +3149,7 @@
                           value={elementProperties.collection}
                           oninput={(e) =>
                             updateElementProperty('collection', e.currentTarget.value)}
-                          placeholder={'${assigneeList}'}
+                          placeholder={'\${assigneeList}'}
                           class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
                         />
                       </div>
@@ -3182,7 +3177,7 @@
                           value={elementProperties.completionCondition}
                           oninput={(e) =>
                             updateElementProperty('completionCondition', e.currentTarget.value)}
-                          placeholder={'${nrOfCompletedInstances >= 2}'}
+                          placeholder={'\${nrOfCompletedInstances >= 2}'}
                           class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
                         />
                       </div>
@@ -3913,8 +3908,8 @@
                       <label class="mb-1 block text-xs font-medium text-gray-700">Visibility Expression</label>
                       <input
                         type="text"
-                        bind:value={grid.visibilityExpression}
-                        placeholder={'${showGrid == true}'}
+                        bind:value={field.visibilityExpression}
+                        placeholder={'\${showField == true}'}
                         class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm font-mono focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
@@ -5148,7 +5143,7 @@ execution.setVariable('total', total)`
                       <label class="block text-sm font-medium text-gray-700 mb-1">Expression to Test</label>
                       <textarea
                         bind:value={testExpression}
-                        placeholder="${amount > 500}"
+                        placeholder={'\${amount > 500}'}
                         rows="3"
                         class="w-full rounded border border-gray-300 p-2 font-mono text-sm focus:border-blue-500 focus:outline-none"
                       ></textarea>

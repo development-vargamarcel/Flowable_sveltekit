@@ -22,7 +22,7 @@
   let docTypes: string[] = $state([]);
 
   onMount(async () => {
-    processId = $page.params.id;
+    processId = $page.params.id ?? '';
     if (!processId) {
        error = 'No process ID provided';
        return;
@@ -102,10 +102,7 @@
     .no-print {
       display: none;
     }
-    .print-only {
-      display: block;
-    }
-    body {
+    :global(body) {
        background: white;
     }
   }

@@ -42,6 +42,7 @@ export interface ProcessDefinition {
 
 export interface ProcessInstance {
   id: string;
+  processDefinitionId: string;
   processDefinitionKey: string;
   processDefinitionName: string | null;
   businessKey: string;
