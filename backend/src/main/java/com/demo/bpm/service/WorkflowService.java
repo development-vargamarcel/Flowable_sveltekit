@@ -2,8 +2,7 @@ package com.demo.bpm.service;
 
 import com.demo.bpm.dto.*;
 import com.demo.bpm.exception.ResourceNotFoundException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.demo.bpm.util.WorkflowVariableUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +49,7 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
-        String currentLevel = (String) variables.getOrDefault("currentLevel", "SUPERVISOR");
+        String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
         String[] nextLevels = ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{});
         if (nextLevels.length == 0) {
@@ -65,8 +64,8 @@ public class WorkflowService {
         }
 
         // Record escalation in history
-        int escalationCount = ((Number) variables.getOrDefault("escalationCount", 0)).intValue() + 1;
-        List<Map<String, Object>> escalationHistory = getEscalationHistoryList(variables);
+        int escalationCount = WorkflowVariableUtils.getIntVariable(variables, "escalationCount", 0) + 1;
+        List<Map<String, Object>> escalationHistory = WorkflowVariableUtils.getListVariable(variables, "escalationHistory", objectMapper);
 
         Map<String, Object> escalationRecord = new HashMap<>();
         escalationRecord.put("id", UUID.randomUUID().toString());
@@ -83,7 +82,7 @@ public class WorkflowService {
         Map<String, Object> updateVars = new HashMap<>();
         updateVars.put("currentLevel", targetLevel);
         updateVars.put("escalationCount", escalationCount);
-        updateVars.put("escalationHistory", serializeList(escalationHistory));
+        updateVars.put("escalationHistory", WorkflowVariableUtils.serializeList(escalationHistory, objectMapper));
         updateVars.put("decision", "escalate");
         updateVars.put("escalationReason", request.getReason());
         updateVars.put("escalatedBy", userId);
@@ -118,7 +117,7 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
-        String currentLevel = (String) variables.getOrDefault("currentLevel", "SUPERVISOR");
+        String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
         String[] prevLevels = DE_ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{});
         if (prevLevels.length == 0) {
@@ -128,7 +127,7 @@ public class WorkflowService {
         String targetLevel = request.getTargetLevel() != null ? request.getTargetLevel() : prevLevels[0];
 
         // Record de-escalation in history
-        List<Map<String, Object>> escalationHistory = getEscalationHistoryList(variables);
+        List<Map<String, Object>> escalationHistory = WorkflowVariableUtils.getListVariable(variables, "escalationHistory", objectMapper);
 
         Map<String, Object> deEscalationRecord = new HashMap<>();
         deEscalationRecord.put("id", UUID.randomUUID().toString());
@@ -144,7 +143,7 @@ public class WorkflowService {
         // Update process variables
         Map<String, Object> updateVars = new HashMap<>();
         updateVars.put("currentLevel", targetLevel);
-        updateVars.put("escalationHistory", serializeList(escalationHistory));
+        updateVars.put("escalationHistory", WorkflowVariableUtils.serializeList(escalationHistory, objectMapper));
         updateVars.put("decision", "de_escalate");
         updateVars.put("deEscalationReason", request.getReason());
         updateVars.put("deEscalatedBy", userId);
@@ -178,7 +177,7 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
-        String currentLevel = (String) variables.getOrDefault("currentLevel", "SUPERVISOR");
+        String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
         return Arrays.asList(ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{}));
     }
@@ -193,7 +192,7 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
-        String currentLevel = (String) variables.getOrDefault("currentLevel", "SUPERVISOR");
+        String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
         return Arrays.asList(DE_ESCALATION_HIERARCHY.getOrDefault(currentLevel, new String[]{}));
     }
@@ -209,7 +208,7 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
-        List<Map<String, Object>> handoffHistory = getHandoffHistoryList(variables);
+        List<Map<String, Object>> handoffHistory = WorkflowVariableUtils.getListVariable(variables, "handoffHistory", objectMapper);
 
         Map<String, Object> handoffRecord = new HashMap<>();
         handoffRecord.put("id", UUID.randomUUID().toString());
@@ -221,7 +220,7 @@ public class WorkflowService {
         handoffRecord.put("timestamp", LocalDateTime.now().toString());
         handoffHistory.add(handoffRecord);
 
-        runtimeService.setVariable(task.getProcessInstanceId(), "handoffHistory", serializeList(handoffHistory));
+        runtimeService.setVariable(task.getProcessInstanceId(), "handoffHistory", WorkflowVariableUtils.serializeList(handoffHistory, objectMapper));
 
         // Unclaim and reassign
         if (task.getAssignee() != null) {
@@ -243,9 +242,9 @@ public class WorkflowService {
         }
 
         Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
-        String currentLevel = (String) variables.getOrDefault("currentLevel", "SUPERVISOR");
+        String currentLevel = WorkflowVariableUtils.getStringVariable(variables, "currentLevel", "SUPERVISOR");
 
-        List<Map<String, Object>> approvalHistory = getApprovalHistoryList(variables);
+        List<Map<String, Object>> approvalHistory = WorkflowVariableUtils.getListVariable(variables, "approvalHistory", objectMapper);
 
         Map<String, Object> approvalRecord = new HashMap<>();
         approvalRecord.put("id", UUID.randomUUID().toString());
@@ -261,7 +260,7 @@ public class WorkflowService {
 
         // Update variables
         Map<String, Object> updateVars = new HashMap<>();
-        updateVars.put("approvalHistory", serializeList(approvalHistory));
+        updateVars.put("approvalHistory", WorkflowVariableUtils.serializeList(approvalHistory, objectMapper));
         updateVars.put("decision", decision.toLowerCase());
         updateVars.put("approvalComments", comments);
         updateVars.put("completedBy", userId);
@@ -283,66 +282,5 @@ public class WorkflowService {
                 .stepOrder(approvalHistory.size())
                 .isRequired(true)
                 .build();
-    }
-
-    // Helper methods
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getEscalationHistoryList(Map<String, Object> variables) {
-        Object historyObj = variables.get("escalationHistory");
-        if (historyObj == null) {
-            return new ArrayList<>();
-        }
-        if (historyObj instanceof List) {
-            return new ArrayList<>((List<Map<String, Object>>) historyObj);
-        }
-        try {
-            return objectMapper.readValue((String) historyObj,
-                    new TypeReference<List<Map<String, Object>>>() {});
-        } catch (JsonProcessingException e) {
-            return new ArrayList<>();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getHandoffHistoryList(Map<String, Object> variables) {
-        Object historyObj = variables.get("handoffHistory");
-        if (historyObj == null) {
-            return new ArrayList<>();
-        }
-        if (historyObj instanceof List) {
-            return new ArrayList<>((List<Map<String, Object>>) historyObj);
-        }
-        try {
-            return objectMapper.readValue((String) historyObj,
-                    new TypeReference<List<Map<String, Object>>>() {});
-        } catch (JsonProcessingException e) {
-            return new ArrayList<>();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getApprovalHistoryList(Map<String, Object> variables) {
-        Object historyObj = variables.get("approvalHistory");
-        if (historyObj == null) {
-            return new ArrayList<>();
-        }
-        if (historyObj instanceof List) {
-            return new ArrayList<>((List<Map<String, Object>>) historyObj);
-        }
-        try {
-            return objectMapper.readValue((String) historyObj,
-                    new TypeReference<List<Map<String, Object>>>() {});
-        } catch (JsonProcessingException e) {
-            return new ArrayList<>();
-        }
-    }
-
-    private String serializeList(List<Map<String, Object>> list) {
-        try {
-            return objectMapper.writeValueAsString(list);
-        } catch (JsonProcessingException e) {
-            return "[]";
-        }
     }
 }
