@@ -9,6 +9,7 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
 	import BackendStartingBanner from '$lib/components/BackendStartingBanner.svelte';
+	import { Toaster } from '$lib/components/ui/sonner';
 
 	const { children } = $props();
 
@@ -60,3 +61,5 @@
 		</main>
 	{/if}
 </div>
+
+<Toaster />
