@@ -4,13 +4,17 @@
 	import { api, ApiError } from '$lib/api/client';
 	import { processStore } from '$lib/stores/processes.svelte';
 	import type { WorkflowHistory, Page } from '$lib/types';
-	import ProcessTimeline from '$lib/components/ProcessTimeline.svelte';
 	import EscalationBadge from '$lib/components/EscalationBadge.svelte';
 	import SLAStats from '$lib/components/SLAStats.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import DurationHistogram from '$lib/components/DurationHistogram.svelte';
 	import UserPerformanceWidget from '$lib/components/UserPerformanceWidget.svelte';
 	import BottleneckWidget from '$lib/components/BottleneckWidget.svelte';
+	import Loading from '$lib/components/Loading.svelte';
+	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import ProcessDetailsModal from '$lib/components/ProcessDetailsModal.svelte';
+	import { Card, CardContent } from '$lib/components/ui/card';
 
 	let loading = $state(true);
 	let error = $state<ApiError | string | null>(null);
@@ -136,27 +140,6 @@
 		goto(`/tasks/${taskId}`);
 	}
 
-	function copyErrorDetails() {
-		if (error instanceof ApiError) {
-			const details = JSON.stringify(
-				{
-					message: error.message,
-					status: error.status,
-					details: error.details,
-					fieldErrors: error.fieldErrors,
-					timestamp: error.timestamp
-				},
-				null,
-				2
-			);
-			navigator.clipboard.writeText(details);
-			alert('Error details copied to clipboard');
-		} else {
-			navigator.clipboard.writeText(String(error));
-			alert('Error message copied to clipboard');
-		}
-	}
-
 	let displayProcesses = $derived(getDisplayProcesses());
 
 	function handlePageChange(page: number) {
@@ -175,69 +158,58 @@
 	</div>
 
 	{#if loading}
-		<div class="text-center py-12">
-			<div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-			<p class="mt-4 text-gray-600">Loading dashboard...</p>
-		</div>
+		<Loading text="Loading dashboard..." />
 	{:else if error}
-		<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-			<div class="flex items-start">
-				<div class="flex-1">
-					<h3 class="font-bold">Error Loading Dashboard</h3>
-					<p class="mt-1">
-						{#if error instanceof ApiError}
-							{error.getFullMessage()}
-						{:else}
-							{error}
-						{/if}
-					</p>
-					{#if error instanceof ApiError && error.timestamp}
-						<p class="mt-2 text-xs text-red-500">Timestamp: {error.timestamp}</p>
-					{/if}
-				</div>
-				<div class="ml-4 flex flex-col gap-2">
-					<button onclick={() => loadDashboard()} class="px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-sm">
-						Retry
-					</button>
-					<button onclick={copyErrorDetails} class="px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-sm">
-						Copy Error
-					</button>
-				</div>
-			</div>
-		</div>
+		<ErrorDisplay {error} onRetry={() => loadDashboard()} title="Error Loading Dashboard" />
 	{:else if dashboard}
 		<SLAStats />
-		
+
 		<!-- Stats Overview -->
 		<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-			<div class="card text-center">
-				<div class="text-2xl font-bold text-blue-600">{dashboard.stats.totalActive}</div>
-				<div class="text-xs text-gray-600">Active</div>
-			</div>
-			<div class="card text-center">
-				<div class="text-2xl font-bold text-green-600">{dashboard.stats.totalCompleted}</div>
-				<div class="text-xs text-gray-600">Completed</div>
-			</div>
-			<div class="card text-center">
-				<div class="text-2xl font-bold text-orange-600">{dashboard.stats.totalPending}</div>
-				<div class="text-xs text-gray-600">Pending Tasks</div>
-			</div>
-			<div class="card text-center">
-				<div class="text-2xl font-bold text-purple-600">{dashboard.stats.myTasks}</div>
-				<div class="text-xs text-gray-600">My Tasks</div>
-			</div>
-			<div class="card text-center">
-				<div class="text-2xl font-bold text-indigo-600">{dashboard.stats.myProcesses}</div>
-				<div class="text-xs text-gray-600">My Processes</div>
-			</div>
-			<div class="card text-center">
-				<div class="text-2xl font-bold text-red-600">{dashboard.stats.pendingEscalations}</div>
-				<div class="text-xs text-gray-600">Escalated</div>
-			</div>
-			<div class="card text-center">
-				<div class="text-2xl font-bold text-teal-600">{dashboard.stats.avgCompletionTimeHours}h</div>
-				<div class="text-xs text-gray-600">Avg. Time</div>
-			</div>
+			<Card class="text-center">
+				<CardContent class="pt-6">
+					<div class="text-2xl font-bold text-blue-600">{dashboard.stats.totalActive}</div>
+					<div class="text-xs text-gray-600">Active</div>
+				</CardContent>
+			</Card>
+			<Card class="text-center">
+				<CardContent class="pt-6">
+					<div class="text-2xl font-bold text-green-600">{dashboard.stats.totalCompleted}</div>
+					<div class="text-xs text-gray-600">Completed</div>
+				</CardContent>
+			</Card>
+			<Card class="text-center">
+				<CardContent class="pt-6">
+					<div class="text-2xl font-bold text-orange-600">{dashboard.stats.totalPending}</div>
+					<div class="text-xs text-gray-600">Pending Tasks</div>
+				</CardContent>
+			</Card>
+			<Card class="text-center">
+				<CardContent class="pt-6">
+					<div class="text-2xl font-bold text-purple-600">{dashboard.stats.myTasks}</div>
+					<div class="text-xs text-gray-600">My Tasks</div>
+				</CardContent>
+			</Card>
+			<Card class="text-center">
+				<CardContent class="pt-6">
+					<div class="text-2xl font-bold text-indigo-600">{dashboard.stats.myProcesses}</div>
+					<div class="text-xs text-gray-600">My Processes</div>
+				</CardContent>
+			</Card>
+			<Card class="text-center">
+				<CardContent class="pt-6">
+					<div class="text-2xl font-bold text-red-600">{dashboard.stats.pendingEscalations}</div>
+					<div class="text-xs text-gray-600">Escalated</div>
+				</CardContent>
+			</Card>
+			<Card class="text-center">
+				<CardContent class="pt-6">
+					<div class="text-2xl font-bold text-teal-600">
+						{dashboard.stats.avgCompletionTimeHours}h
+					</div>
+					<div class="text-xs text-gray-600">Avg. Time</div>
+				</CardContent>
+			</Card>
 		</div>
 
 		<!-- Escalation Metrics -->
@@ -246,15 +218,21 @@
 				<h3 class="font-semibold text-amber-800 mb-2">Escalation Metrics</h3>
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
 					<div>
-						<span class="text-2xl font-bold text-amber-700">{dashboard.escalationMetrics.totalEscalations}</span>
+						<span class="text-2xl font-bold text-amber-700"
+							>{dashboard.escalationMetrics.totalEscalations}</span
+						>
 						<span class="text-sm text-amber-600 ml-1">Total Escalations</span>
 					</div>
 					<div>
-						<span class="text-2xl font-bold text-green-700">{dashboard.escalationMetrics.totalDeEscalations}</span>
+						<span class="text-2xl font-bold text-green-700"
+							>{dashboard.escalationMetrics.totalDeEscalations}</span
+						>
 						<span class="text-sm text-green-600 ml-1">De-escalations</span>
 					</div>
 					<div>
-						<span class="text-2xl font-bold text-red-700">{dashboard.escalationMetrics.activeEscalatedProcesses}</span>
+						<span class="text-2xl font-bold text-red-700"
+							>{dashboard.escalationMetrics.activeEscalatedProcesses}</span
+						>
 						<span class="text-sm text-red-600 ml-1">Currently Escalated</span>
 					</div>
 					<div class="flex flex-wrap gap-2">
@@ -268,16 +246,16 @@
 			</div>
 		{/if}
 
-		    <!-- Row 3: Analytics Widgets -->
-    <div class="mb-8 grid gap-6 lg:grid-cols-2">
-      <DurationHistogram processDefinitionKey="" />
-      <UserPerformanceWidget />
-    </div>
-    
-    <!-- Row 4: Bottleneck Analysis -->
-    <div class="mb-8">
-      <BottleneckWidget />
-    </div>
+		<!-- Row 3: Analytics Widgets -->
+		<div class="mb-8 grid gap-6 lg:grid-cols-2">
+			<DurationHistogram processDefinitionKey="" />
+			<UserPerformanceWidget />
+		</div>
+
+		<!-- Row 4: Bottleneck Analysis -->
+		<div class="mb-8">
+			<BottleneckWidget />
+		</div>
 
 		<!-- Process Type Distribution -->
 		<div class="bg-white rounded-lg shadow p-4 mb-8">
@@ -285,14 +263,20 @@
 			<div class="flex flex-wrap gap-3">
 				{#each Object.entries(dashboard.activeByType) as [type, count]}
 					<button
-						onclick={() => { typeFilter = typeFilter === type ? '' : type; }}
+						onclick={() => {
+							typeFilter = typeFilter === type ? '' : type;
+						}}
 						class="flex items-center gap-2 px-3 py-2 rounded-lg transition-all
-							{typeFilter === type ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+							{typeFilter === type
+							? 'bg-blue-600 text-white'
+							: 'bg-gray-100 hover:bg-gray-200'}"
 					>
 						<span class="text-lg">{getProcessTypeIcon(type)}</span>
 						<span class="font-medium">{type.replace(/-/g, ' ')}</span>
-						<span class="px-2 py-0.5 rounded-full text-xs font-bold
-							{typeFilter === type ? 'bg-blue-500' : 'bg-gray-300'}">
+						<span
+							class="px-2 py-0.5 rounded-full text-xs font-bold
+							{typeFilter === type ? 'bg-blue-500' : 'bg-gray-300'}"
+						>
 							{count}
 						</span>
 					</button>
@@ -303,22 +287,23 @@
 		<!-- Tab Navigation -->
 		<div class="border-b border-gray-200 mb-6">
 			<nav class="flex space-x-8">
-				{#each [
-					{ id: 'all', label: 'All Processes', count: dashboard.activeProcesses.totalElements + dashboard.recentCompleted.totalElements },
-					{ id: 'active', label: 'Active', count: dashboard.activeProcesses.totalElements },
-					{ id: 'completed', label: 'Completed', count: dashboard.recentCompleted.totalElements },
-					{ id: 'my-approvals', label: 'My Pending Approvals', count: dashboard.myPendingApprovals.totalElements }
-				] as tab}
+				{#each [{ id: 'all', label: 'All Processes', count: dashboard.activeProcesses.totalElements + dashboard.recentCompleted.totalElements }, { id: 'active', label: 'Active', count: dashboard.activeProcesses.totalElements }, { id: 'completed', label: 'Completed', count: dashboard.recentCompleted.totalElements }, { id: 'my-approvals', label: 'My Pending Approvals', count: dashboard.myPendingApprovals.totalElements }] as tab}
 					<button
-						onclick={() => { activeTab = tab.id as typeof activeTab; }}
+						onclick={() => {
+							activeTab = tab.id as typeof activeTab;
+						}}
 						class="py-4 px-1 border-b-2 font-medium text-sm transition-colors
 							{activeTab === tab.id
-								? 'border-blue-500 text-blue-600'
-								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+							? 'border-blue-500 text-blue-600'
+							: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
 					>
 						{tab.label}
-						<span class="ml-2 py-0.5 px-2 rounded-full text-xs
-							{activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}">
+						<span
+							class="ml-2 py-0.5 px-2 rounded-full text-xs
+							{activeTab === tab.id
+								? 'bg-blue-100 text-blue-600'
+								: 'bg-gray-100 text-gray-600'}"
+						>
 							{tab.count}
 						</span>
 					</button>
@@ -339,7 +324,9 @@
 			</select>
 			{#if typeFilter}
 				<button
-					onclick={() => { typeFilter = ''; }}
+					onclick={() => {
+						typeFilter = '';
+					}}
 					class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center gap-2"
 				>
 					Clear Type Filter: {typeFilter}
@@ -359,14 +346,30 @@
 			<table class="min-w-full divide-y divide-gray-200">
 				<thead class="bg-gray-50">
 					<tr>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Process</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business Key</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Step</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Process</th
+						>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Business Key</th
+						>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Status</th
+						>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Current Step</th
+						>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Level</th
+						>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Started</th
+						>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Duration</th
+						>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+							>Actions</th
+						>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-gray-200">
@@ -380,13 +383,19 @@
 											<div class="font-medium text-gray-900">
 												{process.processDefinitionName || process.processDefinitionKey}
 											</div>
-											<div class="text-xs text-gray-500">{process.initiatorName || process.initiatorId}</div>
+											<div class="text-xs text-gray-500">
+												{process.initiatorName || process.initiatorId}
+											</div>
 										</div>
 									</div>
 								</td>
 								<td class="px-4 py-3 text-sm font-mono text-gray-600">{process.businessKey}</td>
 								<td class="px-4 py-3">
-									<span class="px-2 py-1 rounded-full text-xs font-medium {getStatusColor(process.status)}">
+									<span
+										class="px-2 py-1 rounded-full text-xs font-medium {getStatusColor(
+											process.status
+										)}"
+									>
 										{process.status}
 									</span>
 									{#if process.escalationCount > 0}
@@ -404,12 +413,16 @@
 									{/if}
 								</td>
 								<td class="px-4 py-3">
-									<span class="px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+									<span
+										class="px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
+									>
 										{process.currentLevel}
 									</span>
 								</td>
 								<td class="px-4 py-3 text-sm text-gray-600">{formatDate(process.startTime)}</td>
-								<td class="px-4 py-3 text-sm text-gray-600">{formatDuration(process.durationInMillis)}</td>
+								<td class="px-4 py-3 text-sm text-gray-600"
+									>{formatDuration(process.durationInMillis)}</td
+								>
 								<td class="px-4 py-3">
 									<div class="flex gap-2">
 										<button
@@ -431,13 +444,8 @@
 							</tr>
 						{:else}
 							<tr>
-								<td colspan="8" class="px-4 py-12 text-center text-gray-500">
-									<div class="flex flex-col items-center justify-center">
-										<svg class="w-12 h-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-										</svg>
-										<p>No processes found matching the current filters.</p>
-									</div>
+								<td colspan="8" class="px-4 py-0">
+									<EmptyState message="No processes found matching the current filters." />
 								</td>
 							</tr>
 						{/each}
@@ -457,133 +465,4 @@
 	{/if}
 </div>
 
-<!-- Process Details Modal -->
-{#if selectedProcess}
-	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-		<div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-			<div class="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-				<div>
-					<h2 class="text-xl font-bold text-gray-900">
-						{selectedProcess.processDefinitionName || selectedProcess.processDefinitionKey}
-					</h2>
-					<p class="text-sm text-gray-500">{selectedProcess.businessKey}</p>
-				</div>
-				<button
-					onclick={() => closeProcessDetails()}
-					class="p-2 text-gray-400 hover:text-gray-600"
-					aria-label="Close process details"
-				>
-					<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-					</svg>
-				</button>
-			</div>
-
-			<div class="p-6">
-				<!-- Status and Info -->
-				<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-					<div class="bg-gray-50 rounded-lg p-3">
-						<div class="text-xs text-gray-500 uppercase">Status</div>
-						<div class="mt-1">
-							<span class="px-2 py-1 rounded-full text-sm font-medium {getStatusColor(selectedProcess.status)}">
-								{selectedProcess.status}
-							</span>
-						</div>
-					</div>
-					<div class="bg-gray-50 rounded-lg p-3">
-						<div class="text-xs text-gray-500 uppercase">Current Level</div>
-						<div class="mt-1 font-medium text-indigo-700">{selectedProcess.currentLevel}</div>
-					</div>
-					<div class="bg-gray-50 rounded-lg p-3">
-						<div class="text-xs text-gray-500 uppercase">Escalations</div>
-						<div class="mt-1 font-medium text-amber-700">{selectedProcess.escalationCount}</div>
-					</div>
-					<div class="bg-gray-50 rounded-lg p-3">
-						<div class="text-xs text-gray-500 uppercase">Duration</div>
-						<div class="mt-1 font-medium">{formatDuration(selectedProcess.durationInMillis)}</div>
-					</div>
-				</div>
-
-				<!-- Timeline -->
-				<div class="mb-6">
-					<h3 class="font-semibold text-gray-800 mb-3">Process Timeline</h3>
-					<ProcessTimeline
-						taskHistory={selectedProcess.taskHistory}
-						escalationHistory={selectedProcess.escalationHistory}
-						approvals={selectedProcess.approvals}
-					/>
-				</div>
-
-				<!-- Approvals -->
-				{#if selectedProcess.approvals.length > 0}
-					<div class="mb-6">
-						<h3 class="font-semibold text-gray-800 mb-3">Approval History</h3>
-						<div class="space-y-2">
-							{#each selectedProcess.approvals as approval}
-								<div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-									<div class="flex items-center gap-3">
-										<span class="w-8 h-8 flex items-center justify-center rounded-full
-											{approval.decision === 'APPROVED' ? 'bg-green-100 text-green-600' :
-											 approval.decision === 'REJECTED' ? 'bg-red-100 text-red-600' :
-											 'bg-amber-100 text-amber-600'}">
-											{approval.stepOrder}
-										</span>
-										<div>
-											<div class="font-medium">{approval.taskName}</div>
-											<div class="text-sm text-gray-500">{approval.approverId} ({approval.approverLevel})</div>
-										</div>
-									</div>
-									<div class="text-right">
-										<span class="px-2 py-1 rounded text-xs font-medium
-											{approval.decision === 'APPROVED' ? 'bg-green-100 text-green-700' :
-											 approval.decision === 'REJECTED' ? 'bg-red-100 text-red-700' :
-											 'bg-amber-100 text-amber-700'}">
-											{approval.decision}
-										</span>
-										<div class="text-xs text-gray-500 mt-1">{formatDate(approval.timestamp)}</div>
-									</div>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Escalation History -->
-				{#if selectedProcess.escalationHistory.length > 0}
-					<div class="mb-6">
-						<h3 class="font-semibold text-gray-800 mb-3">Escalation History</h3>
-						<div class="space-y-2">
-							{#each selectedProcess.escalationHistory as escalation}
-								<div class="flex items-center justify-between bg-amber-50 rounded-lg p-3">
-									<div class="flex items-center gap-3">
-										<span class="text-lg">
-											{escalation.type === 'ESCALATE' ? '⬆️' : '⬇️'}
-										</span>
-										<div>
-											<div class="font-medium">
-												{escalation.fromLevel} → {escalation.toLevel}
-											</div>
-											<div class="text-sm text-gray-600">{escalation.reason}</div>
-										</div>
-									</div>
-									<div class="text-right text-sm text-gray-500">
-										<div>{escalation.fromUserId}</div>
-										<div>{formatDate(escalation.timestamp)}</div>
-									</div>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Variables -->
-				<div>
-					<h3 class="font-semibold text-gray-800 mb-3">Process Variables</h3>
-					<div class="bg-gray-50 rounded-lg p-4 overflow-x-auto">
-						<pre class="text-sm text-gray-700">{JSON.stringify(selectedProcess.variables, null, 2)}</pre>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-{/if}
+<ProcessDetailsModal process={selectedProcess} onClose={closeProcessDetails} />

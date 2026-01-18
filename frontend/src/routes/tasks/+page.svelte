@@ -5,18 +5,20 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import TaskList from '$lib/components/TaskList.svelte';
 	import type { Task } from '$lib/types';
+	import Loading from '$lib/components/Loading.svelte';
+	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 
 	let allTasks = $state<Task[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 	let activeTab = $state<'all' | 'assigned' | 'claimable'>('all');
 
-	const filteredTasks = $derived(() => {
+	const filteredTasks = $derived.by(() => {
 		switch (activeTab) {
 			case 'assigned':
-				return allTasks.filter(t => t.assignee === authStore.user?.username);
+				return allTasks.filter((t) => t.assignee === authStore.user?.username);
 			case 'claimable':
-				return allTasks.filter(t => !t.assignee);
+				return allTasks.filter((t) => !t.assignee);
 			default:
 				return allTasks;
 		}
@@ -68,35 +70,30 @@
 
 	<!-- Tabs -->
 	<div class="flex space-x-2 mb-6">
-		<button class={getTabClass('all')} onclick={() => activeTab = 'all'}>
+		<button class={getTabClass('all')} onclick={() => (activeTab = 'all')}>
 			All ({allTasks.length})
 		</button>
-		<button class={getTabClass('assigned')} onclick={() => activeTab = 'assigned'}>
-			My Tasks ({allTasks.filter(t => t.assignee === authStore.user?.username).length})
+		<button class={getTabClass('assigned')} onclick={() => (activeTab = 'assigned')}>
+			My Tasks ({allTasks.filter((t) => t.assignee === authStore.user?.username).length})
 		</button>
-		<button class={getTabClass('claimable')} onclick={() => activeTab = 'claimable'}>
-			Available ({allTasks.filter(t => !t.assignee).length})
+		<button class={getTabClass('claimable')} onclick={() => (activeTab = 'claimable')}>
+			Available ({allTasks.filter((t) => !t.assignee).length})
 		</button>
 	</div>
 
 	{#if loading}
-		<div class="text-center py-12">
-			<div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-			<p class="mt-4 text-gray-600">Loading tasks...</p>
-		</div>
+		<Loading text="Loading tasks..." />
 	{:else if error}
-		<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-			{error}
-		</div>
+		<ErrorDisplay {error} onRetry={loadTasks} title="Error Loading Tasks" />
 	{:else}
 		<TaskList
-			tasks={filteredTasks()}
+			tasks={filteredTasks}
 			onTaskClick={handleTaskClick}
 			emptyMessage={activeTab === 'assigned'
 				? "You don't have any assigned tasks"
 				: activeTab === 'claimable'
-					? "No tasks available to claim"
-					: "No tasks found"}
+					? 'No tasks available to claim'
+					: 'No tasks found'}
 		/>
 	{/if}
 </div>
