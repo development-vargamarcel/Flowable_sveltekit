@@ -451,7 +451,7 @@
         lastError = err instanceof Error ? err : new Error(String(err));
         if (i < maxRetries - 1) {
           const delayTime = baseDelay * Math.pow(2, i);
-          console.log(`Retry ${i + 1}/${maxRetries} failed, waiting ${delayTime}ms...`);
+          // console.log(`Retry ${i + 1}/${maxRetries} failed, waiting ${delayTime}ms...`);
           await delay(delayTime);
         }
       }

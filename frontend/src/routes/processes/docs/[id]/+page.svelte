@@ -10,7 +10,7 @@
   let isLoading = $state(true);
   let error = $state('');
 
-  let viewerContainer: HTMLDivElement;
+  let viewerContainer = $state<HTMLDivElement>();
   let viewer: any = null;
 
   // Extracted metadata

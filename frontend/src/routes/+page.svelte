@@ -96,7 +96,7 @@
 				<div class="text-sm text-gray-600">My Tasks</div>
 			</div>
 			<div class="card text-center">
-				<div class="text-3xl font-bold text-purple-600">{processes.length}</div>
+				<div class="text-3xl font-bold text-purple-600">{processes?.totalElements || 0}</div>
 				<div class="text-sm text-gray-600">My Processes</div>
 			</div>
 		</div>

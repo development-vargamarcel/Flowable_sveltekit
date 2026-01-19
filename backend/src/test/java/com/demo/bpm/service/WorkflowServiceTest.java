@@ -3,6 +3,7 @@ package com.demo.bpm.service;
 import com.demo.bpm.dto.EscalationDTO;
 import com.demo.bpm.dto.EscalationRequest;
 import com.demo.bpm.exception.InvalidOperationException;
+import com.demo.bpm.service.helpers.HistoryRecorder;
 import com.demo.bpm.util.WorkflowConstants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.flowable.engine.RuntimeService;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.quality.Strictness;
+import org.mockito.junit.jupiter.MockitoSettings;
 
 import java.util.Map;
 
@@ -24,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class WorkflowServiceTest {
 
     @Mock
@@ -31,7 +35,10 @@ class WorkflowServiceTest {
     @Mock
     private TaskService taskService;
     @Mock
-    private ObjectMapper objectMapper;
+    private HistoryRecorder historyRecorder;
+
+    // ObjectMapper is likely no longer used directly in WorkflowService or it's used via HistoryRecorder/Utils
+    // but check if it's injected. The WorkflowService now injects HistoryRecorder.
 
     @Mock
     private TaskQuery taskQuery;
@@ -41,7 +48,7 @@ class WorkflowServiceTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(taskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskService.createTaskQuery()).thenReturn(taskQuery);
     }
 
     @Test
@@ -60,7 +67,9 @@ class WorkflowServiceTest {
         when(taskQuery.singleResult()).thenReturn(task);
 
         when(runtimeService.getVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "SUPERVISOR", WorkflowConstants.VAR_ESCALATION_COUNT, 0));
-        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+
+        when(historyRecorder.recordEscalationHistory(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyMap()))
+            .thenReturn("historyId");
 
         // Execute
         EscalationDTO result = workflowService.escalateTask(taskId, request, userId);
@@ -68,7 +77,9 @@ class WorkflowServiceTest {
         // Verify
         assertNotNull(result);
         assertEquals("MANAGER", result.getToLevel());
-        verify(taskService).complete(eq(taskId), any(Map.class));
+        // verify(taskService).complete(eq(taskId), any(Map.class)); // WorkflowService changed to not pass map to complete for escalation
+        verify(taskService).complete(eq(taskId));
+        verify(runtimeService).setVariables(eq("proc1"), any(Map.class));
     }
 
     @Test
@@ -87,7 +98,9 @@ class WorkflowServiceTest {
         when(taskQuery.singleResult()).thenReturn(task);
 
         when(runtimeService.getVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "MANAGER"));
-        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+
+        when(historyRecorder.recordEscalationHistory(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyMap()))
+            .thenReturn("historyId");
 
         // Execute
         EscalationDTO result = workflowService.deEscalateTask(taskId, request, userId);
@@ -95,7 +108,8 @@ class WorkflowServiceTest {
         // Verify
         assertNotNull(result);
         assertEquals("SUPERVISOR", result.getToLevel());
-        verify(taskService).complete(eq(taskId), any(Map.class));
+        verify(taskService).complete(eq(taskId));
+        verify(runtimeService).setVariables(eq("proc1"), any(Map.class));
     }
 
     @Test

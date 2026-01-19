@@ -416,7 +416,6 @@
             gridsContext,
             {
               query: async (sql: string, params: any[]) => {
-                console.log('SQL:', sql, params);
                 return [];
               }
             },
