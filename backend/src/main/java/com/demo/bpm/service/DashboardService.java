@@ -31,7 +31,7 @@ public class DashboardService {
     private final WorkflowHistoryService workflowHistoryService;
 
     public DashboardDTO getDashboard(String userId, Pageable pageable, String status, String type) {
-        // Get counts for stats
+        // Parallelize or optimize these counts if database load is high, but for now sequential is okay.
         long totalActive = runtimeService.createProcessInstanceQuery().count();
         long totalCompleted = historyService.createHistoricProcessInstanceQuery().finished().count();
         long totalPending = taskService.createTaskQuery().count();
@@ -39,7 +39,10 @@ public class DashboardService {
         long myProcesses = runtimeService.createProcessInstanceQuery().variableValueEquals("startedBy", userId).count();
         long pendingEscalations = runtimeService.createProcessInstanceQuery().variableValueGreaterThan("escalationCount", 0).count();
 
-        // Get paginated lists for display
+        // Optimize: Fetch IDs first or fetch lighter objects if possible.
+        // For dashboard lists, we might not need full history details for every item in the list immediately
+        // but the current DTO structure requires WorkflowHistoryDTO.
+
         List<ProcessInstance> activeProcessesForDisplay = runtimeService.createProcessInstanceQuery()
                 .orderByStartTime().desc()
                 .listPage((int) pageable.getOffset(), pageable.getPageSize());
@@ -49,40 +52,42 @@ public class DashboardService {
                 .orderByProcessInstanceEndTime().desc()
                 .listPage((int) pageable.getOffset(), pageable.getPageSize());
 
-        // Calculate average completion time from a sample of recent completed processes
         long avgCompletionTimeHours = calculateAvgCompletionTime(completedProcesses);
 
-        // For activeByType, query a smaller sample for representative distribution
+        // Active distribution
         Map<String, Long> activeByType = getActiveByTypeDistribution();
 
-        // Group by status
         Map<String, Long> byStatus = new HashMap<>();
         byStatus.put("ACTIVE", totalActive);
         byStatus.put("COMPLETED", totalCompleted);
         byStatus.put("PENDING", totalPending);
 
-        // Get recent completed DTOs
-        Page<WorkflowHistoryDTO> recentCompleted = new PageImpl<>(completedProcesses.stream()
+        // Convert to DTOs.
+        // Note: workflowHistoryService.getWorkflowHistory might be expensive (N+1).
+        // If performance becomes an issue, we should batch fetch variables/history.
+        // For now, let's keep it but be aware.
+
+        List<WorkflowHistoryDTO> recentCompletedList = completedProcesses.stream()
                 .map(hp -> workflowHistoryService.getWorkflowHistory(hp.getId()))
-                .collect(Collectors.toList()), pageable, totalCompleted);
+                .collect(Collectors.toList());
+        Page<WorkflowHistoryDTO> recentCompleted = new PageImpl<>(recentCompletedList, pageable, totalCompleted);
 
-        // Get active with details from the paginated list
-        Page<WorkflowHistoryDTO> activeWithDetails = new PageImpl<>(activeProcessesForDisplay.stream()
+        List<WorkflowHistoryDTO> activeWithDetailsList = activeProcessesForDisplay.stream()
                 .map(ap -> workflowHistoryService.getWorkflowHistory(ap.getId()))
-                .collect(Collectors.toList()), pageable, totalActive);
+                .collect(Collectors.toList());
+        Page<WorkflowHistoryDTO> activeWithDetails = new PageImpl<>(activeWithDetailsList, pageable, totalActive);
 
-        // Get user's pending approvals with pagination
         List<Task> userTasks = taskService.createTaskQuery()
                 .taskCandidateOrAssigned(userId)
                 .orderByTaskCreateTime().desc()
                 .listPage((int) pageable.getOffset(), pageable.getPageSize());
 
-        Page<WorkflowHistoryDTO> myPendingApprovals = new PageImpl<>(userTasks.stream()
+        List<WorkflowHistoryDTO> myPendingApprovalsList = userTasks.stream()
                 .map(t -> workflowHistoryService.getWorkflowHistory(t.getProcessInstanceId()))
                 .distinct()
-                .collect(Collectors.toList()), pageable, myTasks);
+                .collect(Collectors.toList());
+        Page<WorkflowHistoryDTO> myPendingApprovals = new PageImpl<>(myPendingApprovalsList, pageable, myTasks);
 
-        // Escalation metrics
         DashboardDTO.EscalationMetrics escalationMetrics = getEscalationMetrics(pendingEscalations);
 
         DashboardDTO.DashboardStats stats = DashboardDTO.DashboardStats.builder()
@@ -107,21 +112,20 @@ public class DashboardService {
     }
 
     private long calculateAvgCompletionTime(List<HistoricProcessInstance> completedProcesses) {
-        long avgCompletionTimeHours = 0;
-        if (!completedProcesses.isEmpty()) {
-            long totalMillis = completedProcesses.stream()
-                    .filter(p -> p.getDurationInMillis() != null)
-                    .mapToLong(HistoricProcessInstance::getDurationInMillis)
-                    .sum();
-            if (completedProcesses.size() > 0) {
-                avgCompletionTimeHours = totalMillis / (completedProcesses.size() * 3600000);
-            }
-        }
-        return avgCompletionTimeHours;
+        if (completedProcesses.isEmpty()) return 0;
+
+        long totalMillis = completedProcesses.stream()
+                .filter(p -> p.getDurationInMillis() != null)
+                .mapToLong(HistoricProcessInstance::getDurationInMillis)
+                .sum();
+
+        return totalMillis / (completedProcesses.size() * 3600000);
     }
 
     private Map<String, Long> getActiveByTypeDistribution() {
-        // 100 is enough to get process type distribution without performance impact
+        // Use a native query or better API if available to avoid fetching entities.
+        // Flowable doesn't have a direct "group by" query API for runtime processes easily without native queries.
+        // We limit to 100 to avoid memory issues.
         List<ProcessInstance> activeProcessesForGrouping = runtimeService.createProcessInstanceQuery()
                 .orderByStartTime().desc()
                 .listPage(0, 100);
@@ -130,34 +134,29 @@ public class DashboardService {
     }
 
     private DashboardDTO.EscalationMetrics getEscalationMetrics(long pendingEscalations) {
-        long activeEscalatedProcesses = pendingEscalations;
-        long totalEscalations = pendingEscalations; // Approximation based on escalated count
-        long totalDeEscalations = 0;
-        Map<String, Long> escalationsByLevel = new HashMap<>();
+        // Optimized to avoid N+1 for getting currentLevel.
+        // We can include process variables in the query.
 
-        // Only sample a small number of escalated processes for level breakdown
-        // This avoids the N+1 query problem while still providing useful metrics
         List<ProcessInstance> escalatedSample = runtimeService.createProcessInstanceQuery()
                 .variableValueGreaterThan("escalationCount", 0)
+                .includeProcessVariables() // This fetches variables in a single query (or fewer queries)
                 .orderByStartTime().desc()
                 .listPage(0, 50);
 
+        Map<String, Long> escalationsByLevel = new HashMap<>();
+
         for (ProcessInstance pi : escalatedSample) {
-            try {
-                Object levelObj = runtimeService.getVariable(pi.getId(), "currentLevel");
-                if (levelObj != null) {
-                    String currentLevel = levelObj.toString();
-                    escalationsByLevel.merge(currentLevel, 1L, Long::sum);
-                }
-            } catch (Exception e) {
-                log.debug("Could not get currentLevel for process {}: {}", pi.getId(), e.getMessage());
+            Map<String, Object> vars = pi.getProcessVariables();
+            if (vars != null && vars.containsKey("currentLevel")) {
+                String currentLevel = vars.get("currentLevel").toString();
+                escalationsByLevel.merge(currentLevel, 1L, Long::sum);
             }
         }
 
         return DashboardDTO.EscalationMetrics.builder()
-                .totalEscalations(totalEscalations)
-                .totalDeEscalations(totalDeEscalations)
-                .activeEscalatedProcesses(activeEscalatedProcesses)
+                .totalEscalations(pendingEscalations) // Approximation
+                .totalDeEscalations(0) // Not easily trackable without history query
+                .activeEscalatedProcesses(pendingEscalations)
                 .escalationsByLevel(escalationsByLevel)
                 .build();
     }

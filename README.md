@@ -21,9 +21,12 @@ A production-ready Business Process Management (BPM) demo application featuring:
 
 ### Key Implementation Details
 - **Workflow Service**: Centralized logic for task completion, escalation, and history tracking.
+- **History Recording**: `HistoryRecorder` service encapsulates audit trail creation for escalations, handoffs, and approvals.
 - **Workflow Constants**: Standardized variable names (e.g., `currentLevel`, `escalationHistory`) are maintained in `WorkflowConstants.java`.
 - **Error Handling**: Custom exceptions (`InvalidOperationException`) map to HTTP 400 Bad Request for better frontend error reporting.
 - **Logging**: Enhanced SLF4J logging includes `ProcessInstanceId` context for easier troubleshooting.
+- **Frontend State**: Svelte 5 runes (`$state`) are used for reactive state management.
+- **Session Management**: Robust cookie handling and backend health checks in `session-utils.ts` to prevent login issues.
 
 ### 3 User Roles
 | Username | Password | Role | Capabilities |
@@ -31,6 +34,7 @@ A production-ready Business Process Management (BPM) demo application featuring:
 | user1 | password | User | Submit requests, work on tasks |
 | supervisor1 | password | Supervisor | Approve ≤$500 expenses, first-level leave |
 | executive1 | password | Executive | Final approval for high-value items |
+| admin | admin | Admin | Full access |
 
 ## Quick Start
 
@@ -50,6 +54,7 @@ docker-compose up --build
 **Backend (requires Java 17+, Maven):**
 ```bash
 cd backend
+./mvnw clean install
 ./mvnw spring-boot:run
 # API available at http://localhost:8080
 ```
@@ -85,7 +90,8 @@ cd backend
 **Frontend Verification:**
 ```bash
 cd frontend
-npm run test
+npm run check
+npm run test:unit
 ```
 
 ## Project Structure
@@ -93,10 +99,14 @@ npm run test
 ```
 ├── backend/                 # Spring Boot + Flowable
 │   ├── src/main/java/      # Java source code
+│   │   ├── service/       # Business logic
+│   │   ├── service/helpers # Shared helper services (HistoryRecorder, etc.)
+│   │   └── util/          # Constants and utilities
 │   ├── src/main/resources/ # Config + BPMN files
 │   └── Dockerfile
 ├── frontend/               # SvelteKit + Svelte 5
 │   ├── src/lib/           # Components, stores, API
+│   │   └── utils/         # Utility functions (session-utils.ts)
 │   ├── src/routes/        # Page routes
 │   └── Dockerfile
 ├── docker-compose.yml
@@ -115,11 +125,15 @@ npm run test
 - `GET /api/tasks/{id}` - Get task details
 - `POST /api/tasks/{id}/claim` - Claim a task
 - `POST /api/tasks/{id}/complete` - Complete a task
+- `POST /api/tasks/{id}/escalate` - Escalate a task
 
 ### Processes
 - `GET /api/processes` - List available process definitions
 - `POST /api/processes/{key}/start` - Start a new process
 - `GET /api/processes/my-processes` - Get user's active processes
+
+### Dashboard
+- `GET /api/dashboard` - Get dashboard statistics (optimized)
 
 ## Deployment to Railway
 
