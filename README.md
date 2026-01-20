@@ -5,19 +5,25 @@ A production-ready Business Process Management (BPM) demo application featuring:
 - **Frontend**: SvelteKit 2.x + Svelte 5 (runes mode) + Tailwind CSS
 - **Deployment**: Docker + Railway
 
+## Documentation
+
+Detailed documentation is available in the `guides/` directory:
+- [Setup Guide](guides/setup.md)
+- [Architecture](guides/architecture.md)
+- [Workflows](guides/workflows.md)
+- [API Reference](guides/api.md)
+- [Frontend Components](guides/frontend-components.md)
+
 ## Features
 
-### 3 Workflow Types
+### 5 Workflow Types
 1. **Expense Approval** (Threshold-based)
-   - Amounts ≤ $500: Supervisor approval
-   - Amounts > $500: Supervisor review → Executive approval
-
 2. **Leave Request** (Sequential)
-   - ≤ 5 days: Supervisor approval
-   - > 5 days: Supervisor → Executive approval
-
 3. **Task Assignment** (Simple)
-   - Create → Assign/Claim → Complete
+4. **Purchase Request** (Multi-level approval)
+5. **Project Approval** (Parallel review)
+
+See [Workflows Guide](guides/workflows.md) for detailed diagrams and logic.
 
 ### Key Implementation Details
 - **Workflow Service**: Centralized logic for task completion, escalation, and history tracking.

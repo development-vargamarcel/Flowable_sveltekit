@@ -7,6 +7,13 @@ import com.demo.bpm.dto.StartProcessRequest;
 import com.demo.bpm.service.FormDefinitionService;
 import com.demo.bpm.service.ProcessService;
 import com.demo.bpm.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,6 +37,11 @@ public class ProcessController {
     private final UserService userService;
     private final FormDefinitionService formDefinitionService;
 
+    @Operation(summary = "Get available processes for starting")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the processes",
+                    content = { @Content(mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = ProcessDTO.class))) }) })
     @GetMapping
     public ResponseEntity<List<ProcessDTO>> getAvailableProcesses() {
         // Return active latest processes for starting new instances
@@ -37,6 +49,11 @@ public class ProcessController {
         return ResponseEntity.ok(processes);
     }
 
+    @Operation(summary = "Get all process definitions")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found all process definitions",
+                    content = { @Content(mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = ProcessDTO.class))) }) })
     @GetMapping("/definitions")
     public ResponseEntity<List<ProcessDTO>> getAllProcessDefinitions() {
         // Return ALL definitions for management
@@ -44,14 +61,26 @@ public class ProcessController {
         return ResponseEntity.ok(processes);
     }
 
+    @Operation(summary = "Get a process definition by ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the process definition",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ProcessDTO.class)) }) })
     @GetMapping("/{id}")
-    public ResponseEntity<ProcessDTO> getProcessById(@PathVariable String id) {
+    public ResponseEntity<ProcessDTO> getProcessById(@Parameter(description = "ID of the process definition") @PathVariable String id) {
         return ResponseEntity.ok(processService.getProcessById(id));
     }
 
+    @Operation(summary = "Start a process instance")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Process started successfully",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @PostMapping("/{processKey}/start")
     public ResponseEntity<?> startProcess(
-            @PathVariable String processKey,
+            @Parameter(description = "Key of the process to start") @PathVariable String processKey,
             @RequestBody(required = false) StartProcessRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
         try {
@@ -82,8 +111,15 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Get a process instance by ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the process instance",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ProcessInstanceDTO.class)) }),
+            @ApiResponse(responseCode = "404", description = "Process instance not found",
+                    content = @Content) })
     @GetMapping("/instance/{processInstanceId}")
-    public ResponseEntity<?> getProcessInstance(@PathVariable String processInstanceId) {
+    public ResponseEntity<?> getProcessInstance(@Parameter(description = "ID of the process instance") @PathVariable String processInstanceId) {
         try {
             ProcessInstanceDTO instance = processService.getProcessInstance(processInstanceId);
             return ResponseEntity.ok(instance);
@@ -92,6 +128,11 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Get active processes for the current user")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the active processes",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Page.class)) }) })
     @GetMapping("/my-processes")
     public ResponseEntity<Page<ProcessInstanceDTO>> getMyProcesses(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -102,11 +143,23 @@ public class ProcessController {
         return ResponseEntity.ok(processes);
     }
 
+    @Operation(summary = "Get all users")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the users",
+                    content = { @Content(mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = Map.class))) }) })
     @GetMapping("/users")
     public ResponseEntity<?> getUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
+    @Operation(summary = "Deploy a new process definition")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Process deployed successfully",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @PostMapping("/deploy")
     public ResponseEntity<?> deployProcess(@RequestBody Map<String, String> request) {
         try {
@@ -139,8 +192,15 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Get BPMN XML for a process definition")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the BPMN XML",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @GetMapping("/{processDefinitionId}/bpmn")
-    public ResponseEntity<?> getProcessBpmn(@PathVariable String processDefinitionId) {
+    public ResponseEntity<?> getProcessBpmn(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
         try {
             String bpmnXml = processService.getProcessDefinitionBpmn(processDefinitionId);
             return ResponseEntity.ok(Map.of(
@@ -154,9 +214,16 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Delete a process definition")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Process definition deleted successfully",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @DeleteMapping("/{processDefinitionId}")
     public ResponseEntity<?> deleteProcess(
-            @PathVariable String processDefinitionId,
+            @Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId,
             @RequestParam(defaultValue = "false") boolean cascade) {
         try {
             processService.deleteProcessDefinition(processDefinitionId, cascade);
@@ -171,8 +238,15 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Suspend a process definition")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Process definition suspended",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @PutMapping("/{processDefinitionId}/suspend")
-    public ResponseEntity<?> suspendProcess(@PathVariable String processDefinitionId) {
+    public ResponseEntity<?> suspendProcess(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
         try {
             processService.suspendProcessDefinition(processDefinitionId);
             return ResponseEntity.ok(Map.of("message", "Process definition suspended"));
@@ -181,8 +255,15 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Activate a process definition")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Process definition activated",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @PutMapping("/{processDefinitionId}/activate")
-    public ResponseEntity<?> activateProcess(@PathVariable String processDefinitionId) {
+    public ResponseEntity<?> activateProcess(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
         try {
             processService.activateProcessDefinition(processDefinitionId);
             return ResponseEntity.ok(Map.of("message", "Process definition activated"));
@@ -191,9 +272,16 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Update process definition category")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Category updated",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @PutMapping("/{processDefinitionId}/category")
     public ResponseEntity<?> updateCategory(
-            @PathVariable String processDefinitionId,
+            @Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId,
             @RequestBody Map<String, String> body) {
         try {
             String category = body.get("category");
@@ -204,8 +292,15 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Get start form definition")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the start form definition",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = FormDefinitionDTO.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @GetMapping("/{processDefinitionId}/start-form")
-    public ResponseEntity<?> getStartFormDefinition(@PathVariable String processDefinitionId) {
+    public ResponseEntity<?> getStartFormDefinition(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
         try {
             FormDefinitionDTO formDefinition = formDefinitionService.getStartFormDefinition(processDefinitionId);
             return ResponseEntity.ok(formDefinition);
@@ -217,8 +312,15 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Get all form definitions for a process")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the form definitions",
+                    content = { @Content(mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = FormDefinitionDTO.class))) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @GetMapping("/{processDefinitionId}/forms")
-    public ResponseEntity<?> getAllFormDefinitions(@PathVariable String processDefinitionId) {
+    public ResponseEntity<?> getAllFormDefinitions(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
         try {
             var formDefinitions = formDefinitionService.getAllFormDefinitions(processDefinitionId);
             return ResponseEntity.ok(formDefinitions);
@@ -230,10 +332,17 @@ public class ProcessController {
         }
     }
 
+    @Operation(summary = "Get form definition for a specific element")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the form definition",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = FormDefinitionDTO.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
     @GetMapping("/{processDefinitionId}/forms/{elementId}")
     public ResponseEntity<?> getFormDefinitionForElement(
-            @PathVariable String processDefinitionId,
-            @PathVariable String elementId) {
+            @Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId,
+            @Parameter(description = "Element ID (e.g. task ID)") @PathVariable String elementId) {
         try {
             FormDefinitionDTO formDefinition = formDefinitionService.getFormDefinitionForElement(
                     processDefinitionId, elementId);

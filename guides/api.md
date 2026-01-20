@@ -24,9 +24,13 @@ The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 
 | Method | Endpoint | Description |
 | hum | hum | hum |
-| GET | `/api/processes` | List all process definitions. |
+| GET | `/api/processes` | List available processes for starting. |
+| GET | `/api/processes/definitions` | List all process definitions. |
+| GET | `/api/processes/{id}` | Get process definition details. |
 | POST | `/api/processes/{key}/start` | Start a process instance. Body: `StartProcessRequest`. |
+| GET | `/api/processes/instance/{id}` | Get process instance details. |
 | GET | `/api/processes/my-processes` | List processes started by the current user. |
+| POST | `/api/processes/deploy` | Deploy a new process (BPMN XML). |
 
 ## Dashboard
 
@@ -39,3 +43,15 @@ The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 | Method | Endpoint | Description |
 | hum | hum | hum |
 | GET | `/api/slas/stats` | Returns SLA statistics (`SlaStatsDTO`). |
+
+## Database
+
+| Method | Endpoint | Description |
+| hum | hum | hum |
+| POST | `/api/database/seed` | Seed the database with initial data (users, groups, document types). |
+
+## Documents
+
+| Method | Endpoint | Description |
+| hum | hum | hum |
+| GET | `/api/document-types` | List all available document types. |

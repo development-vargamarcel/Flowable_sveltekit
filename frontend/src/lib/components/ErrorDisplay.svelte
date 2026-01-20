@@ -43,7 +43,7 @@
 </script>
 
 {#if error}
-	<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+	<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg" role="alert">
 		<div class="flex items-start">
 			<div class="flex-1">
 				<h3 class="font-bold">{title}</h3>

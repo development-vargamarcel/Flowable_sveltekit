@@ -16,10 +16,12 @@
 			{@render icon()}
 		{:else}
 			<svg
-				class="w-12 h-12 text-gray-300 mb-3"
+				class="w-12 h-12 text-gray-400 mb-3"
 				fill="none"
 				viewBox="0 0 24 24"
 				stroke="currentColor"
+				aria-hidden="true"
+				role="img"
 			>
 				<path
 					stroke-linecap="round"

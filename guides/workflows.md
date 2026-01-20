@@ -1,6 +1,6 @@
 # Workflows
 
-The application includes three core BPMN workflows.
+The application includes five core BPMN workflows.
 
 ## 1. Expense Approval (`expense-approval`)
 
@@ -44,3 +44,41 @@ A simple ad-hoc task assignment workflow.
 2. **Task Work**: A user task is created and assigned to the specified `assignee` (or `USER` group).
    - The assignee works on the task and completes it.
 3. **End**: Process completes.
+
+## 4. Purchase Request (`purchase-request`)
+
+A multi-level approval process based on purchase amount.
+
+### Flow
+1. **Start**: User submits a purchase request with an `amount`.
+2. **Auto-Approval Check**:
+   - If `amount <= 1000`: Auto-approved.
+   - If `amount > 1000`: Moves to Supervisor Approval.
+3. **Supervisor Approval**: Assigned to `SUPERVISOR` group.
+   - If `amount <= 5000`: Ends after approval.
+   - If `amount > 5000`: Moves to Manager Approval.
+4. **Manager Approval**: Assigned to `MANAGER` group.
+   - If `amount <= 20000`: Ends after approval.
+   - If `amount > 20000`: Moves to Director Approval.
+5. **Director Approval**: Assigned to `DIRECTOR` group.
+   - If `amount <= 50000`: Ends after approval.
+   - If `amount > 50000`: Moves to Executive Approval.
+6. **Executive Approval**: Assigned to `EXECUTIVE` group.
+7. **End**: Process completes.
+
+## 5. Project Approval (`project-approval`)
+
+A parallel approval process for project initiation.
+
+### Flow
+1. **Start**: User submits a project proposal with `budget` and `projectType`.
+2. **Parallel Review**: The process splits into parallel paths:
+   - **Technical Review**: Assigned to `MANAGER`. Always required.
+   - **Financial Review**: Assigned to `MANAGER`. Always required.
+   - **Legal Review**: Assigned to `MANAGER`. Required if `budget > 25000` OR `projectType` is 'legal' or 'compliance'.
+3. **Join**: The process waits for all active reviews to complete.
+4. **Budget Check**:
+   - If `budget <= 100000`: Process ends.
+   - If `budget > 100000`: Moves to Executive Approval.
+5. **Executive Approval**: Assigned to `EXECUTIVE` group.
+6. **End**: Process completes.
