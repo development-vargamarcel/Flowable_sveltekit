@@ -77,9 +77,8 @@ public class FormDefinitionService {
      * Get form definition for a specific element in a process
      */
     public FormDefinitionDTO getFormDefinitionForElement(String processDefinitionId, String elementId) {
-        try {
+        try (InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId)) {
             // Get the BPMN XML
-            InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId);
             String bpmnXml = new String(bpmnStream.readAllBytes(), StandardCharsets.UTF_8);
 
             // Parse BPMN XML to find form definitions
@@ -97,9 +96,8 @@ public class FormDefinitionService {
     public Map<String, FormDefinitionDTO> getAllFormDefinitions(String processDefinitionId) {
         Map<String, FormDefinitionDTO> formDefinitions = new HashMap<>();
 
-        try {
+        try (InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId)) {
             BpmnModel bpmnModel = repositoryService.getBpmnModel(processDefinitionId);
-            InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId);
             String bpmnXml = new String(bpmnStream.readAllBytes(), StandardCharsets.UTF_8);
 
             // Get start event form
@@ -359,8 +357,7 @@ public class FormDefinitionService {
      * Get process-level form configuration including field library and condition rules
      */
     public ProcessFormConfigDTO getProcessFormConfig(String processDefinitionId) {
-        try {
-            InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId);
+        try (InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId)) {
             String bpmnXml = new String(bpmnStream.readAllBytes(), StandardCharsets.UTF_8);
 
             return parseProcessFormConfigFromXml(bpmnXml, processDefinitionId);

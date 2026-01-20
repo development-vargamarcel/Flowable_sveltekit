@@ -152,13 +152,21 @@ export class ExpressionEvaluator {
 
     const hasAnyRoleMatch = expr.match(/^hasAnyRole\((.+)\)$/);
     if (hasAnyRoleMatch) {
-      const roles = this.parseArrayValues(hasAnyRoleMatch[1]);
+      let args = hasAnyRoleMatch[1].trim();
+      if (args.startsWith('[') && args.endsWith(']')) {
+        args = args.slice(1, -1);
+      }
+      const roles = this.parseArrayValues(args);
       return roles.some(role => this.context.user.roles.includes(String(role)));
     }
 
     const hasAnyGroupMatch = expr.match(/^hasAnyGroup\((.+)\)$/);
     if (hasAnyGroupMatch) {
-      const groups = this.parseArrayValues(hasAnyGroupMatch[1]);
+      let args = hasAnyGroupMatch[1].trim();
+      if (args.startsWith('[') && args.endsWith(']')) {
+        args = args.slice(1, -1);
+      }
+      const groups = this.parseArrayValues(args);
       return groups.some(group => this.context.user.groups.includes(String(group)));
     }
 

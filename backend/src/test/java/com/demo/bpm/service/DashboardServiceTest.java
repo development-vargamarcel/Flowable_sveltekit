@@ -76,6 +76,7 @@ class DashboardServiceTest {
         when(processInstanceQuery.variableValueGreaterThan(anyString(), anyInt())).thenReturn(processInstanceQuery);
 
         // Active processes list
+        when(processInstanceQuery.includeProcessVariables()).thenReturn(processInstanceQuery);
         when(processInstanceQuery.orderByStartTime()).thenReturn(processInstanceQuery);
         when(processInstanceQuery.desc()).thenReturn(processInstanceQuery);
         ProcessInstance processInstance = mock(ProcessInstance.class);
