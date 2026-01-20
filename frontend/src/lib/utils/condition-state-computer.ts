@@ -124,21 +124,20 @@ export class ConditionStateComputer {
           break;
         case 'visible':
           // Only makes visible if not already hidden by another rule
-          // Since we process rules and hidden wins, we don't change isHidden here
           // This effect is useful for overriding static hidden=true
           if (!appliedRules.some(id =>
             rules.find(r => r.id === id && r.effect === 'hidden')
           )) {
-            isHidden = field.hidden; // Reset to original
+            isHidden = false;
           }
           break;
         case 'editable':
           // Only makes editable if not already readonly by another rule
-          // Similar logic - editable can't override readonly from other rules
+          // This allows overriding static readonly=true
           if (!appliedRules.some(id =>
             rules.find(r => r.id === id && r.effect === 'readonly')
           )) {
-            isReadonly = field.readonly || this.options.formReadonly || false;
+            isReadonly = !!this.options.formReadonly;
           }
           break;
       }
