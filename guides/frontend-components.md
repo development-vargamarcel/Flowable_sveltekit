@@ -235,3 +235,19 @@ Available validation rules:
 - `rules.email(message?)`
 - `rules.dateAfter(getMinDate, message?)`
 - `rules.dateBefore(getMaxDate, message?)`
+
+# Notifications Page
+
+A dedicated page for managing system notifications (`/notifications`).
+
+## Features
+
+- Lists all user notifications
+- Filtering by type (icon indicators)
+- "Mark all as read" functionality
+- Optimistic UI updates
+- Links to relevant tasks or processes
+
+## Usage
+
+This page is automatically linked from the `NotificationBell` component in the navbar.

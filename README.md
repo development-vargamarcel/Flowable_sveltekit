@@ -23,6 +23,11 @@ Detailed documentation is available in the `guides/` directory:
 4. **Purchase Request** (Multi-level approval)
 5. **Project Approval** (Parallel review)
 
+### Notification System
+- **Notifications Page**: Dedicated view for managing alerts.
+- **In-App Alerts**: Real-time notifications for task assignments and SLA warnings.
+- **Backend Integration**: Centralized `NotificationService` with logging.
+
 See [Workflows Guide](guides/workflows.md) for detailed diagrams and logic.
 
 ### Key Implementation Details

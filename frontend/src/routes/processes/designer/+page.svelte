@@ -250,14 +250,14 @@
 
       // Convert field library to storable format
       const libraryData = {
-        fields: fieldLibrary.fields.map((f) => ({
+        fields: fieldLibrary.fields.map((f: FormField) => ({
           ...f,
           options: f.options || [],
           validation: f.validation || null
         })),
-        grids: fieldLibrary.grids.map((g) => ({
+        grids: fieldLibrary.grids.map((g: FormGrid) => ({
           ...g,
-          columns: g.columns.map((c) => ({
+          columns: g.columns.map((c: any) => ({
             ...c,
             options: c.options || [],
             validation: c.validation || null
@@ -271,12 +271,12 @@
       });
 
       // Update process variables
-      fieldLibrary.fields.forEach((field) => {
+      fieldLibrary.fields.forEach((field: FormField) => {
         if (field.name && !processVariables.includes(field.name)) {
           processVariables = [...processVariables, field.name];
         }
       });
-      fieldLibrary.grids.forEach((grid) => {
+      fieldLibrary.grids.forEach((grid: FormGrid) => {
         if (grid.name && !processVariables.includes(grid.name)) {
           processVariables = [...processVariables, grid.name];
         }
@@ -3649,8 +3649,9 @@
         {#if showGridConfig}
           <div class="mt-3 flex items-center gap-4 rounded bg-gray-50 p-3">
             <div>
-              <label class="block text-xs font-medium text-gray-700">Grid Columns</label>
+              <label for="form-grid-columns" class="block text-xs font-medium text-gray-700">Grid Columns</label>
               <select
+                id="form-grid-columns"
                 bind:value={formGridColumns}
                 class="mt-1 rounded border border-gray-300 px-2 py-1 text-sm"
               >
@@ -3661,8 +3662,9 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-700">Gap (px)</label>
+              <label for="form-grid-gap" class="block text-xs font-medium text-gray-700">Gap (px)</label>
               <input
+                id="form-grid-gap"
                 type="number"
                 bind:value={formGridGap}
                 min="0"
@@ -3704,8 +3706,17 @@
               <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
                 <!-- Field Header -->
                 <div
-                  class="flex cursor-pointer items-center justify-between rounded-t-lg bg-gray-50 p-3"
+                  role="button"
+                  tabindex="0"
+                  class="flex w-full cursor-pointer items-center justify-between rounded-t-lg bg-gray-50 p-3 text-left"
                   onclick={() => (expandedFieldIndex = expandedFieldIndex === index ? null : index)}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      expandedFieldIndex = expandedFieldIndex === index ? null : index;
+                    }
+                  }}
+                  aria-expanded={expandedFieldIndex === index}
                 >
                   <div class="flex items-center gap-3">
                     <span
@@ -3731,6 +3742,7 @@
                       }}
                       class="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
                       disabled={index === 0}
+                      aria-label="Move field up"
                     >
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
@@ -3748,6 +3760,7 @@
                       }}
                       class="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
                       disabled={index === formFields.length - 1}
+                      aria-label="Move field down"
                     >
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
@@ -3817,10 +3830,11 @@
                     <!-- Basic Settings -->
                     <div class="grid gap-4 md:grid-cols-4">
                       <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="field-name-{index}" class="mb-1 block text-xs font-medium text-gray-700"
                           >Variable Name <span class="text-red-500">*</span></label
                         >
                         <input
+                          id="field-name-{index}"
                           type="text"
                           bind:value={field.name}
                           placeholder="fieldName"
@@ -3828,10 +3842,11 @@
                         />
                       </div>
                       <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="field-label-{index}" class="mb-1 block text-xs font-medium text-gray-700"
                           >Label <span class="text-red-500">*</span></label
                         >
                         <input
+                          id="field-label-{index}"
                           type="text"
                           bind:value={field.label}
                           placeholder="Display Label"
@@ -3839,8 +3854,9 @@
                         />
                       </div>
                       <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-700">Type</label>
+                        <label for="field-type-{index}" class="mb-1 block text-xs font-medium text-gray-700">Type</label>
                         <select
+                          id="field-type-{index}"
                           bind:value={field.type}
                           class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
                         >
@@ -3872,10 +3888,11 @@
                     <!-- Additional Settings -->
                     <div class="mt-4 grid gap-4 md:grid-cols-3">
                       <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="field-placeholder-{index}" class="mb-1 block text-xs font-medium text-gray-700"
                           >Placeholder</label
                         >
                         <input
+                          id="field-placeholder-{index}"
                           type="text"
                           bind:value={field.placeholder}
                           placeholder="Enter placeholder text"
@@ -3883,10 +3900,11 @@
                         />
                       </div>
                       <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="field-default-{index}" class="mb-1 block text-xs font-medium text-gray-700"
                           >Default Value</label
                         >
                         <input
+                          id="field-default-{index}"
                           type="text"
                           bind:value={field.defaultValue}
                           placeholder="Default value"
@@ -3894,8 +3912,9 @@
                         />
                       </div>
                       <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-700">Tooltip</label>
+                        <label for="field-tooltip-{index}" class="mb-1 block text-xs font-medium text-gray-700">Tooltip</label>
                         <input
+                          id="field-tooltip-{index}"
                           type="text"
                           bind:value={field.tooltip}
                           placeholder="Help text"
@@ -3905,8 +3924,9 @@
                     </div>
 
                     <div class="mt-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Visibility Expression</label>
+                      <label for="field-visibility-{index}" class="mb-1 block text-xs font-medium text-gray-700">Visibility Expression</label>
                       <input
+                        id="field-visibility-{index}"
                         type="text"
                         bind:value={field.visibilityExpression}
                         placeholder={'\${showField == true}'}
@@ -3916,12 +3936,13 @@
 
                     <!-- Grid Layout -->
                     <div class="mt-4">
-                      <label class="mb-2 block text-xs font-medium text-gray-700">Grid Layout</label
+                      <h5 class="mb-2 block text-xs font-medium text-gray-700">Grid Layout</h5
                       >
                       <div class="grid gap-4 md:grid-cols-3">
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">Column</label>
+                          <label for="field-gridcol-{index}" class="mb-1 block text-xs text-gray-600">Column</label>
                           <select
+                            id="field-gridcol-{index}"
                             bind:value={field.gridColumn}
                             class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
                           >
@@ -3931,8 +3952,9 @@
                           </select>
                         </div>
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">Width (columns)</label>
+                          <label for="field-gridwidth-{index}" class="mb-1 block text-xs text-gray-600">Width (columns)</label>
                           <select
+                            id="field-gridwidth-{index}"
                             bind:value={field.gridWidth}
                             class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
                           >
@@ -3942,8 +3964,9 @@
                           </select>
                         </div>
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">CSS Class</label>
+                          <label for="field-css-{index}" class="mb-1 block text-xs text-gray-600">CSS Class</label>
                           <input
+                            id="field-css-{index}"
                             type="text"
                             bind:value={field.cssClass}
                             placeholder="custom-class"
@@ -3956,7 +3979,7 @@
                     <!-- Options for Select/Radio/Multiselect -->
                     {#if field.type === 'select' || field.type === 'multiselect' || field.type === 'radio'}
                       <div class="mt-4">
-                        <label class="mb-2 block text-xs font-medium text-gray-700">Options</label>
+                        <h5 class="mb-2 block text-xs font-medium text-gray-700">Options</h5>
                         <div class="space-y-2">
                           {#each field.options as option, optIndex}
                             <div class="flex gap-2">
@@ -3975,6 +3998,7 @@
                               <button
                                 onclick={() => removeFieldOption(index, optIndex)}
                                 class="rounded bg-red-100 px-2 py-1 text-red-600 hover:bg-red-200"
+                                aria-label="Remove option"
                               >
                                 <svg
                                   class="h-4 w-4"
@@ -4004,12 +4028,13 @@
 
                     <!-- Validation Rules -->
                     <div class="mt-4">
-                      <label class="mb-2 block text-xs font-medium text-gray-700">Validation</label>
+                      <h5 class="mb-2 block text-xs font-medium text-gray-700">Validation</h5>
                       <div class="grid gap-4 md:grid-cols-4">
                         {#if field.type === 'text' || field.type === 'textarea' || field.type === 'email' || field.type === 'phone'}
                           <div>
-                            <label class="mb-1 block text-xs text-gray-600">Min Length</label>
+                            <label for="field-minlen-{index}" class="mb-1 block text-xs text-gray-600">Min Length</label>
                             <input
+                              id="field-minlen-{index}"
                               type="number"
                               bind:value={field.validation.minLength}
                               min="0"
@@ -4017,8 +4042,9 @@
                             />
                           </div>
                           <div>
-                            <label class="mb-1 block text-xs text-gray-600">Max Length</label>
+                            <label for="field-maxlen-{index}" class="mb-1 block text-xs text-gray-600">Max Length</label>
                             <input
+                              id="field-maxlen-{index}"
                               type="number"
                               bind:value={field.validation.maxLength}
                               min="0"
@@ -4028,16 +4054,18 @@
                         {/if}
                         {#if field.type === 'number' || field.type === 'currency' || field.type === 'percentage'}
                           <div>
-                            <label class="mb-1 block text-xs text-gray-600">Min Value</label>
+                            <label for="field-minval-{index}" class="mb-1 block text-xs text-gray-600">Min Value</label>
                             <input
+                              id="field-minval-{index}"
                               type="number"
                               bind:value={field.validation.min}
                               class="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                             />
                           </div>
                           <div>
-                            <label class="mb-1 block text-xs text-gray-600">Max Value</label>
+                            <label for="field-maxval-{index}" class="mb-1 block text-xs text-gray-600">Max Value</label>
                             <input
+                              id="field-maxval-{index}"
                               type="number"
                               bind:value={field.validation.max}
                               class="w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -4045,8 +4073,9 @@
                           </div>
                         {/if}
                         <div class="md:col-span-2">
-                          <label class="mb-1 block text-xs text-gray-600">Pattern (Regex)</label>
+                          <label for="field-pattern-{index}" class="mb-1 block text-xs text-gray-600">Pattern (Regex)</label>
                           <input
+                            id="field-pattern-{index}"
                             type="text"
                             bind:value={field.validation.pattern}
                             placeholder="^[A-Za-z]+$"
@@ -4055,10 +4084,11 @@
                         </div>
                       </div>
                       <div class="mt-2">
-                        <label class="mb-1 block text-xs text-gray-600"
+                        <label for="field-customval-{index}" class="mb-1 block text-xs text-gray-600"
                           >Custom Validation Expression</label
                         >
                         <input
+                          id="field-customval-{index}"
                           type="text"
                           bind:value={field.validation.customExpression}
                           placeholder={'${value > 0 && value < 1000}'}
@@ -4069,13 +4099,14 @@
 
                     <!-- Dynamic Behavior -->
                     <div class="mt-4">
-                      <label class="mb-2 block text-xs font-medium text-gray-700"
-                        >Dynamic Behavior</label
+                      <h5 class="mb-2 block text-xs font-medium text-gray-700"
+                        >Dynamic Behavior</h5
                       >
                       <div class="grid gap-4 md:grid-cols-2">
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">Hidden Expression</label>
+                          <label for="field-hidden-{index}" class="mb-1 block text-xs text-gray-600">Hidden Expression</label>
                           <input
+                            id="field-hidden-{index}"
                             type="text"
                             bind:value={field.hiddenExpression}
                             placeholder={'${showField == false}'}
@@ -4083,9 +4114,10 @@
                           />
                         </div>
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">Readonly Expression</label
+                          <label for="field-readonly-{index}" class="mb-1 block text-xs text-gray-600">Readonly Expression</label
                           >
                           <input
+                            id="field-readonly-{index}"
                             type="text"
                             bind:value={field.readonlyExpression}
                             placeholder={"${status == 'approved'}"}
@@ -4095,8 +4127,9 @@
                       </div>
                       <div class="mt-2 grid gap-4 md:grid-cols-2">
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">Required Expression</label>
+                          <label for="field-required-{index}" class="mb-1 block text-xs text-gray-600">Required Expression</label>
                           <input
+                            id="field-required-{index}"
                             type="text"
                             bind:value={field.requiredExpression}
                             placeholder={'${amount > 1000}'}
@@ -4104,8 +4137,9 @@
                           />
                         </div>
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">Calculation Expression</label>
+                          <label for="field-calc-{index}" class="mb-1 block text-xs text-gray-600">Calculation Expression</label>
                           <input
+                            id="field-calc-{index}"
                             type="text"
                             bind:value={field.calculationExpression}
                             placeholder={'${price * quantity}'}
@@ -4117,13 +4151,14 @@
 
                     <!-- JavaScript Event Handlers -->
                     <div class="mt-4">
-                      <label class="mb-2 block text-xs font-medium text-gray-700"
-                        >Event Handlers (JavaScript)</label
+                      <h5 class="mb-2 block text-xs font-medium text-gray-700"
+                        >Event Handlers (JavaScript)</h5
                       >
                       <div class="grid gap-4 md:grid-cols-2">
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">On Change</label>
+                          <label for="field-onchange-{index}" class="mb-1 block text-xs text-gray-600">On Change</label>
                           <textarea
+                            id="field-onchange-{index}"
                             bind:value={field.onChange}
                             placeholder="// value contains the new value&#10;console.log('Changed:', value);"
                             rows="2"
@@ -4131,8 +4166,9 @@
                           ></textarea>
                         </div>
                         <div>
-                          <label class="mb-1 block text-xs text-gray-600">On Blur</label>
+                          <label for="field-onblur-{index}" class="mb-1 block text-xs text-gray-600">On Blur</label>
                           <textarea
+                            id="field-onblur-{index}"
                             bind:value={field.onBlur}
                             placeholder="// Validate or transform value&#10;return value.trim();"
                             rows="2"
@@ -4839,8 +4875,9 @@
                                     <h6 class="text-xs font-medium text-gray-700 mb-2">Dynamic Behavior</h6>
                                     <div class="grid gap-3 md:grid-cols-2">
                                       <div>
-                                        <label class="mb-1 block text-xs text-gray-600">Hidden Expr.</label>
+                                        <label for="col-hidden-{gridIndex}-{colIndex}" class="mb-1 block text-xs text-gray-600">Hidden Expr.</label>
                                         <input
+                                          id="col-hidden-{gridIndex}-{colIndex}"
                                           type="text"
                                           bind:value={column.hiddenExpression}
                                           placeholder={'${hideCol}'}
@@ -4848,8 +4885,9 @@
                                         />
                                       </div>
                                       <div>
-                                        <label class="mb-1 block text-xs text-gray-600">Readonly Expr.</label>
+                                        <label for="col-readonly-{gridIndex}-{colIndex}" class="mb-1 block text-xs text-gray-600">Readonly Expr.</label>
                                         <input
+                                          id="col-readonly-{gridIndex}-{colIndex}"
                                           type="text"
                                           bind:value={column.readonlyExpression}
                                           placeholder={'${readonly}'}
@@ -4857,8 +4895,9 @@
                                         />
                                       </div>
                                       <div>
-                                        <label class="mb-1 block text-xs text-gray-600">Required Expr.</label>
+                                        <label for="col-required-{gridIndex}-{colIndex}" class="mb-1 block text-xs text-gray-600">Required Expr.</label>
                                         <input
+                                          id="col-required-{gridIndex}-{colIndex}"
                                           type="text"
                                           bind:value={column.requiredExpression}
                                           placeholder={'${required}'}
@@ -4866,8 +4905,9 @@
                                         />
                                       </div>
                                       <div>
-                                        <label class="mb-1 block text-xs text-gray-600">Calculation Expr.</label>
+                                        <label for="col-calc-{gridIndex}-{colIndex}" class="mb-1 block text-xs text-gray-600">Calculation Expr.</label>
                                         <input
+                                          id="col-calc-{gridIndex}-{colIndex}"
                                           type="text"
                                           bind:value={column.calculationExpression}
                                           placeholder={'${row.price * row.qty}'}
@@ -4939,6 +4979,7 @@
           <button
             onclick={() => (showScriptEditor = false)}
             class="text-gray-400 hover:text-gray-600"
+            aria-label="Close script editor"
           >
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -4955,8 +4996,9 @@
       <div class="p-4">
         <div class="mb-3 flex gap-4">
           <div class="flex-1">
-            <label class="mb-1 block text-sm font-medium text-gray-700">Script Format</label>
+            <label for="script-format-select" class="mb-1 block text-sm font-medium text-gray-700">Script Format</label>
             <select
+              id="script-format-select"
               bind:value={scriptFormat}
               class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             >
@@ -4966,8 +5008,9 @@
             </select>
           </div>
           <div class="flex-1">
-            <label class="mb-1 block text-sm font-medium text-gray-700">Insert Variable</label>
+            <label for="insert-variable-select" class="mb-1 block text-sm font-medium text-gray-700">Insert Variable</label>
             <select
+              id="insert-variable-select"
               onchange={(e) => {
                 if (e.currentTarget.value) {
                   scriptCode += `execution.getVariable('${e.currentTarget.value}')`;
@@ -4991,8 +5034,9 @@
         {/if}
 
         <div class="mb-3">
-          <label class="mb-1 block text-sm font-medium text-gray-700">Script Code</label>
+          <label for="script-code-editor" class="mb-1 block text-sm font-medium text-gray-700">Script Code</label>
           <textarea
+            id="script-code-editor"
             bind:value={scriptCode}
             rows="18"
             class="w-full rounded border border-gray-300 p-3 font-mono text-sm focus:border-blue-500 focus:outline-none"
@@ -5120,6 +5164,7 @@ execution.setVariable('total', total)`
           <button
             onclick={() => (showExpressionTester = false)}
             class="text-gray-400 hover:text-gray-600"
+            aria-label="Close expression tester"
           >
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -5131,8 +5176,9 @@ execution.setVariable('total', total)`
       <div class="p-4 grid gap-4">
           <div class="grid grid-cols-2 gap-4">
               <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Test Context (JSON)</label>
+                  <label for="test-context-json" class="block text-sm font-medium text-gray-700 mb-1">Test Context (JSON)</label>
                   <textarea
+                    id="test-context-json"
                     bind:value={testContextJson}
                     rows="8"
                     class="w-full rounded border border-gray-300 p-2 font-mono text-xs focus:border-blue-500 focus:outline-none"
@@ -5140,8 +5186,9 @@ execution.setVariable('total', total)`
               </div>
               <div class="flex flex-col">
                   <div class="mb-4">
-                      <label class="block text-sm font-medium text-gray-700 mb-1">Expression to Test</label>
+                      <label for="expression-to-test" class="block text-sm font-medium text-gray-700 mb-1">Expression to Test</label>
                       <textarea
+                        id="expression-to-test"
                         bind:value={testExpression}
                         placeholder={'\${amount > 500}'}
                         rows="3"
@@ -5157,8 +5204,8 @@ execution.setVariable('total', total)`
                   </button>
 
                   <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-1">Result</label>
-                      <div class="w-full h-24 rounded border border-gray-300 p-2 bg-gray-50 overflow-auto">
+                      <label for="test-result-output" class="block text-sm font-medium text-gray-700 mb-1">Result</label>
+                      <div id="test-result-output" class="w-full h-24 rounded border border-gray-300 p-2 bg-gray-50 overflow-auto">
                           {#if testError}
                              <span class="text-red-600 font-mono text-sm">{testError}</span>
                           {:else if testResult}
@@ -5185,6 +5232,7 @@ execution.setVariable('total', total)`
           <button
             onclick={() => (showExpressionBuilder = false)}
             class="text-gray-400 hover:text-gray-600"
+            aria-label="Close expression builder"
           >
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -5200,8 +5248,9 @@ execution.setVariable('total', total)`
 
       <div class="p-4">
         <div class="mb-4">
-          <label class="mb-1 block text-sm font-medium text-gray-700">Expression</label>
+          <label for="expression-builder-input" class="mb-1 block text-sm font-medium text-gray-700">Expression</label>
           <input
+            id="expression-builder-input"
             type="text"
             bind:value={expressionValue}
             placeholder={'${variable}'}
