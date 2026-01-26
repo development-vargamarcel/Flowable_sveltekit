@@ -1,16 +1,6 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api/client';
-
-export interface Notification {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'TASK_ASSIGNED' | 'TASK_DUE_SOON' | 'TASK_OVERDUE' | 'PROCESS_COMPLETED' | 'PROCESS_REJECTED' | 'MENTION' | 'SYSTEM';
-  link?: string;
-  read: boolean;
-  createdAt: string;
-}
+import type { Notification } from '$lib/types';
 
 function createNotificationStore() {
   let notifications = $state<Notification[]>([]);

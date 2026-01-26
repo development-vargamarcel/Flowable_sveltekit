@@ -1,5 +1,3 @@
-import type { Page } from './index';
-
 export interface ProcessDTO {
     id: string;
     key: string;
@@ -282,4 +280,77 @@ export interface Page<T> {
     numberOfElements: number;
     first: boolean;
     empty: boolean;
+}
+
+export interface Notification {
+    id: string;
+    userId: string;
+    title: string;
+    message: string;
+    type: 'TASK_ASSIGNED' | 'TASK_DUE_SOON' | 'TASK_OVERDUE' | 'PROCESS_COMPLETED' | 'PROCESS_REJECTED' | 'SLA_WARNING' | 'SLA_BREACH' | 'INFO';
+    link?: string;
+    read: boolean;
+    createdAt: string;
+}
+
+export interface SlaStats {
+    totalActiveSlas: number;
+    breachedSlas: number;
+    atRiskSlas: number;
+    compliantSlas: number;
+    breachRate: number;
+    averageResolutionTime: number; // in hours
+}
+
+export interface LoginRequest {
+    username: string;
+    password: string;
+}
+
+export interface EscalationOptions {
+    levels: string[];
+    canEscalate: boolean;
+    canDeEscalate: boolean;
+    currentLevel: string;
+}
+
+export interface EscalationRequest {
+    reason: string;
+    toLevel?: string;
+    targetUser?: string;
+}
+
+export interface TableColumn {
+    name: string;
+    type: string;
+    primaryKey: boolean;
+    nullable: boolean;
+}
+
+export interface DocumentDTO {
+    id: string;
+    name: string;
+    type: string;
+    content: string;
+    mimeType: string;
+    size: number;
+    createdAt: string;
+    createdBy: string;
+}
+
+export interface GridRowDTO {
+    id: string;
+    data: Record<string, any>;
+    createdAt: string;
+    createdBy: string;
+}
+
+export interface SaveDocumentRequest {
+    name: string;
+    type: string;
+    content: string;
+}
+
+export interface SaveGridRowsRequest {
+    rows: Record<string, any>[];
 }

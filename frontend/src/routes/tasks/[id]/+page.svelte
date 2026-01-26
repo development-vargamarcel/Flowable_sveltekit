@@ -325,7 +325,7 @@
 
 	// Get variables to display (excluding system variables)
 	function getDisplayVariables(): Array<[string, unknown]> {
-		if (!taskDetails) return [];
+		if (!taskDetails || !taskDetails.variables) return [];
 		return Object.entries(taskDetails.variables).filter(([key]) => !excludedKeys.includes(key));
 	}
 </script>
@@ -357,7 +357,7 @@
 		</div>
 	{:else if taskDetails}
 		{@const task = taskDetails.task}
-		{@const formConfig = getFormFields(task.formKey)}
+		{@const formConfig = getFormFields(task.formKey || null)}
 		{@const displayVariables = getDisplayVariables()}
 
 		<!-- Task Header -->

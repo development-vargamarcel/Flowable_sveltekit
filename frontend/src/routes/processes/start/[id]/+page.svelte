@@ -162,8 +162,8 @@
 						<DynamicForm
 							bind:this={dynamicFormRef}
 							fields={formDefinition.fields}
-							grids={formDefinition.grids}
-							gridConfig={formDefinition.gridConfig}
+							grids={formDefinition.grids || []}
+							gridConfig={formDefinition.gridConfig || {}}
 							onValuesChange={handleFormChange}
 						/>
 					</div>

@@ -3,6 +3,7 @@ package com.demo.bpm.service;
 import com.demo.bpm.entity.Notification;
 import com.demo.bpm.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -32,6 +34,7 @@ public class NotificationService {
     @Transactional
     public Notification createNotification(String userId, String title, String message, 
                                          Notification.NotificationType type, String link) {
+        log.info("Creating notification for user: {}, type: {}", userId, type);
         Notification notification = new Notification();
         notification.setUserId(userId);
         notification.setTitle(title);
@@ -59,6 +62,7 @@ public class NotificationService {
 
     @Transactional
     public void markAsRead(String notificationId) {
+        log.info("Marking notification {} as read", notificationId);
         notificationRepository.findById(notificationId).ifPresent(notification -> {
             notification.setRead(true);
             notificationRepository.save(notification);
@@ -67,6 +71,7 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(String userId) {
+        log.info("Marking all notifications as read for user: {}", userId);
         List<Notification> userNotifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
         userNotifications.forEach(notification -> notification.setRead(true));
         notificationRepository.saveAll(userNotifications);
