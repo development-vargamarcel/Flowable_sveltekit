@@ -12,16 +12,45 @@
 	let loading = $state(true);
 	let error = $state('');
 	let activeTab = $state<'all' | 'assigned' | 'claimable'>('all');
+	let searchQuery = $state('');
+	let sortOption = $state<'newest' | 'oldest' | 'priority'>('newest');
 
 	const filteredTasks = $derived.by(() => {
+		let tasks = allTasks;
+
+		// Filter by tab
 		switch (activeTab) {
 			case 'assigned':
-				return allTasks.filter((t) => t.assignee === authStore.user?.username);
+				tasks = tasks.filter((t) => t.assignee === authStore.user?.username);
+				break;
 			case 'claimable':
-				return allTasks.filter((t) => !t.assignee);
-			default:
-				return allTasks;
+				tasks = tasks.filter((t) => !t.assignee);
+				break;
 		}
+
+		// Filter by search query
+		if (searchQuery) {
+			const query = searchQuery.toLowerCase();
+			tasks = tasks.filter(
+				(t) =>
+					t.name.toLowerCase().includes(query) ||
+					(t.assignee && t.assignee.toLowerCase().includes(query)) ||
+					(t.description && t.description.toLowerCase().includes(query))
+			);
+		}
+
+		// Sort
+		return [...tasks].sort((a, b) => {
+			if (sortOption === 'priority') {
+				// Higher priority number first
+				return b.priority - a.priority;
+			} else if (sortOption === 'oldest') {
+				return new Date(a.createTime).getTime() - new Date(b.createTime).getTime();
+			} else {
+				// newest
+				return new Date(b.createTime).getTime() - new Date(a.createTime).getTime();
+			}
+		});
 	});
 
 	onMount(async () => {
@@ -68,17 +97,48 @@
 		</button>
 	</div>
 
-	<!-- Tabs -->
-	<div class="flex space-x-2 mb-6">
-		<button class={getTabClass('all')} onclick={() => (activeTab = 'all')}>
-			All ({allTasks.length})
-		</button>
-		<button class={getTabClass('assigned')} onclick={() => (activeTab = 'assigned')}>
-			My Tasks ({allTasks.filter((t) => t.assignee === authStore.user?.username).length})
-		</button>
-		<button class={getTabClass('claimable')} onclick={() => (activeTab = 'claimable')}>
-			Available ({allTasks.filter((t) => !t.assignee).length})
-		</button>
+	<!-- Tabs & Filters -->
+	<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+		<div class="flex space-x-2 overflow-x-auto pb-1 lg:pb-0">
+			<button class={getTabClass('all')} onclick={() => (activeTab = 'all')}>
+				All ({allTasks.length})
+			</button>
+			<button class={getTabClass('assigned')} onclick={() => (activeTab = 'assigned')}>
+				My Tasks ({allTasks.filter((t) => t.assignee === authStore.user?.username).length})
+			</button>
+			<button class={getTabClass('claimable')} onclick={() => (activeTab = 'claimable')}>
+				Available ({allTasks.filter((t) => !t.assignee).length})
+			</button>
+		</div>
+
+		<div class="flex flex-col sm:flex-row gap-2">
+			<div class="relative">
+				<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+					<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+						/>
+					</svg>
+				</div>
+				<input
+					type="text"
+					bind:value={searchQuery}
+					placeholder="Search tasks..."
+					class="pl-10 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
+				/>
+			</div>
+			<select
+				bind:value={sortOption}
+				class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+			>
+				<option value="newest">Newest First</option>
+				<option value="oldest">Oldest First</option>
+				<option value="priority">Priority</option>
+			</select>
+		</div>
 	</div>
 
 	{#if loading}

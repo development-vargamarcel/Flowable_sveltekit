@@ -27,11 +27,11 @@
 			events.push({
 				id: `task-${task.id}`,
 				type: 'task',
-				timestamp: task.endTime || task.createTime,
+				timestamp: task.endTime || task.startTime,
 				title: task.name,
 				subtitle: task.assignee || 'Unassigned',
 				status: task.endTime ? 'completed' : 'pending',
-				details: task.deleteReason || undefined
+				details: undefined
 			});
 		}
 

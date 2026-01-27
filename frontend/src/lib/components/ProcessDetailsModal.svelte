@@ -25,7 +25,8 @@
 		}
 	}
 
-	function getStatusClass(status: string): string {
+	function getStatusClass(status: string | undefined): string {
+		if (!status) return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
 		switch (status) {
 			case 'ACTIVE':
 				return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
@@ -84,7 +85,7 @@
 			</div>
 			<div class="bg-gray-50 rounded-lg p-3">
 				<div class="text-xs text-gray-500 uppercase">Duration</div>
-				<div class="mt-1 font-medium">{formatDuration(process.durationInMillis)}</div>
+				<div class="mt-1 font-medium">{formatDuration(process.durationInMillis || null)}</div>
 			</div>
 		</div>
 

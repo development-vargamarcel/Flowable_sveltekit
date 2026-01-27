@@ -37,15 +37,36 @@ public class TaskService {
     private final ProcessConfigRepository processConfigRepository;
     private final TaskQueryHelper taskQueryHelper;
 
+    /**
+     * Retrieves tasks assigned to the specific user.
+     *
+     * @param userId the ID of the user
+     * @return list of assigned tasks
+     */
     public List<TaskDTO> getAssignedTasks(String userId) {
+        log.debug("Fetching assigned tasks for user: {}", userId);
         return getTasks(flowableTaskService.createTaskQuery().taskAssignee(userId));
     }
 
+    /**
+     * Retrieves tasks that the user can claim (candidate tasks).
+     *
+     * @param userId the ID of the user
+     * @return list of claimable tasks
+     */
     public List<TaskDTO> getClaimableTasks(String userId) {
+        log.debug("Fetching claimable tasks for user: {}", userId);
         return getTasks(flowableTaskService.createTaskQuery().taskCandidateUser(userId));
     }
 
+    /**
+     * Retrieves tasks assigned to the user or their groups (candidate or assigned).
+     *
+     * @param userId the ID of the user
+     * @return list of tasks
+     */
     public List<TaskDTO> getGroupTasks(String userId) {
+        log.debug("Fetching group tasks for user: {}", userId);
         return getTasks(flowableTaskService.createTaskQuery().taskCandidateOrAssigned(userId));
     }
 
@@ -138,8 +159,15 @@ public class TaskService {
         return task.getProcessDefinitionId();
     }
 
+    /**
+     * Claims a task for a user.
+     *
+     * @param taskId the ID of the task
+     * @param userId the ID of the user claiming the task
+     */
     @Transactional
     public void claimTask(String taskId, String userId) {
+        log.debug("User {} attempting to claim task {}", userId, taskId);
         Task task = flowableTaskService.createTaskQuery()
                 .taskId(taskId)
                 .singleResult();
@@ -153,11 +181,19 @@ public class TaskService {
         }
 
         flowableTaskService.claim(taskId, userId);
-        log.info("Task {} claimed by {}", taskId, userId);
+        log.info("Task {} successfully claimed by {}", taskId, userId);
     }
 
+    /**
+     * Completes a task with the given variables.
+     *
+     * @param taskId the ID of the task
+     * @param variables the variables to complete the task with
+     * @param userId the ID of the user completing the task
+     */
     @Transactional
     public void completeTask(String taskId, Map<String, Object> variables, String userId) {
+        log.debug("User {} completing task {} with variables: {}", userId, taskId, variables);
         Task task = flowableTaskService.createTaskQuery()
                 .taskId(taskId)
                 .singleResult();

@@ -14,10 +14,10 @@
     error = null;
     try {
       const stats = await api.getSlaStats();
-      overdueTasks = stats.breached;
-      nearBreachTasks = stats.atRisk;
-      if (stats.totalProcesses > 0) {
-        healthScore = Math.round(((stats.totalProcesses - stats.breached) / stats.totalProcesses) * 100);
+      overdueTasks = stats.breachedSlas;
+      nearBreachTasks = stats.atRiskSlas;
+      if (stats.totalActiveSlas > 0) {
+        healthScore = Math.round(((stats.totalActiveSlas - stats.breachedSlas) / stats.totalActiveSlas) * 100);
       } else {
         healthScore = 100;
       }

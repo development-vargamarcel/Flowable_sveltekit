@@ -2699,7 +2699,7 @@
               />
             </svg>
             <p class="text-sm text-red-800">{error}</p>
-            <button onclick={() => (error = '')} class="ml-auto text-red-600 hover:text-red-800">
+            <button onclick={() => (error = '')} class="ml-auto text-red-600 hover:text-red-800" aria-label="Close error">
               <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   stroke-linecap="round"
@@ -2780,6 +2780,7 @@
             <button
               onclick={() => (validationWarnings = [])}
               class="ml-auto flex-shrink-0 text-yellow-600 hover:text-yellow-800"
+              aria-label="Clear warnings"
             >
               <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -2901,8 +2902,9 @@
                   </h4>
 
                   <div class="mb-3">
-                    <label class="mb-1 block text-xs font-medium text-gray-700">ID</label>
+                    <label for="prop-id" class="mb-1 block text-xs font-medium text-gray-700">ID</label>
                     <input
+                      id="prop-id"
                       type="text"
                       value={elementProperties.id}
                       oninput={(e) => updateElementProperty('id', e.currentTarget.value)}
@@ -2911,8 +2913,9 @@
                   </div>
 
                   <div>
-                    <label class="mb-1 block text-xs font-medium text-gray-700">Name</label>
+                    <label for="prop-name" class="mb-1 block text-xs font-medium text-gray-700">Name</label>
                     <input
+                      id="prop-name"
                       type="text"
                       value={elementProperties.name}
                       oninput={(e) => updateElementProperty('name', e.currentTarget.value)}
@@ -2929,9 +2932,10 @@
                     </h4>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Assignee</label>
+                      <label for="prop-assignee" class="mb-1 block text-xs font-medium text-gray-700">Assignee</label>
                       <div class="flex gap-1">
                         <input
+                          id="prop-assignee"
                           type="text"
                           value={elementProperties.assignee}
                           oninput={(e) =>
@@ -2954,10 +2958,11 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700"
+                      <label for="prop-candidateGroups" class="mb-1 block text-xs font-medium text-gray-700"
                         >Candidate Groups</label
                       >
                       <input
+                        id="prop-candidateGroups"
                         type="text"
                         value={elementProperties.candidateGroups}
                         oninput={(e) =>
@@ -2969,10 +2974,11 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700"
+                      <label for="prop-candidateUsers" class="mb-1 block text-xs font-medium text-gray-700"
                         >Candidate Users</label
                       >
                       <input
+                        id="prop-candidateUsers"
                         type="text"
                         value={elementProperties.candidateUsers}
                         oninput={(e) =>
@@ -2983,8 +2989,9 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Due Date</label>
+                      <label for="prop-dueDate" class="mb-1 block text-xs font-medium text-gray-700">Due Date</label>
                       <input
+                        id="prop-dueDate"
                         type="text"
                         value={elementProperties.dueDate}
                         oninput={(e) =>
@@ -2995,8 +3002,9 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Priority</label>
+                      <label for="prop-priority" class="mb-1 block text-xs font-medium text-gray-700">Priority</label>
                       <input
+                        id="prop-priority"
                         type="text"
                         value={elementProperties.priority}
                         oninput={(e) =>
@@ -3013,11 +3021,12 @@
                     </h4>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700"
+                      <label for="prop-documentType" class="mb-1 block text-xs font-medium text-gray-700"
                         >Document Type</label
                       >
                       <div class="flex gap-1">
                         <select
+                          id="prop-documentType"
                           value={elementProperties.documentType}
                           onchange={(e) => handleDocumentTypeChange(e.currentTarget.value)}
                           class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
@@ -3060,8 +3069,9 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Form Key</label>
+                      <label for="prop-formKey" class="mb-1 block text-xs font-medium text-gray-700">Form Key</label>
                       <input
+                        id="prop-formKey"
                         type="text"
                         value={elementProperties.formKey}
                         oninput={(e) =>
@@ -3112,8 +3122,9 @@
                     </h4>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Type</label>
+                      <label for="prop-multiInstanceType" class="mb-1 block text-xs font-medium text-gray-700">Type</label>
                       <select
+                        id="prop-multiInstanceType"
                         value={elementProperties.multiInstanceType}
                         onchange={(e) =>
                           updateElementProperty('multiInstanceType', e.currentTarget.value)}
@@ -3127,10 +3138,11 @@
 
                     {#if elementProperties.multiInstanceType !== 'none'}
                       <div class="mb-3">
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="prop-loopCardinality" class="mb-1 block text-xs font-medium text-gray-700"
                           >Loop Cardinality</label
                         >
                         <input
+                          id="prop-loopCardinality"
                           type="text"
                           value={elementProperties.loopCardinality}
                           oninput={(e) =>
@@ -3141,10 +3153,11 @@
                       </div>
 
                       <div class="mb-3">
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="prop-collection" class="mb-1 block text-xs font-medium text-gray-700"
                           >Collection</label
                         >
                         <input
+                          id="prop-collection"
                           type="text"
                           value={elementProperties.collection}
                           oninput={(e) =>
@@ -3155,10 +3168,11 @@
                       </div>
 
                       <div class="mb-3">
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="prop-elementVariable" class="mb-1 block text-xs font-medium text-gray-700"
                           >Element Variable</label
                         >
                         <input
+                          id="prop-elementVariable"
                           type="text"
                           value={elementProperties.elementVariable}
                           oninput={(e) =>
@@ -3169,10 +3183,11 @@
                       </div>
 
                       <div class="mb-3">
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="prop-completionCondition" class="mb-1 block text-xs font-medium text-gray-700"
                           >Completion Condition</label
                         >
                         <input
+                          id="prop-completionCondition"
                           type="text"
                           value={elementProperties.completionCondition}
                           oninput={(e) =>
@@ -3193,8 +3208,9 @@
                     </h4>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Type</label>
+                      <label for="prop-implementation" class="mb-1 block text-xs font-medium text-gray-700">Type</label>
                       <select
+                        id="prop-implementation"
                         value={elementProperties.implementation}
                         onchange={(e) => {
                           elementProperties.implementation = e.currentTarget.value;
@@ -3209,8 +3225,9 @@
 
                     {#if elementProperties.implementation === 'class'}
                       <div class="mb-3">
-                        <label class="mb-1 block text-xs font-medium text-gray-700">Class</label>
+                        <label for="prop-class" class="mb-1 block text-xs font-medium text-gray-700">Class</label>
                         <input
+                          id="prop-class"
                           type="text"
                           value={elementProperties.class}
                           oninput={(e) =>
@@ -3221,10 +3238,11 @@
                       </div>
                     {:else if elementProperties.implementation === 'expression'}
                       <div class="mb-3">
-                        <label class="mb-1 block text-xs font-medium text-gray-700"
+                        <label for="prop-expression" class="mb-1 block text-xs font-medium text-gray-700"
                           >Expression</label
                         >
                         <input
+                          id="prop-expression"
                           type="text"
                           value={elementProperties.expression}
                           oninput={(e) =>
@@ -3254,10 +3272,11 @@
                     {/if}
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700"
+                      <label for="prop-resultVariable" class="mb-1 block text-xs font-medium text-gray-700"
                         >Result Variable</label
                       >
                       <input
+                        id="prop-resultVariable"
                         type="text"
                         value={elementProperties.resultVariable}
                         oninput={(e) =>
@@ -3277,8 +3296,9 @@
                     </h4>
                     
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Time Duration (ISO 8601)</label>
+                      <label for="prop-timeDuration" class="mb-1 block text-xs font-medium text-gray-700">Time Duration (ISO 8601)</label>
                       <input
+                        id="prop-timeDuration"
                         type="text"
                         value={elementProperties.timeDuration || ''}
                         oninput={(e) => updateElementProperty('timeDuration', e.currentTarget.value)}
@@ -3289,8 +3309,9 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Time Date (ISO 8601)</label>
+                      <label for="prop-timeDate" class="mb-1 block text-xs font-medium text-gray-700">Time Date (ISO 8601)</label>
                       <input
+                        id="prop-timeDate"
                         type="text"
                         value={elementProperties.timeDate || ''}
                         oninput={(e) => updateElementProperty('timeDate', e.currentTarget.value)}
@@ -3300,8 +3321,9 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700">Time Cycle (Cron/ISO)</label>
+                      <label for="prop-timeCycle" class="mb-1 block text-xs font-medium text-gray-700">Time Cycle (Cron/ISO)</label>
                       <input
+                        id="prop-timeCycle"
                         type="text"
                         value={elementProperties.timeCycle || ''}
                         oninput={(e) => updateElementProperty('timeCycle', e.currentTarget.value)}
@@ -3320,10 +3342,11 @@
                     </h4>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700"
+                      <label for="prop-scriptFormat" class="mb-1 block text-xs font-medium text-gray-700"
                         >Script Format</label
                       >
                       <select
+                        id="prop-scriptFormat"
                         bind:value={scriptFormat}
                         onchange={(e) =>
                           updateElementProperty('scriptFormat', e.currentTarget.value)}
@@ -3336,10 +3359,11 @@
                     </div>
 
                     <div class="mb-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700"
+                      <label for="prop-scriptResultVariable" class="mb-1 block text-xs font-medium text-gray-700"
                         >Result Variable</label
                       >
                       <input
+                        id="prop-scriptResultVariable"
                         type="text"
                         value={elementProperties.resultVariable}
                         oninput={(e) =>
@@ -3466,10 +3490,11 @@
                     </div>
 
                     <div class="mt-3">
-                      <label class="mb-1 block text-xs font-medium text-gray-700"
+                      <label for="prop-skipExpression" class="mb-1 block text-xs font-medium text-gray-700"
                         >Skip Expression</label
                       >
                       <input
+                        id="prop-skipExpression"
                         type="text"
                         value={elementProperties.skipExpression}
                         oninput={(e) =>
@@ -3486,7 +3511,9 @@
                   <h4 class="mb-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
                     Documentation
                   </h4>
+                  <label for="prop-documentation" class="sr-only">Documentation</label>
                   <textarea
+                    id="prop-documentation"
                     value={elementProperties.documentation}
                     oninput={(e) => updateElementProperty('documentation', e.currentTarget.value)}
                     placeholder="Describe this element..."
@@ -3532,6 +3559,7 @@
                 <button
                   onclick={() => (showFieldLibrary = false)}
                   class="text-gray-400 hover:text-gray-600"
+                  aria-label="Close field library"
                 >
                   <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -3557,6 +3585,7 @@
                 <button
                   onclick={() => (showConditionRules = false)}
                   class="text-gray-400 hover:text-gray-600"
+                  aria-label="Close condition rules"
                 >
                   <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -3633,6 +3662,7 @@
             <button
               onclick={() => (showFormBuilder = false)}
               class="text-gray-400 hover:text-gray-600"
+              aria-label="Close form builder"
             >
               <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -3778,6 +3808,7 @@
                       }}
                       class="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
                       title="Duplicate"
+                        aria-label="Duplicate field"
                     >
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
@@ -3795,6 +3826,7 @@
                       }}
                       class="rounded p-1 text-red-400 hover:bg-red-100 hover:text-red-600"
                       title="Delete"
+                        aria-label="Delete field"
                     >
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path

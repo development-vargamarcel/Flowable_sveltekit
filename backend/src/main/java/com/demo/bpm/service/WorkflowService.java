@@ -27,13 +27,31 @@ public class WorkflowService {
     private final TaskService taskService;
     private final HistoryRecorder historyRecorder;
 
+    /**
+     * Escalates a task to the next level of authority.
+     *
+     * @param taskId the ID of the task to escalate
+     * @param request the escalation request details
+     * @param userId the ID of the user performing the escalation
+     * @return the escalation result DTO
+     */
     @Transactional
     public EscalationDTO escalateTask(String taskId, EscalationRequest request, String userId) {
+        log.debug("Escalating task {} by user {}", taskId, userId);
         return processEscalation(taskId, request, userId, true);
     }
 
+    /**
+     * De-escalates a task to the previous level of authority.
+     *
+     * @param taskId the ID of the task to de-escalate
+     * @param request the de-escalation request details
+     * @param userId the ID of the user performing the de-escalation
+     * @return the de-escalation result DTO
+     */
     @Transactional
     public EscalationDTO deEscalateTask(String taskId, EscalationRequest request, String userId) {
+        log.debug("De-escalating task {} by user {}", taskId, userId);
         return processEscalation(taskId, request, userId, false);
     }
 
@@ -139,8 +157,17 @@ public class WorkflowService {
         return task;
     }
 
+    /**
+     * Hands off a task from one user to another.
+     *
+     * @param taskId the ID of the task
+     * @param toUserId the ID of the user receiving the task
+     * @param reason the reason for the handoff
+     * @param fromUserId the ID of the user handing off the task
+     */
     @Transactional
     public void handoffTask(String taskId, String toUserId, String reason, String fromUserId) {
+        log.debug("Handing off task {} from {} to {} due to: {}", taskId, fromUserId, toUserId, reason);
         Task task = getTaskOrThrow(taskId);
         String processInstanceId = task.getProcessInstanceId();
 
@@ -156,8 +183,18 @@ public class WorkflowService {
         log.info("Task {} (ProcessInstance: {}) handed off from {} to {} - Reason: {}", taskId, processInstanceId, fromUserId, toUserId, reason);
     }
 
+    /**
+     * Records an approval decision for a task.
+     *
+     * @param taskId the ID of the task
+     * @param decision the approval decision (e.g., "approve", "reject")
+     * @param comments optional comments
+     * @param userId the ID of the user recording the approval
+     * @return the approval result DTO
+     */
     @Transactional
     public ApprovalDTO recordApproval(String taskId, String decision, String comments, String userId) {
+        log.debug("Recording approval for task {} by user {}. Decision: {}", taskId, userId, decision);
         Task task = getTaskOrThrow(taskId);
         String processInstanceId = task.getProcessInstanceId();
         String currentLevel = getCurrentLevel(processInstanceId);
