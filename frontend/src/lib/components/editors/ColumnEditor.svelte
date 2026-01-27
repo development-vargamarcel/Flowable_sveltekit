@@ -20,7 +20,7 @@
 		type: 'text' as GridColumn['type'],
 		required: false,
 		placeholder: '',
-		options: [] as string[],
+		options: [] as (string | { label: string; value: string })[],
 		hiddenExpression: '',
 		readonlyExpression: '',
 		requiredExpression: '',
@@ -156,7 +156,7 @@
 	}
 
 	function addColumnOption() {
-		columnForm.options = [...columnForm.options, ''];
+		columnForm.options = [...columnForm.options, { value: '', label: '' }];
 	}
 
 	function removeColumnOption(index: number) {
@@ -224,11 +224,17 @@
 			<div>
 				<span class="block text-sm font-medium text-gray-700 mb-2">Options</span>
 				<div class="space-y-2">
-					{#each columnForm.options as _option, index}
+					{#each columnForm.options as option, index}
+						{@const optValue = typeof option === 'string' ? option : option.value}
+						{@const optLabel = typeof option === 'string' ? option : option.label}
 						<div class="flex items-center gap-2">
 							<input
 								type="text"
-								bind:value={columnForm.options[index]}
+								value={optLabel}
+								oninput={(e) => {
+									const val = e.currentTarget.value;
+									columnForm.options[index] = { label: val, value: val };
+								}}
 								class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
 								placeholder="Option value"
 								aria-label="Column option value"

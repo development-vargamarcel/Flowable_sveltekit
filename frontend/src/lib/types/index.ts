@@ -200,12 +200,15 @@ export interface FormField {
   required: boolean;
   placeholder?: string;
   defaultValue?: any;
-  options?: string[];
+  options?: (string | { label: string; value: string })[];
   validation?: FormFieldValidation;
   hiddenExpression?: string;
   readonlyExpression?: string;
   requiredExpression?: string;
   calculationExpression?: string;
+  visibilityExpression?: string;
+  validationExpression?: string;
+  validationMessage?: string;
   gridId?: string; // If field belongs to a grid
   tooltip?: string;
   readonly?: boolean;
@@ -213,6 +216,12 @@ export interface FormField {
   richText?: boolean;
   signature?: boolean;
   pickerType?: string;
+  gridColumn?: number;
+  gridRow?: number;
+  gridWidth?: number;
+  cssClass?: string;
+  onChange?: string;
+  onBlur?: string;
 }
 
 export interface GridColumn {
@@ -222,12 +231,19 @@ export interface GridColumn {
   type: 'text' | 'number' | 'date' | 'select' | 'textarea';
   required: boolean;
   placeholder?: string;
-  options?: string[]; // For select types
+  options?: (string | { label: string; value: string })[]; // For select types
   validation?: FormFieldValidation;
   hiddenExpression?: string;
   readonlyExpression?: string;
   requiredExpression?: string;
   calculationExpression?: string;
+  visibilityExpression?: string;
+  validationExpression?: string;
+  validationMessage?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  logic?: any;
 }
 
 export interface GridDefinition {
@@ -269,12 +285,49 @@ export interface FormDefinition {
 
 // Legacy aliases for compatibility
 export type FormGrid = GridDefinition;
-export type FieldConditionRule = any; // Placeholder for now
-export type ProcessFieldLibrary = any;
-// Fix TaskFormWithConfig type
+
+export type ConditionEffect = 'hidden' | 'visible' | 'readonly' | 'editable';
+export type ConditionTargetType = 'all' | 'field' | 'grid' | 'column';
+
+export interface ConditionTarget {
+    type: ConditionTargetType;
+    fieldNames?: string[];
+    gridNames?: string[];
+    columnTargets?: { gridName: string; columnNames: string[] }[];
+}
+
+export interface FieldConditionRule {
+    id: string;
+    name: string;
+    description?: string;
+    condition: string;
+    effect: ConditionEffect;
+    target: ConditionTarget;
+    priority: number;
+    enabled: boolean;
+}
+
+export type ProcessFieldLibrary = {
+    fields: FormField[];
+    grids: GridDefinition[];
+};
+
 export interface TaskFormWithConfig {
     taskForm: FormDefinition;
     processConfig: any;
+}
+
+export interface ComputedFieldState {
+    isHidden: boolean;
+    isReadonly: boolean;
+    appliedRules: string[];
+}
+
+export interface ComputedGridState {
+    isHidden: boolean;
+    isReadonly: boolean;
+    columnStates: Record<string, ComputedFieldState>;
+    appliedRules: string[];
 }
 
 // Table Data Types
@@ -329,16 +382,14 @@ export interface LoginRequest {
 }
 
 export interface EscalationOptions {
-    levels: string[];
-    canEscalate: boolean;
-    canDeEscalate: boolean;
-    currentLevel: string;
+    escalateTo: string[];
+    deEscalateTo: string[];
 }
 
 export interface EscalationRequest {
     reason: string;
-    toLevel?: string;
-    targetUser?: string;
+    targetLevel?: string;
+    targetUserId?: string;
 }
 
 export interface TableColumn {

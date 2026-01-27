@@ -7,7 +7,7 @@
 	<p class="mt-4">Click the button below to seed the database with initial data.</p>
 	<button
 		class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md"
-		on:click={async () => {
+		onclick={async () => {
 			const response = await fetch('/api/database/seed', {
 				method: 'POST'
 			});
