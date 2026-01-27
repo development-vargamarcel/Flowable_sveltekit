@@ -7,7 +7,7 @@
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { toast } from 'svelte-sonner';
 
-	let instances: ProcessInstance[] = [];
+	let instances = $state<ProcessInstance[]>([]);
 
 	onMount(async () => {
 		try {

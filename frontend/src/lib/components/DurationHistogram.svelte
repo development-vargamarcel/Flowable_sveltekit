@@ -2,13 +2,19 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api/client';
 
+	interface Props {
+		processDefinitionKey?: string;
+	}
+
+	const { processDefinitionKey = '' }: Props = $props();
+
 	let data = $state<{ label: string; count: number }[]>([]);
 	let loading = $state(true);
 	let maxCount = $state(0);
 
 	onMount(async () => {
 		try {
-			data = await api.getProcessDurationAnalytics();
+			data = await api.getProcessDurationAnalytics(processDefinitionKey);
 			maxCount = Math.max(...data.map(d => d.count), 1); // Avoid div by zero
 		} catch (e) {
 			console.error('Failed to load duration analytics', e);

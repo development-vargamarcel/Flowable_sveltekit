@@ -5,8 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function getVariableDisplay(variables: Record<string, unknown>): { label: string; value: string }[] {
+export function getVariableDisplay(variables: Record<string, unknown> | undefined | null): { label: string; value: string }[] {
   const displays: { label: string; value: string }[] = [];
+
+  if (!variables) return displays;
 
   if (variables.amount !== undefined) {
     displays.push({ label: 'Amount', value: `$${Number(variables.amount).toFixed(2)}` });

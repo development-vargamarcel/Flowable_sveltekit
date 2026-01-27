@@ -110,6 +110,13 @@ export interface Approval {
     stepOrder: number;
 }
 
+export interface Comment {
+    id: string;
+    message: string;
+    authorId: string;
+    timestamp: string;
+}
+
 export interface WorkflowHistory {
     processInstanceId: string;
     processDefinitionKey: string;
@@ -135,6 +142,7 @@ export interface WorkflowHistory {
     taskHistory: TaskHistory[];
     escalationHistory: Escalation[];
     approvals: Approval[];
+    comments: Comment[];
 }
 
 export interface DashboardStats {
@@ -199,6 +207,12 @@ export interface FormField {
   requiredExpression?: string;
   calculationExpression?: string;
   gridId?: string; // If field belongs to a grid
+  tooltip?: string;
+  readonly?: boolean;
+  hidden?: boolean;
+  richText?: boolean;
+  signature?: boolean;
+  pickerType?: string;
 }
 
 export interface GridColumn {
@@ -229,6 +243,13 @@ export interface GridDefinition {
   gridWidth?: number; // Layout width
   cssClass?: string;
   visibilityExpression?: string;
+  enablePagination?: boolean;
+  pageSize?: number;
+  enableSorting?: boolean;
+  enableRowActions?: boolean;
+  enableImportExport?: boolean;
+  enableGrouping?: boolean;
+  groupByColumn?: string;
 }
 
 export interface GridConfig {

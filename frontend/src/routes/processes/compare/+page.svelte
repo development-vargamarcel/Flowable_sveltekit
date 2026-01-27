@@ -14,8 +14,8 @@
 
   let isLoading = $state(true);
   let error = $state('');
-  let viewerContainer: HTMLDivElement;
-  let viewer: any = null;
+  let viewerContainer = $state<HTMLDivElement>();
+  let viewer = $state<any>(null);
 
   // Diff statistics
   let added = $state(0);

@@ -82,3 +82,15 @@ A parallel approval process for project initiation.
    - If `budget > 100000`: Moves to Executive Approval.
 5. **Executive Approval**: Assigned to `EXECUTIVE` group.
 6. **End**: Process completes.
+
+## Feature: Comments
+
+Users can add comments to any active process instance to provide updates, ask questions, or document decisions.
+
+### Usage
+1. Open the **Process Details** modal for any active process.
+2. Scroll to the **Comments** section.
+3. Enter your message in the text area.
+4. Click **Add** to submit the comment.
+
+Comments are visible to all users with access to the process instance and are included in the process history.

@@ -1,9 +1,11 @@
 <script lang="ts">
-	import type { WorkflowHistory } from '$lib/types';
+	import type { WorkflowHistory, Comment } from '$lib/types';
 	import ProcessTimeline from './ProcessTimeline.svelte';
 	import Modal from './Modal.svelte';
 	import { formatDate, formatDuration } from '$lib/utils';
 	import { Badge } from '$lib/components/ui/badge';
+	import { api } from '$lib/api/client';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
 		process: WorkflowHistory | null;
@@ -11,6 +13,35 @@
 	}
 
 	const { process, onClose }: Props = $props();
+
+	let comments = $state<Comment[]>([]);
+	let newComment = $state('');
+	let isSubmittingComment = $state(false);
+
+	$effect(() => {
+		if (process?.comments) {
+			comments = [...process.comments];
+		} else {
+			comments = [];
+		}
+	});
+
+	async function handleAddComment() {
+		if (!process || !newComment.trim()) return;
+
+		isSubmittingComment = true;
+		try {
+			const response = await api.addComment(process.processInstanceId, newComment);
+			comments = [...comments, response.comment];
+			newComment = '';
+			toast.success('Comment added');
+		} catch (e) {
+			console.error(e);
+			toast.error('Failed to add comment');
+		} finally {
+			isSubmittingComment = false;
+		}
+	}
 
 	function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
 		switch (status) {
@@ -164,6 +195,40 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Comments -->
+		<div class="mb-6">
+			<h3 class="font-semibold text-gray-800 mb-3">Comments</h3>
+			{#if comments.length > 0}
+				<div class="space-y-3 mb-4">
+					{#each comments as comment}
+						<div class="bg-gray-50 rounded-lg p-3">
+							<div class="flex justify-between items-start mb-1">
+								<span class="font-medium text-sm text-gray-900">{comment.authorId}</span>
+								<span class="text-xs text-gray-500">{formatDate(comment.timestamp)}</span>
+							</div>
+							<p class="text-sm text-gray-700 whitespace-pre-wrap">{comment.message}</p>
+						</div>
+					{/each}
+				</div>
+			{/if}
+			{#if process.status === 'ACTIVE'}
+				<div class="flex gap-2">
+					<textarea
+						bind:value={newComment}
+						class="flex-1 min-h-[60px] p-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+						placeholder="Add a comment..."
+					></textarea>
+					<button
+						onclick={handleAddComment}
+						disabled={!newComment.trim() || isSubmittingComment}
+						class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed h-fit"
+					>
+						{isSubmittingComment ? 'Adding...' : 'Add'}
+					</button>
+				</div>
+			{/if}
+		</div>
 
 		<!-- Variables -->
 		<div>

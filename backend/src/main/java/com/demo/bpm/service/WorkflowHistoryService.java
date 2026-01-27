@@ -123,6 +123,9 @@ public class WorkflowHistoryService {
         // Get approvals
         List<ApprovalDTO> approvals = getApprovalHistory(processInstanceId, variables);
 
+        // Get comments
+        List<CommentDTO> comments = getComments(processInstanceId);
+
         return WorkflowHistoryDTO.builder()
                 .processInstanceId(processInstanceId)
                 .processDefinitionKey(processDefKey)
@@ -143,7 +146,23 @@ public class WorkflowHistoryService {
                 .taskHistory(taskHistory)
                 .escalationHistory(escalationHistory)
                 .approvals(approvals)
+                .comments(comments)
                 .build();
+    }
+
+    private List<CommentDTO> getComments(String processInstanceId) {
+        log.debug("Fetching comments for process {}", processInstanceId);
+        List<org.flowable.engine.task.Comment> comments = taskService.getProcessInstanceComments(processInstanceId);
+
+        return comments.stream()
+                .map(comment -> CommentDTO.builder()
+                        .id(comment.getId())
+                        .message(comment.getFullMessage())
+                        .authorId(comment.getUserId())
+                        .timestamp(comment.getTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                        .build())
+                .sorted(Comparator.comparing(CommentDTO::getTimestamp))
+                .collect(Collectors.toList());
     }
 
     public List<TaskHistoryDTO> getTaskHistory(String processInstanceId) {

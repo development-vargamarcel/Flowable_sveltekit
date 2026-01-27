@@ -65,6 +65,24 @@ public class WorkflowController {
         return ResponseEntity.ok(taskHistory);
     }
 
+    @PostMapping("/processes/{processInstanceId}/comments")
+    public ResponseEntity<?> addComment(
+            @PathVariable String processInstanceId,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String message = request.get("message");
+        if (message == null || message.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Comment message is required"));
+        }
+
+        CommentDTO comment = workflowService.addComment(processInstanceId, message, userDetails.getUsername());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Comment added successfully",
+                "comment", comment
+        ));
+    }
+
     // ==================== Escalation ====================
 
     @PostMapping("/tasks/{taskId}/escalate")

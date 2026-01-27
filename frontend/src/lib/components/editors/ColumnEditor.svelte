@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { GridColumn, ProcessFieldLibrary } from '$lib/types';
+	import type { GridColumn, ProcessFieldLibrary, FormField, GridDefinition } from '$lib/types';
 	import Modal from '../Modal.svelte';
     import CodeEditor from '../CodeEditor.svelte';
 
@@ -26,10 +26,10 @@
 		requiredExpression: '',
 		calculationExpression: '',
 		validation: {
-			minLength: null as number | null,
-			maxLength: null as number | null,
-			min: null as number | null,
-			max: null as number | null,
+			minLength: undefined as number | undefined,
+			maxLength: undefined as number | undefined,
+			min: undefined as number | undefined,
+			max: undefined as number | undefined,
 			pattern: '',
 			patternMessage: ''
 		}
@@ -61,11 +61,11 @@
 			{ label: 'row', value: 'row', type: 'variable', description: 'Current grid row' }
 		);
 
-		library.fields.forEach(f => {
+		library.fields.forEach((f: FormField) => {
 			suggestions.push({ label: `form.${f.name}`, value: `form.${f.name}`, type: 'field', description: f.label });
 		});
 
-		library.grids.forEach(g => {
+		library.grids.forEach((g: GridDefinition) => {
 			suggestions.push({ label: `grids.${g.name}`, value: `grids.${g.name}`, type: 'grid', description: g.label });
 			suggestions.push({ label: `grids.${g.name}.selectedRow`, value: `grids.${g.name}.selectedRow`, type: 'grid', description: 'Selected row' });
 			suggestions.push({ label: `grids.${g.name}.selectedRows`, value: `grids.${g.name}.selectedRows`, type: 'grid', description: 'Selected rows (array)' });
@@ -73,7 +73,7 @@
 			suggestions.push({ label: `grids.${g.name}.rows`, value: `grids.${g.name}.rows`, type: 'grid', description: 'All rows' });
 			suggestions.push({ label: `grids.${g.name}.sum`, value: `grids.${g.name}.sum('')`, type: 'function', description: 'Sum column' });
 
-			g.columns.forEach(c => {
+			g.columns.forEach((c: GridColumn) => {
 				suggestions.push({ label: `row.${c.name}`, value: `row.${c.name}`, type: 'column', description: `${g.label} - ${c.label}` });
 			});
 		});
@@ -90,16 +90,16 @@
 				type: column.type as typeof columnForm.type,
 				required: column.required || false,
 				placeholder: column.placeholder || '',
-				options: column.options ? column.options.map(o => o.value) : [], // Simplified for this demo
+				options: column.options || [],
 				hiddenExpression: column.hiddenExpression || '',
 				readonlyExpression: column.readonlyExpression || '',
 				requiredExpression: column.requiredExpression || '',
 				calculationExpression: column.calculationExpression || '',
 				validation: column.validation ? { ...column.validation } : {
-					minLength: null,
-					maxLength: null,
-					min: null,
-					max: null,
+					minLength: undefined,
+					maxLength: undefined,
+					min: undefined,
+					max: undefined,
 					pattern: '',
 					patternMessage: ''
 				}
@@ -118,10 +118,10 @@
                 requiredExpression: '',
                 calculationExpression: '',
                 validation: {
-                    minLength: null,
-                    maxLength: null,
-                    min: null,
-                    max: null,
+                    minLength: undefined,
+                    maxLength: undefined,
+                    min: undefined,
+                    max: undefined,
                     pattern: '',
                     patternMessage: ''
                 }
@@ -138,7 +138,7 @@
 			type: columnForm.type,
 			required: columnForm.required,
 			placeholder: columnForm.placeholder,
-			options: columnForm.type === 'select' ? columnForm.options.map(o => ({ value: o, label: o })) : null,
+			options: columnForm.type === 'select' ? columnForm.options : undefined,
 			hiddenExpression: columnForm.hiddenExpression,
 			readonlyExpression: columnForm.readonlyExpression,
 			requiredExpression: columnForm.requiredExpression,

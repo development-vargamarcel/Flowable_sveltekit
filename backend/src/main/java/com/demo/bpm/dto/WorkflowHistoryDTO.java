@@ -33,4 +33,5 @@ public class WorkflowHistoryDTO {
     private List<TaskHistoryDTO> taskHistory;
     private List<EscalationDTO> escalationHistory;
     private List<ApprovalDTO> approvals;
+    private List<CommentDTO> comments;
 }

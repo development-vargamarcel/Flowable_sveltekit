@@ -89,12 +89,13 @@
 								<div class="mt-4">
 									<div class="flex flex-col space-y-2">
 										{#each navigationSchema as item}
+											{@const Icon = item.icon as any}
 											<a
 												href={item.href}
 												class="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-100 rounded-md"
 												onclick={() => (open = false)}
 											>
-												<svelte:component this={item.icon} class="h-5 w-5 mr-3" />
+												<Icon class="h-5 w-5 mr-3" />
 												{item.title}
 											</a>
 										{/each}

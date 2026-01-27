@@ -11,6 +11,7 @@ import type {
   Escalation,
   EscalationOptions,
   Approval,
+  Comment,
   HandoffRequest,
   FormDefinition,
   TaskFormWithConfig,
@@ -550,6 +551,16 @@ export const api = {
 
   async getWorkflowHistory(processInstanceId: string): Promise<WorkflowHistory> {
     return fetchApi(`/api/workflow/processes/${processInstanceId}`);
+  },
+
+  async addComment(
+    processInstanceId: string,
+    message: string
+  ): Promise<{ message: string; comment: Comment }> {
+    return fetchApi(`/api/workflow/processes/${processInstanceId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ message })
+    });
   },
 
   // Escalation

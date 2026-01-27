@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { NavigationItem } from '$lib/nav-schema';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { ChevronDown } from '@lucide/svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { cn } from '$lib/utils';
@@ -29,8 +30,9 @@
 		</DropdownMenu.Trigger>
 		<DropdownMenu.Content>
 			{#each item.children as child}
-				<DropdownMenu.Item href={child.href}>
-					<svelte:component this={child.icon} class="h-4 w-4 mr-2" />
+				{@const Icon = child.icon as any}
+				<DropdownMenu.Item onclick={() => goto(child.href)}>
+					<Icon class="h-4 w-4 mr-2" />
 					{child.title}
 				</DropdownMenu.Item>
 			{/each}

@@ -91,10 +91,12 @@
   {:else if error}
     <ErrorDisplay {error} onRetry={loadNotifications} title="Error Loading Notifications" />
   {:else if notifications.length === 0}
+    {#snippet bellIcon()}
+      <Bell class="w-12 h-12 text-gray-400 mb-3" />
+    {/snippet}
     <EmptyState
-      title="No notifications"
-      message="You're all caught up! Check back later for updates."
-      icon={Bell}
+      message="No notifications. You're all caught up! Check back later for updates."
+      icon={bellIcon}
     />
   {:else}
     <div class="bg-white shadow rounded-lg overflow-hidden border border-gray-200">

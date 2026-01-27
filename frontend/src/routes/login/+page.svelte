@@ -95,9 +95,9 @@
 			</h2>
 			<p class="mt-2 text-center text-sm text-gray-600">
 				Or
-				<a href="#" class="font-medium text-blue-600 hover:text-blue-500">
+				<button type="button" class="font-medium text-blue-600 hover:text-blue-500 bg-transparent border-0 p-0 cursor-pointer">
 					start your 14-day free trial
-				</a>
+				</button>
 			</p>
 		</div>
 
@@ -212,7 +212,7 @@
 				</div>
 
 				<div class="text-sm">
-					<a href="#" class="font-medium text-blue-600 hover:text-blue-500">Forgot password?</a>
+					<button type="button" class="font-medium text-blue-600 hover:text-blue-500 bg-transparent border-0 p-0 cursor-pointer">Forgot password?</button>
 				</div>
 			</div>
 

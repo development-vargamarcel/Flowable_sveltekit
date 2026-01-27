@@ -393,12 +393,12 @@
 								<td class="px-4 py-3">
 									<span
 										class="px-2 py-1 rounded-full text-xs font-medium {getStatusColor(
-											process.status
+											process.status || ''
 										)}"
 									>
 										{process.status}
 									</span>
-									{#if process.escalationCount > 0}
+									{#if process.escalationCount != null && process.escalationCount > 0}
 										<EscalationBadge count={process.escalationCount} />
 									{/if}
 								</td>
@@ -421,7 +421,7 @@
 								</td>
 								<td class="px-4 py-3 text-sm text-gray-600">{formatDate(process.startTime)}</td>
 								<td class="px-4 py-3 text-sm text-gray-600"
-									>{formatDuration(process.durationInMillis)}</td
+									>{formatDuration(process.durationInMillis || null)}</td
 								>
 								<td class="px-4 py-3">
 									<div class="flex gap-2">

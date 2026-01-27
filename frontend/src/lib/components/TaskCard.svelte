@@ -11,13 +11,13 @@
 	const { task, onclick }: Props = $props();
 
 	import { getVariableDisplay } from '$lib/utils';
-	const displays = $derived(getVariableDisplay(task.variables));
+	const displays = $derived(getVariableDisplay(task.variables || null));
 </script>
 
 <button
 	type="button"
 	{onclick}
-	class="w-full text-left card border-2 hover:shadow-lg transition-all {getProcessCardClasses(task.processDefinitionKey)}"
+	class="w-full text-left card border-2 hover:shadow-lg transition-all {getProcessCardClasses(task.processDefinitionKey || '')}"
 >
 	<div class="flex justify-between items-start mb-3">
 		<div class="flex-1">

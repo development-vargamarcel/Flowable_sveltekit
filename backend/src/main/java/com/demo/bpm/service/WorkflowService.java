@@ -9,6 +9,7 @@ import com.demo.bpm.util.WorkflowConstants;
 import com.demo.bpm.util.WorkflowVariableUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.flowable.engine.IdentityService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
@@ -25,7 +26,38 @@ public class WorkflowService {
 
     private final RuntimeService runtimeService;
     private final TaskService taskService;
+    private final IdentityService identityService;
     private final HistoryRecorder historyRecorder;
+
+    /**
+     * Adds a comment to a process instance.
+     *
+     * @param processInstanceId the process instance ID
+     * @param message the comment message
+     * @param userId the user adding the comment
+     * @return the created comment DTO
+     */
+    @Transactional
+    public CommentDTO addComment(String processInstanceId, String message, String userId) {
+        log.debug("Adding comment to process {} by user {}: {}", processInstanceId, userId, message);
+
+        identityService.setAuthenticatedUserId(userId);
+
+        try {
+            org.flowable.engine.task.Comment comment = taskService.addComment(null, processInstanceId, message);
+
+            log.info("Comment added to process {} by user {}", processInstanceId, userId);
+
+            return CommentDTO.builder()
+                    .id(comment.getId())
+                    .message(comment.getFullMessage())
+                    .authorId(comment.getUserId())
+                    .timestamp(LocalDateTime.now())
+                    .build();
+        } finally {
+            identityService.setAuthenticatedUserId(null);
+        }
+    }
 
     /**
      * Escalates a task to the next level of authority.

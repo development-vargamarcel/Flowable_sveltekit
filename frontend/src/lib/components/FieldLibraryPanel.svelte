@@ -65,7 +65,7 @@
 		if (editingField) {
 			onChange({
 				...library,
-				fields: library.fields.map((f) => (f.id === editingField!.id ? field : f))
+				fields: library.fields.map((f: FormField) => (f.id === editingField!.id ? field : f))
 			});
 		} else {
 			onChange({
@@ -80,7 +80,7 @@
 	function handleDeleteField(fieldId: string) {
 		onChange({
 			...library,
-			fields: library.fields.filter((f) => f.id !== fieldId)
+			fields: library.fields.filter((f: FormField) => f.id !== fieldId)
 		});
 	}
 
@@ -112,7 +112,7 @@
 		if (editingGrid) {
 			onChange({
 				...library,
-				grids: library.grids.map((g) => (g.id === editingGrid!.id ? grid : g))
+				grids: library.grids.map((g: FormGrid) => (g.id === editingGrid!.id ? grid : g))
 			});
 		} else {
 			onChange({
@@ -127,7 +127,7 @@
 	function handleDeleteGrid(gridId: string) {
 		onChange({
 			...library,
-			grids: library.grids.filter((g) => g.id !== gridId)
+			grids: library.grids.filter((g: FormGrid) => g.id !== gridId)
 		});
 	}
 
@@ -149,14 +149,14 @@
 		let newColumns: GridColumn[];
 
 		if (editingColumn.column) {
-			newColumns = grid.columns.map((c) => (c.id === editingColumn!.column!.id ? newColumn : c));
+			newColumns = grid.columns.map((c: GridColumn) => (c.id === editingColumn!.column!.id ? newColumn : c));
 		} else {
 			newColumns = [...grid.columns, newColumn];
 		}
 
 		onChange({
 			...library,
-			grids: library.grids.map((g, i) =>
+			grids: library.grids.map((g: FormGrid, i: number) =>
 				i === editingColumn!.gridIndex ? { ...g, columns: newColumns } : g
 			)
 		});
@@ -168,8 +168,8 @@
 	function handleDeleteColumn(gridIndex: number, columnId: string) {
 		onChange({
 			...library,
-			grids: library.grids.map((g, i) =>
-				i === gridIndex ? { ...g, columns: g.columns.filter((c) => c.id !== columnId) } : g
+			grids: library.grids.map((g: FormGrid, i: number) =>
+				i === gridIndex ? { ...g, columns: g.columns.filter((c: GridColumn) => c.id !== columnId) } : g
 			)
 		});
 	}
@@ -182,7 +182,7 @@
 
         onChange({
             ...library,
-            grids: library.grids.map((g, i) => i === gridIndex ? { ...g, columns: newColumns } : g)
+            grids: library.grids.map((g: FormGrid, i: number) => i === gridIndex ? { ...g, columns: newColumns } : g)
         });
     }
 
