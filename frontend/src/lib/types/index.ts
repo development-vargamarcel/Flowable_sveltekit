@@ -269,8 +269,28 @@ export interface FormDefinition {
 
 // Legacy aliases for compatibility
 export type FormGrid = GridDefinition;
-export type FieldConditionRule = any; // Placeholder for now
 export type ProcessFieldLibrary = any;
+
+export type ConditionEffect = 'hidden' | 'visible' | 'readonly' | 'editable';
+export type ConditionTargetType = 'all' | 'field' | 'grid' | 'column';
+
+export type ConditionTarget =
+  | { type: 'all' }
+  | { type: 'field'; fieldNames: string[] }
+  | { type: 'grid'; gridNames: string[] }
+  | { type: 'column'; columnTargets: { gridName: string; columnNames: string[] }[] };
+
+export interface FieldConditionRule {
+  id: string;
+  name: string;
+  description?: string;
+  condition: string;
+  effect: ConditionEffect;
+  target: ConditionTarget;
+  priority: number;
+  enabled: boolean;
+}
+
 // Fix TaskFormWithConfig type
 export interface TaskFormWithConfig {
     taskForm: FormDefinition;
@@ -333,12 +353,14 @@ export interface EscalationOptions {
     canEscalate: boolean;
     canDeEscalate: boolean;
     currentLevel: string;
+    escalateTo: string[];
+    deEscalateTo: string[];
 }
 
 export interface EscalationRequest {
     reason: string;
-    toLevel?: string;
-    targetUser?: string;
+    targetLevel?: string;
+    targetUserId?: string;
 }
 
 export interface TableColumn {

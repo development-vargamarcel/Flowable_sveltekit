@@ -251,3 +251,13 @@ A dedicated page for managing system notifications (`/notifications`).
 ## Usage
 
 This page is automatically linked from the `NotificationBell` component in the navbar.
+
+# Profile Page
+
+A user settings page (`/profile`) allowing users to manage their personal information.
+
+## Features
+
+- View read-only username and roles
+- Update First Name, Last Name, and Email
+- Real-time feedback with toast notifications

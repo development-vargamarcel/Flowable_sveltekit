@@ -10,6 +10,13 @@ The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 | POST | `/api/auth/logout` | Invalidates the session. |
 | GET | `/api/auth/me` | Returns the currently authenticated user (`UserDTO`). |
 
+## Users
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| GET | `/api/users/{id}` | Get user details by ID. |
+| PUT | `/api/users/profile` | Update current user profile. Body: `UpdateProfileRequest`. |
+
 ## Tasks
 
 | Method | Endpoint | Description |

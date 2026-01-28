@@ -62,7 +62,9 @@
 					<div class="hidden sm:flex items-center space-x-4">
 						<NotificationBell />
 						<div class="flex items-center space-x-2">
-							<span class="text-sm text-gray-600">{authStore.user.displayName}</span>
+							<a href="/profile" class="text-sm text-gray-600 hover:text-gray-900 font-medium"
+								>{authStore.user.displayName}</a
+							>
 							{#each authStore.user.roles as role}
 								<span
 									class="px-2 py-0.5 text-xs font-medium rounded-full {getRoleBadgeColor(role)}"
@@ -101,6 +103,13 @@
 										{/each}
 									</div>
 									<div class="mt-6 border-t pt-4">
+										<a
+											href="/profile"
+											class="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-100 rounded-md"
+											onclick={() => (open = false)}
+										>
+											Profile
+										</a>
 										<button
 											onclick={() => {
 												handleLogout();

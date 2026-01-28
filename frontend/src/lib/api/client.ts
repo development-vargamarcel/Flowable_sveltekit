@@ -427,6 +427,17 @@ export const api = {
     return fetchApi('/api/auth/me');
   },
 
+  async updateProfile(request: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  }): Promise<User> {
+    return fetchApi('/api/users/profile', {
+      method: 'PUT',
+      body: JSON.stringify(request)
+    });
+  },
+
   // Analytics Endpoints
   async getProcessDurationAnalytics(
     processDefinitionKey?: string

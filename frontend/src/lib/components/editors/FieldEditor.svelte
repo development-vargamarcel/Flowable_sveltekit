@@ -80,11 +80,11 @@
 			{ label: 'row', value: 'row', type: 'variable', description: 'Current grid row' }
 		);
 
-		library.fields.forEach(f => {
+		library.fields.forEach((f: any) => {
 			suggestions.push({ label: `form.${f.name}`, value: `form.${f.name}`, type: 'field', description: f.label });
 		});
 
-		library.grids.forEach(g => {
+		library.grids.forEach((g: any) => {
 			suggestions.push({ label: `grids.${g.name}`, value: `grids.${g.name}`, type: 'grid', description: g.label });
 			suggestions.push({ label: `grids.${g.name}.selectedRow`, value: `grids.${g.name}.selectedRow`, type: 'grid', description: 'Selected row' });
 			suggestions.push({ label: `grids.${g.name}.selectedRows`, value: `grids.${g.name}.selectedRows`, type: 'grid', description: 'Selected rows (array)' });
@@ -92,7 +92,7 @@
 			suggestions.push({ label: `grids.${g.name}.rows`, value: `grids.${g.name}.rows`, type: 'grid', description: 'All rows' });
 			suggestions.push({ label: `grids.${g.name}.sum`, value: `grids.${g.name}.sum('')`, type: 'function', description: 'Sum column' });
 
-			g.columns.forEach(c => {
+			g.columns.forEach((c: any) => {
 				suggestions.push({ label: `row.${c.name}`, value: `row.${c.name}`, type: 'column', description: `${g.label} - ${c.label}` });
 			});
 		});

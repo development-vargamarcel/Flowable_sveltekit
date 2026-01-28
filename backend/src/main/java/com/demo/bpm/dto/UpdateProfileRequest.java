@@ -1,17 +1,16 @@
 package com.demo.bpm.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-
-import java.util.List;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-public class UserDTO {
-    private String username;
+@NoArgsConstructor
+@AllArgsConstructor
+public class UpdateProfileRequest {
     private String firstName;
     private String lastName;
-    private String displayName;
     private String email;
-    private List<String> roles;
 }

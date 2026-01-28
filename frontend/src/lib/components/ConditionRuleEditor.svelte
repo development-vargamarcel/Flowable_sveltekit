@@ -25,12 +25,12 @@
 	let description = $state(rule?.description ?? '');
 	let enabled = $state(rule?.enabled ?? true);
 	let priority = $state(rule?.priority ?? 0);
-	let effect = $state(rule?.effect ?? 'readonly');
+	let ruleEffect = $state(rule?.effect ?? 'readonly');
 	let targetType = $state(rule?.target.type ?? 'all');
-	let selectedFields = $state(rule?.target.fieldNames ?? []);
-	let selectedGrids = $state(rule?.target.gridNames ?? []);
+	let selectedFields = $state(rule?.target.type === 'field' ? rule.target.fieldNames : []);
+	let selectedGrids = $state(rule?.target.type === 'grid' ? rule.target.gridNames : []);
 	
-	const defaultColumns = rule?.target.columnTargets ?? [];
+	const defaultColumns = rule?.target.type === 'column' ? rule.target.columnTargets : [];
 	let selectedColumns = $state(defaultColumns);
 
 	// Condition builder state
@@ -208,7 +208,7 @@
 			name,
 			description,
 			condition: buildConditionExpression(),
-			effect,
+			effect: ruleEffect,
 			target: buildTarget(),
 			priority,
 			enabled
@@ -218,7 +218,7 @@
 
 	function toggleFieldSelection(fieldName: string) {
 		if (selectedFields.includes(fieldName)) {
-			selectedFields = selectedFields.filter((f) => f !== fieldName);
+			selectedFields = selectedFields.filter((f: string) => f !== fieldName);
 		} else {
 			selectedFields = [...selectedFields, fieldName];
 		}
@@ -226,19 +226,19 @@
 
 	function toggleGridSelection(gridName: string) {
 		if (selectedGrids.includes(gridName)) {
-			selectedGrids = selectedGrids.filter((g) => g !== gridName);
+			selectedGrids = selectedGrids.filter((g: string) => g !== gridName);
 		} else {
 			selectedGrids = [...selectedGrids, gridName];
 		}
 	}
 
 	function toggleColumnSelection(gridName: string, columnName: string) {
-		const existing = selectedColumns.find((c) => c.gridName === gridName);
+		const existing = selectedColumns.find((c: { gridName: string }) => c.gridName === gridName);
 		if (existing) {
 			if (existing.columnNames.includes(columnName)) {
-				existing.columnNames = existing.columnNames.filter((c) => c !== columnName);
+				existing.columnNames = existing.columnNames.filter((c: string) => c !== columnName);
 				if (existing.columnNames.length === 0) {
-					selectedColumns = selectedColumns.filter((c) => c.gridName !== gridName);
+					selectedColumns = selectedColumns.filter((c: { gridName: string }) => c.gridName !== gridName);
 				} else {
 					selectedColumns = [...selectedColumns];
 				}
@@ -252,7 +252,7 @@
 	}
 
 	function isColumnSelected(gridName: string, columnName: string): boolean {
-		const gridTarget = selectedColumns.find((c) => c.gridName === gridName);
+		const gridTarget = selectedColumns.find((c: { gridName: string; columnNames: string[] }) => c.gridName === gridName);
 		return gridTarget?.columnNames.includes(columnName) ?? false;
 	}
 
@@ -457,7 +457,7 @@
 						bind:value={conditionExpression}
 						class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-2 focus:ring-blue-500"
 						rows="3"
-						placeholder="${amount > 1000 && status == 'pending'}"
+						placeholder={'${amount > 1000 && status == \'pending\'}'}
 					></textarea>
 					<p class="mt-1 text-xs text-gray-500">
 						Available: form fields, user.id, user.username, user.roles, user.groups,
@@ -478,12 +478,12 @@
 			<h4 class="font-medium text-gray-900 mb-3">Then apply:</h4>
 			<div class="flex flex-wrap gap-3">
 				<label
-					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {effect ===
+					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {ruleEffect ===
 					'hidden'
 						? 'border-blue-500 bg-blue-50'
 						: ''}"
 				>
-					<input type="radio" name="effect" value="hidden" bind:group={effect} class="sr-only" />
+					<input type="radio" name="effect" value="hidden" bind:group={ruleEffect} class="sr-only" />
 					<svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"
@@ -496,12 +496,12 @@
 				</label>
 
 				<label
-					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {effect ===
+					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {ruleEffect ===
 					'visible'
 						? 'border-blue-500 bg-blue-50'
 						: ''}"
 				>
-					<input type="radio" name="effect" value="visible" bind:group={effect} class="sr-only" />
+					<input type="radio" name="effect" value="visible" bind:group={ruleEffect} class="sr-only" />
 					<svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"
@@ -520,12 +520,12 @@
 				</label>
 
 				<label
-					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {effect ===
+					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {ruleEffect ===
 					'readonly'
 						? 'border-blue-500 bg-blue-50'
 						: ''}"
 				>
-					<input type="radio" name="effect" value="readonly" bind:group={effect} class="sr-only" />
+					<input type="radio" name="effect" value="readonly" bind:group={ruleEffect} class="sr-only" />
 					<svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"
@@ -538,12 +538,12 @@
 				</label>
 
 				<label
-					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {effect ===
+					class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 {ruleEffect ===
 					'editable'
 						? 'border-blue-500 bg-blue-50'
 						: ''}"
 				>
-					<input type="radio" name="effect" value="editable" bind:group={effect} class="sr-only" />
+					<input type="radio" name="effect" value="editable" bind:group={ruleEffect} class="sr-only" />
 					<svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path
 							stroke-linecap="round"

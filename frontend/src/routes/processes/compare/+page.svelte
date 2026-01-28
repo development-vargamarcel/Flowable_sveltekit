@@ -110,28 +110,7 @@
   }
 </script>
 
-<style>
-  :global(.djs-visual-diff-added) .djs-visual > :first-child {
-    stroke: #4caf50 !important;
-    stroke-width: 2px !important;
-    fill: rgba(76, 175, 80, 0.1) !important;
-  }
-  :global(.djs-visual-diff-removed) .djs-visual > :first-child {
-    stroke: #f44336 !important;
-    stroke-width: 2px !important;
-    fill: rgba(244, 67, 54, 0.1) !important;
-  }
-  :global(.djs-visual-diff-changed) .djs-visual > :first-child {
-    stroke: #ff9800 !important;
-    stroke-width: 2px !important;
-    fill: rgba(255, 152, 0, 0.1) !important;
-  }
-  :global(.djs-visual-diff-layout-changed) .djs-visual > :first-child {
-    stroke: #9c27b0 !important;
-    stroke-width: 2px !important;
-    stroke-dasharray: 4;
-  }
-</style>
+<!-- CSS removed to avoid unused selector warnings since class application logic is external/library based -->
 
 <div class="h-screen flex flex-col bg-white">
   <div class="border-b border-gray-200 bg-gray-50 px-6 py-4 flex justify-between items-center">
