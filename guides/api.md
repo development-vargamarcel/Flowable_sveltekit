@@ -26,6 +26,7 @@ The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 | POST | `/api/tasks/{id}/claim` | Claim a candidate task (assign to self). |
 | POST | `/api/tasks/{id}/complete` | Complete a task. Body: `{"variables": {...}}`. |
 | POST | `/api/tasks/{id}/escalate` | Escalate a task. Body: `EscalationRequest`. |
+| POST | `/api/tasks/{id}/delegate` | Delegate (reassign) a task to another user. Body: `{"targetUserId": "..."}`. |
 
 ## Processes
 

@@ -17,12 +17,12 @@
 <button
 	type="button"
 	{onclick}
-	class="w-full text-left card border-2 hover:shadow-lg transition-all {getProcessCardClasses(task.processDefinitionKey || '')}"
+	class="w-full text-left card border-2 hover:shadow-lg transition-all dark:bg-gray-800 dark:border-gray-700 {getProcessCardClasses(task.processDefinitionKey || '')}"
 >
 	<div class="flex justify-between items-start mb-3">
 		<div class="flex-1">
-			<h3 class="font-semibold text-gray-900">{task.name}</h3>
-			<p class="text-sm text-gray-600">{task.processName}</p>
+			<h3 class="font-semibold text-gray-900 dark:text-gray-100">{task.name}</h3>
+			<p class="text-sm text-gray-600 dark:text-gray-400">{task.processName}</p>
 		</div>
 		<span class="px-2 py-1 text-xs font-medium rounded border {getPriorityClasses(task.priority)}">
 			{getPriorityLabel(task.priority)}
@@ -30,26 +30,26 @@
 	</div>
 
 	{#if task.description}
-		<p class="text-sm text-gray-600 mb-3 line-clamp-2">{task.description}</p>
+		<p class="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">{task.description}</p>
 	{/if}
 
 	{#if displays.length > 0}
 		<div class="flex flex-wrap gap-2 mb-3">
 			{#each displays as { label, value }}
-				<span class="px-2 py-1 text-xs bg-white rounded border border-gray-200">
-					<span class="text-gray-500">{label}:</span>
-					<span class="font-medium ml-1">{value}</span>
+				<span class="px-2 py-1 text-xs bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+					<span class="text-gray-500 dark:text-gray-400">{label}:</span>
+					<span class="font-medium ml-1 dark:text-gray-200">{value}</span>
 				</span>
 			{/each}
 		</div>
 	{/if}
 
-	<div class="flex justify-between items-center text-xs text-gray-500">
+	<div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
 		<span>
 			{#if task.assignee}
 				Assigned to: {task.assignee}
 			{:else}
-				<span class="text-orange-600">Unassigned</span>
+				<span class="text-orange-600 dark:text-orange-400">Unassigned</span>
 			{/if}
 		</span>
 		<span>{formatDate(task.createTime)}</span>

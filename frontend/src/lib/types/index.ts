@@ -571,10 +571,23 @@ export interface TaskFormWithConfig {
 }
 
 /**
+ * Process-level field library
+ */
+export interface ProcessFieldLibrary {
+    fields: FormField[];
+    grids: GridDefinition[];
+}
+
+/**
  * Process-level configuration
  */
 export interface ProcessConfig {
-    fieldLibrary?: ProcessFieldDefinition[];
+    processDefinitionId?: string;
+    fieldLibrary?: ProcessFieldLibrary;
+    globalConditions?: FieldConditionRule[];
+    defaultGridConfig?: GridConfig;
+
+    // Legacy fields
     conditionRules?: FieldConditionRule[];
     taskConditionRules?: Record<string, FieldConditionRule[]>;
 }

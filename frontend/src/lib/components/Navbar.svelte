@@ -5,10 +5,35 @@
 	import NotificationBell from './NotificationBell.svelte';
 	import { navigationSchema } from '$lib/nav-schema';
 	import NavLink from './NavLink.svelte';
-	import { Menu } from '@lucide/svelte';
+	import { Menu, Sun, Moon } from '@lucide/svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
 
 	let open = $state(false);
+	let isDark = $state(false);
+
+	$effect(() => {
+		if (
+			localStorage.theme === 'dark' ||
+			(!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+		) {
+			isDark = true;
+			document.documentElement.classList.add('dark');
+		} else {
+			isDark = false;
+			document.documentElement.classList.remove('dark');
+		}
+	});
+
+	function toggleDarkMode() {
+		isDark = !isDark;
+		if (isDark) {
+			document.documentElement.classList.add('dark');
+			localStorage.setItem('theme', 'dark');
+		} else {
+			document.documentElement.classList.remove('dark');
+			localStorage.setItem('theme', 'light');
+		}
+	}
 
 	async function handleLogout() {
 		try {
@@ -36,7 +61,7 @@
 	}
 </script>
 
-<nav class="bg-white shadow-sm border-b border-gray-200">
+<nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
 	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 		<div class="flex justify-between h-16">
 			<div class="flex items-center">
@@ -44,7 +69,7 @@
 					<div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
 						<span class="text-white font-bold text-sm">BPM</span>
 					</div>
-					<span class="font-semibold text-gray-900">Flowable Demo</span>
+					<span class="font-semibold text-gray-900 dark:text-white">Flowable Demo</span>
 				</a>
 
 				<!-- Desktop navigation -->
@@ -60,9 +85,21 @@
 			{#if authStore.isAuthenticated && authStore.user}
 				<div class="flex items-center space-x-4">
 					<div class="hidden sm:flex items-center space-x-4">
+						<button
+							onclick={toggleDarkMode}
+							class="p-1 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+							aria-label="Toggle dark mode"
+						>
+							{#if isDark}
+								<Sun class="w-5 h-5" />
+							{:else}
+								<Moon class="w-5 h-5" />
+							{/if}
+						</button>
+
 						<NotificationBell />
 						<div class="flex items-center space-x-2">
-							<a href="/profile" class="text-sm text-gray-600 hover:text-gray-900 font-medium"
+							<a href="/profile" class="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white font-medium"
 								>{authStore.user.displayName}</a
 							>
 							{#each authStore.user.roles as role}
@@ -73,7 +110,7 @@
 								</span>
 							{/each}
 						</div>
-						<button onclick={handleLogout} class="text-sm text-gray-600 hover:text-gray-900">
+						<button onclick={handleLogout} class="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
 							Logout
 						</button>
 					</div>

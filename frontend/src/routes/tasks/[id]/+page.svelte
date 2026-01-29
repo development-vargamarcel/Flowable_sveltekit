@@ -6,9 +6,11 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import DynamicForm from '$lib/components/DynamicForm.svelte';
+	import DelegateTaskModal from '$lib/components/DelegateTaskModal.svelte';
 	import type { TaskDetails, FormDefinition, TaskFormWithConfig, FormField, FormGrid, FieldConditionRule, GridConfig } from '$lib/types';
 
 	let taskDetails = $state<TaskDetails | null>(null);
+	let showDelegateModal = $state(false);
 	let formDefinition = $state<FormDefinition | null>(null);
 	let processConfig = $state<TaskFormWithConfig['processConfig'] | null>(null);
 	let loading = $state(true);
@@ -339,7 +341,7 @@
 {/if}
 
 <div class="max-w-4xl mx-auto px-4 py-8">
-	<a href="/tasks" class="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6">
+	<a href="/tasks" class="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 mb-6">
 		<svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
 		</svg>
@@ -349,10 +351,10 @@
 	{#if loading}
 		<div class="text-center py-12">
 			<div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-			<p class="mt-4 text-gray-600">Loading task...</p>
+			<p class="mt-4 text-gray-600 dark:text-gray-400">Loading task...</p>
 		</div>
 	{:else if error}
-		<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+		<div class="bg-red-50 border border-red-200 text-red-700 dark:bg-red-900 dark:border-red-800 dark:text-red-200 px-4 py-3 rounded-lg">
 			{error}
 		</div>
 	{:else if taskDetails}
@@ -361,13 +363,13 @@
 		{@const displayVariables = getDisplayVariables()}
 
 		<!-- Task Header -->
-		<div class="card mb-6">
+		<div class="card mb-6 dark:bg-gray-800 dark:border-gray-700">
 			<div class="flex items-start justify-between">
 				<div>
-					<h1 class="text-2xl font-bold text-gray-900">{task.name}</h1>
-					<p class="text-gray-600 mt-1">{task.processName}</p>
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{task.name}</h1>
+					<p class="text-gray-600 dark:text-gray-400 mt-1">{task.processName}</p>
 					{#if task.businessKey}
-						<p class="text-sm text-gray-500 mt-1">Reference: {task.businessKey}</p>
+						<p class="text-sm text-gray-500 dark:text-gray-500 mt-1">Reference: {task.businessKey}</p>
 					{/if}
 				</div>
 				{#if task.assignee}
@@ -388,33 +390,33 @@
 
 		<!-- Request Details (Process Variables) -->
 		{#if displayVariables.length > 0}
-			<div class="card mb-6">
-				<h2 class="text-lg font-semibold text-gray-900 mb-4">Request Details</h2>
+			<div class="card mb-6 dark:bg-gray-800 dark:border-gray-700">
+				<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Request Details</h2>
 				<div class="grid grid-cols-2 gap-4">
 					{#each displayVariables as [key, value]}
 						{#if isGridData(key, value)}
 							{@const items = parseGridData(value as string)}
 							<!-- Grid Data Display -->
-							<div class="col-span-2 py-2 border-b border-gray-100">
-								<dt class="text-sm text-gray-500 mb-3">{formatLabel(key)}</dt>
+							<div class="col-span-2 py-2 border-b border-gray-100 dark:border-gray-700">
+								<dt class="text-sm text-gray-500 dark:text-gray-400 mb-3">{formatLabel(key)}</dt>
 								<dd>
 									{#if items.length > 0}
 										<div class="overflow-x-auto">
-											<table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
-												<thead class="bg-gray-50">
+											<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg">
+												<thead class="bg-gray-50 dark:bg-gray-700">
 													<tr>
 														{#each Object.keys(items[0]) as column}
-															<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+															<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
 																{formatLabel(column)}
 															</th>
 														{/each}
 													</tr>
 												</thead>
-												<tbody class="bg-white divide-y divide-gray-200">
+												<tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
 													{#each items as item}
 														<tr>
 															{#each Object.entries(item) as [col, val]}
-																<td class="px-4 py-3 text-sm text-gray-900">
+																<td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-200">
 																	{#if col.toLowerCase().includes('amount') || col.toLowerCase().includes('price') || col.toLowerCase().includes('total') || col.toLowerCase().includes('cost')}
 																		{formatCurrency(val)}
 																	{:else}
@@ -428,14 +430,14 @@
 											</table>
 										</div>
 									{:else}
-										<p class="text-gray-500 text-sm">No items</p>
+										<p class="text-gray-500 dark:text-gray-400 text-sm">No items</p>
 									{/if}
 								</dd>
 							</div>
 						{:else}
-							<div class="py-2 border-b border-gray-100">
-								<dt class="text-sm text-gray-500">{formatLabel(key)}</dt>
-								<dd class="text-gray-900 font-medium">{formatValue(key, value)}</dd>
+							<div class="py-2 border-b border-gray-100 dark:border-gray-700">
+								<dt class="text-sm text-gray-500 dark:text-gray-400">{formatLabel(key)}</dt>
+								<dd class="text-gray-900 dark:text-gray-200 font-medium">{formatValue(key, value)}</dd>
 							</div>
 						{/if}
 					{/each}
@@ -444,12 +446,12 @@
 		{/if}
 
 		<!-- Action Form -->
-		<div class="card">
-			<h2 class="text-lg font-semibold text-gray-900 mb-4">Take Action</h2>
+		<div class="card dark:bg-gray-800 dark:border-gray-700">
+			<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Take Action</h2>
 
 			{#if !task.assignee && task.formKey !== 'complete-task-form'}
-				<div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-					<p class="text-yellow-800">This task is not assigned. Claim it to work on it.</p>
+				<div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+					<p class="text-yellow-800 dark:text-yellow-200">This task is not assigned. Claim it to work on it.</p>
 					<button
 						onclick={handleClaim}
 						class="mt-2 btn btn-primary"
@@ -490,10 +492,10 @@
 					<!-- Legacy Decision Form (fallback or supplement) -->
 					{#if formConfig.showDecision && !hasDynamicForm}
 						<fieldset>
-							<legend class="label">Your Decision *</legend>
+							<legend class="label dark:text-gray-200">Your Decision *</legend>
 							<div class="space-y-2">
 								{#each formConfig.decisions as opt}
-									<label class="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 {decision === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}">
+									<label class="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors {decision === opt.value ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500' : 'border-gray-200 dark:border-gray-700'}">
 										<input
 											type="radio"
 											name="decision"
@@ -501,7 +503,7 @@
 											bind:group={decision}
 											class="text-blue-600"
 										/>
-										<span class="font-medium">{opt.label}</span>
+										<span class="font-medium dark:text-gray-200">{opt.label}</span>
 									</label>
 								{/each}
 							</div>
@@ -511,12 +513,12 @@
 					<!-- Comments (always show unless dynamic form has its own) -->
 					{#if !hasDynamicForm || !formDefinition?.fields.some(f => f.name === 'comments')}
 						<div>
-							<label for="comments" class="label">Comments</label>
+							<label for="comments" class="label dark:text-gray-200">Comments</label>
 							<textarea
 								id="comments"
 								bind:value={comments}
 								rows="3"
-								class="input"
+								class="input dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
 								placeholder="Add any comments..."
 							></textarea>
 						</div>
@@ -524,6 +526,16 @@
 
 					<div class="flex justify-end space-x-3 pt-4">
 						<a href="/tasks" class="btn btn-secondary">Cancel</a>
+
+						<button
+							type="button"
+							onclick={() => (showDelegateModal = true)}
+							class="btn btn-secondary"
+							disabled={savingDraft || submitting}
+						>
+							Delegate
+						</button>
+
 						<button
 							type="button"
 							onclick={handleSaveDraft}
@@ -563,5 +575,18 @@
 				</form>
 			{/if}
 		</div>
+	{/if}
+
+	{#if showDelegateModal && taskDetails}
+		<DelegateTaskModal
+			open={showDelegateModal}
+			taskId={taskDetails.task.id}
+			currentAssignee={taskDetails.task.assignee}
+			onClose={() => (showDelegateModal = false)}
+			onSuccess={() => {
+				// Navigate back to tasks as we no longer own it
+				goto('/tasks');
+			}}
+		/>
 	{/if}
 </div>
