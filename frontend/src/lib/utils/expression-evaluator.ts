@@ -404,6 +404,283 @@ export class ExpressionEvaluator {
     }
     return str;
   }
+
+  /**
+   * Evaluate arithmetic expressions safely
+   * Supports: +, -, *, /, %, ()
+   */
+  evaluateArithmetic(expr: string): number {
+    try {
+      // First resolve all variables in the expression
+      const resolvedExpr = this.resolveVariablesInExpression(expr);
+      return this.parseArithmeticExpression(resolvedExpr);
+    } catch (error) {
+      console.warn(`Failed to evaluate arithmetic expression: ${expr}`, error);
+      return 0;
+    }
+  }
+
+  private resolveVariablesInExpression(expr: string): string {
+    // Replace variable references with their values
+    // Match patterns like form.fieldName, process.var, or just fieldName
+    return expr.replace(/[a-zA-Z_][a-zA-Z0-9_.]*(?![a-zA-Z0-9_(])/g, (match) => {
+      // Skip keywords
+      if (['true', 'false', 'null', 'undefined'].includes(match)) {
+        return match;
+      }
+      const value = this.resolveVariable(match);
+      if (typeof value === 'number') return String(value);
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        return isNaN(num) ? '0' : String(num);
+      }
+      return '0';
+    });
+  }
+
+  private parseArithmeticExpression(expr: string): number {
+    expr = expr.trim();
+    
+    // Handle addition/subtraction (lowest precedence)
+    let depth = 0;
+    for (let i = expr.length - 1; i >= 0; i--) {
+      const char = expr[i];
+      if (char === ')') depth++;
+      if (char === '(') depth--;
+      if (depth === 0 && (char === '+' || char === '-') && i > 0) {
+        const left = this.parseArithmeticExpression(expr.slice(0, i));
+        const right = this.parseArithmeticExpression(expr.slice(i + 1));
+        return char === '+' ? left + right : left - right;
+      }
+    }
+
+    // Handle multiplication/division/modulo
+    depth = 0;
+    for (let i = expr.length - 1; i >= 0; i--) {
+      const char = expr[i];
+      if (char === ')') depth++;
+      if (char === '(') depth--;
+      if (depth === 0 && (char === '*' || char === '/' || char === '%')) {
+        const left = this.parseArithmeticExpression(expr.slice(0, i));
+        const right = this.parseArithmeticExpression(expr.slice(i + 1));
+        if (char === '*') return left * right;
+        if (char === '/') return right !== 0 ? left / right : 0;
+        return right !== 0 ? left % right : 0;
+      }
+    }
+
+    // Handle parentheses
+    if (expr.startsWith('(') && expr.endsWith(')')) {
+      return this.parseArithmeticExpression(expr.slice(1, -1));
+    }
+
+    // Handle unary minus
+    if (expr.startsWith('-')) {
+      return -this.parseArithmeticExpression(expr.slice(1));
+    }
+
+    // Parse number
+    const num = parseFloat(expr);
+    return isNaN(num) ? 0 : num;
+  }
+
+  /**
+   * Evaluate grid aggregate functions
+   */
+  evaluateGridFunction(expr: string, grids: Record<string, GridContext>): unknown {
+    // Match: grids.gridName.sum('columnName') or grids.gridName.rows.length
+    const sumMatch = expr.match(/^grids\.([a-zA-Z_][a-zA-Z0-9_]*)\.sum\(['"]([a-zA-Z_][a-zA-Z0-9_]*)['"]\)$/);
+    if (sumMatch) {
+      const gridName = sumMatch[1];
+      const columnName = sumMatch[2];
+      const grid = grids[gridName];
+      if (grid && typeof grid.sum === 'function') {
+        return grid.sum(columnName);
+      }
+      return 0;
+    }
+
+    const countMatch = expr.match(/^grids\.([a-zA-Z_][a-zA-Z0-9_]*)\.rows\.length$/);
+    if (countMatch) {
+      const gridName = countMatch[1];
+      const grid = grids[gridName];
+      if (grid && Array.isArray(grid.rows)) {
+        return grid.rows.length;
+      }
+      return 0;
+    }
+
+    return undefined;
+  }
+}
+
+/**
+ * Grid context for expression evaluation
+ */
+export interface GridContext {
+  rows: Record<string, unknown>[];
+  selectedRows?: Record<string, unknown>[];
+  selectedRow?: Record<string, unknown> | null;
+  sum: (column: string) => number;
+}
+
+/**
+ * Extended evaluation context with grids and task
+ */
+export interface ExtendedEvaluationContext extends EvaluationContext {
+  grids?: Record<string, GridContext>;
+  task?: { id: string; name: string; taskDefinitionKey: string };
+  value?: unknown; // Current field value for validation expressions
+}
+
+/**
+ * Safe expression evaluator for DynamicForm
+ * Replaces unsafe new Function() calls with safe parsing
+ */
+export class SafeExpressionEvaluator extends ExpressionEvaluator {
+  private extendedContext: ExtendedEvaluationContext;
+
+  constructor(context: ExtendedEvaluationContext) {
+    super(context);
+    this.extendedContext = context;
+  }
+
+  /**
+   * Evaluate a calculation expression safely
+   * Returns the calculated value or undefined if evaluation fails
+   */
+  evaluateCalculation(expression: string): unknown {
+    if (!expression || expression.trim() === '') {
+      return undefined;
+    }
+
+    try {
+      // Check for return statement (common in calculation expressions)
+      let expr = expression.trim();
+      if (expr.startsWith('return ')) {
+        expr = expr.slice(7).trim();
+      }
+      // Remove trailing semicolon
+      if (expr.endsWith(';')) {
+        expr = expr.slice(0, -1).trim();
+      }
+
+      // Try grid functions first
+      if (this.extendedContext.grids) {
+        const gridResult = this.evaluateGridFunction(expr, this.extendedContext.grids);
+        if (gridResult !== undefined) {
+          return gridResult;
+        }
+      }
+
+      // Try arithmetic expression
+      if (this.isArithmeticExpression(expr)) {
+        return this.evaluateArithmetic(expr);
+      }
+
+      // Try boolean expression
+      return this.evaluate(expr);
+    } catch (error) {
+      console.warn(`SafeExpressionEvaluator: Failed to evaluate calculation: ${expression}`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Evaluate a visibility expression safely
+   * Returns true if visible, false if hidden
+   */
+  evaluateVisibility(expression: string): boolean {
+    if (!expression || expression.trim() === '') {
+      return true; // Default to visible
+    }
+
+    try {
+      let expr = expression.trim();
+      if (expr.startsWith('return ')) {
+        expr = expr.slice(7).trim();
+      }
+      if (expr.endsWith(';')) {
+        expr = expr.slice(0, -1).trim();
+      }
+
+      const result = this.evaluate(expr);
+      return this.toBool(result);
+    } catch (error) {
+      console.warn(`SafeExpressionEvaluator: Failed to evaluate visibility: ${expression}`, error);
+      return true; // Default to visible on error
+    }
+  }
+
+  /**
+   * Evaluate a validation expression safely
+   * Returns true if valid, false if invalid, or a string error message
+   */
+  evaluateValidation(expression: string): boolean | string {
+    if (!expression || expression.trim() === '') {
+      return true; // Default to valid
+    }
+
+    try {
+      let expr = expression.trim();
+      if (expr.startsWith('return ')) {
+        expr = expr.slice(7).trim();
+      }
+      if (expr.endsWith(';')) {
+        expr = expr.slice(0, -1).trim();
+      }
+
+      const result = this.evaluate(expr);
+      
+      // If result is a string, it's an error message
+      if (typeof result === 'string' && result !== '') {
+        return result;
+      }
+      
+      return this.toBool(result);
+    } catch (error) {
+      console.warn(`SafeExpressionEvaluator: Failed to evaluate validation: ${expression}`, error);
+      return true; // Default to valid on error
+    }
+  }
+
+  private toBool(value: unknown): boolean {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') return value !== '' && value.toLowerCase() !== 'false';
+    if (typeof value === 'number') return value !== 0;
+    return Boolean(value);
+  }
+
+  private isArithmeticExpression(expr: string): boolean {
+    // Check if expression contains arithmetic operators
+    // but is not a comparison or logical expression
+    return /^[0-9a-zA-Z_.\s+\-*/%()]+$/.test(expr) &&
+           !/[=!<>&|]/.test(expr) &&
+           /[+\-*/%]/.test(expr);
+  }
+
+  /**
+   * Update context with new values
+   */
+  updateExtendedContext(updates: Partial<ExtendedEvaluationContext>): void {
+    this.extendedContext = { ...this.extendedContext, ...updates };
+    this.updateContext(updates);
+  }
+}
+
+/**
+ * Create a safe expression evaluator for DynamicForm
+ */
+export function createSafeEvaluator(context: Partial<ExtendedEvaluationContext> = {}): SafeExpressionEvaluator {
+  return new SafeExpressionEvaluator({
+    form: context.form || {},
+    process: context.process || {},
+    user: context.user || { id: '', username: '', roles: [], groups: [] },
+    grids: context.grids,
+    task: context.task,
+    value: context.value
+  });
 }
 
 /**

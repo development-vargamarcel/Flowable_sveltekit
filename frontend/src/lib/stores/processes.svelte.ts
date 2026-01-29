@@ -6,32 +6,37 @@ import type { ProcessDefinition, ProcessInstance, Dashboard, Page } from '$lib/t
  *
  * This store provides:
  * - Cached process definitions with automatic invalidation
- * - Dashboard data caching
+ * - Dashboard data caching with SWR (stale-while-revalidate) pattern
  * - Event-driven updates when processes are deployed/deleted
- * - Stale data detection
+ * - Stale data detection with background refresh
+ * - Optimistic updates for better perceived performance
  */
 class ProcessStore {
   // Process definitions (deployed processes)
   definitions = $state<ProcessDefinition[]>([]);
   definitionsLoading = $state(false);
+  definitionsRefreshing = $state(false);
   definitionsError = $state<string | null>(null);
   definitionsLastFetched = $state<number | null>(null);
 
   // My process instances
   myInstances = $state<Page<ProcessInstance> | null>(null);
   myInstancesLoading = $state(false);
+  myInstancesRefreshing = $state(false);
   myInstancesError = $state<string | null>(null);
   myInstancesLastFetched = $state<number | null>(null);
 
   // Dashboard data
   dashboard = $state<Dashboard | null>(null);
   dashboardLoading = $state(false);
+  dashboardRefreshing = $state(false);
   dashboardError = $state<string | null>(null);
   dashboardLastFetched = $state<number | null>(null);
 
   // Cache configuration (in milliseconds)
-  private readonly CACHE_TTL = 30000; // 30 seconds
-  private readonly STALE_THRESHOLD = 5000; // 5 seconds - consider data stale after this
+  private readonly CACHE_TTL = 30000; // 30 seconds - data is fresh
+  private readonly STALE_THRESHOLD = 5000; // 5 seconds - trigger background refresh
+  private readonly MAX_AGE = 300000; // 5 minutes - force refresh even with errors
 
   // Listeners for process changes
   private changeListeners = new Set<() => void>();

@@ -3,20 +3,22 @@
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api/client';
 	import { processStore } from '$lib/stores/processes.svelte';
-	import type { WorkflowHistory, Page } from '$lib/types';
+	import type { WorkflowHistory, Page, SlaStats } from '$lib/types';
 	import EscalationBadge from '$lib/components/EscalationBadge.svelte';
 	import SLAStats from '$lib/components/SLAStats.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import DurationHistogram from '$lib/components/DurationHistogram.svelte';
 	import UserPerformanceWidget from '$lib/components/UserPerformanceWidget.svelte';
 	import BottleneckWidget from '$lib/components/BottleneckWidget.svelte';
-	import DashboardSkeleton from '$lib/components/DashboardSkeleton.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ProcessDetailsModal from '$lib/components/ProcessDetailsModal.svelte';
+	import DashboardSkeleton from '$lib/components/DashboardSkeleton.svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 
-	let loading = $state(true);
+	// Loading states - separate for initial load vs refresh
+	let initialLoading = $state(true);
+	let refreshing = $state(false);
 	let error = $state<ApiError | string | null>(null);
 	let activeTab = $state<'all' | 'active' | 'completed' | 'my-approvals'>('all');
 	let selectedProcess = $state<WorkflowHistory | null>(null);
@@ -27,17 +29,23 @@
 	// Subscribe to process changes for reactive updates
 	let unsubscribe: (() => void) | null = null;
 
-	// Use dashboard from store
+	// Use dashboard from store - show stale data while refreshing (SWR pattern)
 	const dashboard = $derived(processStore.dashboard);
+	
+	// Show loading skeleton only on initial load when no data exists
+	const showSkeleton = $derived(initialLoading && !dashboard);
+	
+	// Show refresh indicator when we have data but are updating
+	const isRefreshing = $derived(refreshing && dashboard !== null);
 
 	onMount(async () => {
 		// Subscribe to process changes from other components
 		unsubscribe = processStore.onProcessChange(() => {
-			// Force refresh when processes change elsewhere
-			loadDashboard(true, 0);
+			// Force refresh when processes change elsewhere (background refresh)
+			loadDashboard(true, 0, true);
 		});
 
-		await loadDashboard(false, 0);
+		await loadDashboard(false, 0, false);
 	});
 
 	onDestroy(() => {
@@ -46,23 +54,48 @@
 		}
 	});
 
-	async function loadDashboard(forceRefresh = false, page = 0) {
-		loading = true;
-		error = null;
+	/**
+	 * Load dashboard with SWR (stale-while-revalidate) pattern
+	 * - Shows existing data immediately
+	 * - Fetches fresh data in background
+	 * - Updates UI when fresh data arrives
+	 */
+	async function loadDashboard(forceRefresh = false, page = 0, isBackgroundRefresh = false) {
+		// Set appropriate loading state
+		if (isBackgroundRefresh || dashboard) {
+			refreshing = true;
+		} else {
+			initialLoading = true;
+		}
+		
+		// Clear error only on non-background refresh
+		if (!isBackgroundRefresh) {
+			error = null;
+		}
+		
 		try {
 			await processStore.loadDashboard(
 				() => api.getDashboard(page, 10, statusFilter, typeFilter),
 				forceRefresh
 			);
 			currentPage = page;
+			// Clear any previous errors on success
+			error = null;
 		} catch (err) {
-			if (err instanceof ApiError) {
-				error = err;
+			// Only show error if we don't have stale data to show
+			if (!dashboard) {
+				if (err instanceof ApiError) {
+					error = err;
+				} else {
+					error = err instanceof Error ? err.message : 'Failed to load dashboard';
+				}
 			} else {
-				error = err instanceof Error ? err.message : 'Failed to load dashboard';
+				// Log error but don't disrupt the UI if we have stale data
+				console.warn('Dashboard refresh failed, showing stale data:', err);
 			}
 		} finally {
-			loading = false;
+			initialLoading = false;
+			refreshing = false;
 		}
 	}
 
@@ -151,17 +184,28 @@
 	<title>Workflow Dashboard - BPM Demo</title>
 </svelte:head>
 
-<div class="max-w-7xl mx-auto px-4 py-8">
-	<div class="mb-8">
-		<h1 class="text-2xl font-bold text-gray-900">Workflow Dashboard</h1>
-		<p class="text-gray-600 mt-1">Centralized view of all past, ongoing, and planned processes</p>
-	</div>
+<!-- Show skeleton on initial load without data -->
+{#if showSkeleton}
+	<DashboardSkeleton />
+{:else}
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+		<!-- Header with refresh indicator -->
+		<div class="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+			<div>
+				<h1 class="text-xl sm:text-2xl font-bold text-gray-900">Workflow Dashboard</h1>
+				<p class="text-sm sm:text-base text-gray-600 mt-1">Centralized view of all past, ongoing, and planned processes</p>
+			</div>
+			{#if isRefreshing}
+				<div class="flex items-center gap-2 text-sm text-gray-500">
+					<div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+					<span>Updating...</span>
+				</div>
+			{/if}
+		</div>
 
-	{#if loading}
-		<DashboardSkeleton />
-	{:else if error}
-		<ErrorDisplay {error} onRetry={() => loadDashboard()} title="Error Loading Dashboard" />
-	{:else if dashboard}
+		{#if error && !dashboard}
+			<ErrorDisplay {error} onRetry={() => loadDashboard()} title="Error Loading Dashboard" />
+		{:else if dashboard}
 		<SLAStats />
 
 		<!-- Stats Overview -->
@@ -284,22 +328,25 @@
 			</div>
 		</div>
 
-		<!-- Tab Navigation -->
-		<div class="border-b border-gray-200 mb-6">
-			<nav class="flex space-x-8">
-				{#each [{ id: 'all', label: 'All Processes', count: dashboard.activeProcesses.totalElements + dashboard.recentCompleted.totalElements }, { id: 'active', label: 'Active', count: dashboard.activeProcesses.totalElements }, { id: 'completed', label: 'Completed', count: dashboard.recentCompleted.totalElements }, { id: 'my-approvals', label: 'My Pending Approvals', count: dashboard.myPendingApprovals.totalElements }] as tab}
+		<!-- Tab Navigation - Scrollable on mobile -->
+		<div class="border-b border-gray-200 mb-4 sm:mb-6 -mx-4 sm:mx-0 px-4 sm:px-0">
+			<nav class="flex space-x-4 sm:space-x-8 overflow-x-auto pb-px scrollbar-hide" role="tablist" aria-label="Process filters">
+				{#each [{ id: 'all', label: 'All Processes', shortLabel: 'All', count: dashboard.activeProcesses.totalElements + dashboard.recentCompleted.totalElements }, { id: 'active', label: 'Active', shortLabel: 'Active', count: dashboard.activeProcesses.totalElements }, { id: 'completed', label: 'Completed', shortLabel: 'Done', count: dashboard.recentCompleted.totalElements }, { id: 'my-approvals', label: 'My Pending Approvals', shortLabel: 'My Approvals', count: dashboard.myPendingApprovals.totalElements }] as tab}
 					<button
+						role="tab"
+						aria-selected={activeTab === tab.id}
 						onclick={() => {
 							activeTab = tab.id as typeof activeTab;
 						}}
-						class="py-4 px-1 border-b-2 font-medium text-sm transition-colors
+						class="py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0
 							{activeTab === tab.id
 							? 'border-blue-500 text-blue-600'
 							: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
 					>
-						{tab.label}
+						<span class="hidden sm:inline">{tab.label}</span>
+						<span class="sm:hidden">{tab.shortLabel}</span>
 						<span
-							class="ml-2 py-0.5 px-2 rounded-full text-xs
+							class="ml-1 sm:ml-2 py-0.5 px-1.5 sm:px-2 rounded-full text-xs
 							{activeTab === tab.id
 								? 'bg-blue-100 text-blue-600'
 								: 'bg-gray-100 text-gray-600'}"
@@ -311,31 +358,34 @@
 			</nav>
 		</div>
 
-		<!-- Filter Bar -->
-		<div class="flex gap-4 mb-4">
-			<select
-				bind:value={statusFilter}
-				class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-			>
-				<option value="">All Statuses</option>
-				<option value="ACTIVE">Active</option>
-				<option value="COMPLETED">Completed</option>
-				<option value="SUSPENDED">Suspended</option>
-			</select>
-			{#if typeFilter}
-				<button
-					onclick={() => {
-						typeFilter = '';
-					}}
-					class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center gap-2"
+		<!-- Filter Bar - Stack on mobile -->
+		<div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
+			<div class="flex gap-2 flex-1 min-w-0">
+				<select
+					bind:value={statusFilter}
+					aria-label="Filter by status"
+					class="flex-1 sm:flex-none px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 min-w-0"
 				>
-					Clear Type Filter: {typeFilter}
-					<span class="text-gray-500">×</span>
-				</button>
-			{/if}
+					<option value="">All Statuses</option>
+					<option value="ACTIVE">Active</option>
+					<option value="COMPLETED">Completed</option>
+					<option value="SUSPENDED">Suspended</option>
+				</select>
+				{#if typeFilter}
+					<button
+						onclick={() => {
+							typeFilter = '';
+						}}
+						class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center gap-2 truncate max-w-[150px] sm:max-w-none"
+					>
+						<span class="truncate">Clear: {typeFilter}</span>
+						<span class="text-gray-500 flex-shrink-0">×</span>
+					</button>
+				{/if}
+			</div>
 			<button
 				onclick={() => loadDashboard()}
-				class="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+				class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm w-full sm:w-auto"
 			>
 				Refresh
 			</button>
@@ -462,7 +512,19 @@
 				</div>
 			{/if}
 		</div>
-	{/if}
-</div>
+		{/if}
+	</div>
+{/if}
 
 <ProcessDetailsModal process={selectedProcess} onClose={closeProcessDetails} />
+
+<style>
+	/* Hide scrollbar for tab navigation on mobile while keeping functionality */
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
+</style>

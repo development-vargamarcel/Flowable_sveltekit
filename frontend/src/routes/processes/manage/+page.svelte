@@ -3,11 +3,26 @@
   import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
   import { processStore } from '$lib/stores/processes.svelte';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   let isLoading = $state(true);
   let error = $state('');
   let success = $state('');
-  let deleteConfirm = $state<string | null>(null);
+  
+  // Delete confirmation state
+  let deleteDialog = $state<{
+    open: boolean;
+    processDefId: string;
+    processKey: string;
+    processName: string;
+    loading: boolean;
+  }>({
+    open: false,
+    processDefId: '',
+    processKey: '',
+    processName: '',
+    loading: false
+  });
 
   // Start Instance Modal State
   let showStartModal = $state(false);
@@ -59,25 +74,35 @@
     }
   }
 
-  async function handleDelete(processDefId: string, processKey: string, processName: string) {
-    if (deleteConfirm !== processKey) {
-      deleteConfirm = processKey;
-      return;
-    }
+  function openDeleteDialog(processDefId: string, processKey: string, processName: string) {
+    deleteDialog = {
+      open: true,
+      processDefId,
+      processKey,
+      processName,
+      loading: false
+    };
+  }
 
+  function closeDeleteDialog() {
+    deleteDialog = { ...deleteDialog, open: false, loading: false };
+  }
+
+  async function confirmDelete() {
+    deleteDialog.loading = true;
     error = '';
     success = '';
 
     try {
-      await api.deleteProcess(processDefId, false);
-      success = `Process "${processName}" deleted successfully`;
-      processStore.removeProcess(processDefId);
+      await api.deleteProcess(deleteDialog.processDefId, false);
+      success = `Process "${deleteDialog.processName}" deleted successfully`;
+      processStore.removeProcess(deleteDialog.processDefId);
+      closeDeleteDialog();
       await loadProcesses(true);
     } catch (err) {
       console.error('Error deleting process:', err);
       error = err instanceof Error ? err.message : 'Failed to delete process';
-    } finally {
-      deleteConfirm = null;
+      deleteDialog.loading = false;
     }
   }
 
@@ -119,10 +144,6 @@
 
   function handleCreate() {
     goto('/processes/designer');
-  }
-
-  function cancelDelete() {
-    deleteConfirm = null;
   }
 
   function openStartModal(processKey: string, processName: string) {
@@ -432,30 +453,13 @@
                   </button>
                 {/if}
 
-                {#if deleteConfirm === key}
-                  <div class="flex gap-2 w-full justify-end mt-2">
-                    <button
-                      onclick={() => handleDelete(latest.id, key, latest.name || key)}
-                      class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
-                    >
-                      Confirm
-                    </button>
-                    <button
-                      onclick={cancelDelete}
-                      class="rounded-md bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                {:else}
-                  <button
-                    onclick={() => (deleteConfirm = key)}
-                    class="rounded-md bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200"
-                    title="Delete process (all versions)"
-                  >
-                    Delete
-                  </button>
-                {/if}
+                <button
+                  onclick={() => openDeleteDialog(latest.id, key, latest.name || key)}
+                  class="rounded-md bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200"
+                  title="Delete process (all versions)"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           </div>
@@ -575,3 +579,16 @@
     </div>
   </div>
 {/if}
+
+<!-- Delete Confirmation Dialog -->
+<ConfirmDialog
+  open={deleteDialog.open}
+  title="Delete Process"
+  message="Are you sure you want to delete '{deleteDialog.processName}'? This will remove all versions of this process definition. Running process instances will not be affected."
+  confirmText="Delete"
+  cancelText="Cancel"
+  variant="danger"
+  loading={deleteDialog.loading}
+  onConfirm={confirmDelete}
+  onCancel={closeDeleteDialog}
+/>

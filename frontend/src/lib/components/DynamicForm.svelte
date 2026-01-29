@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { FormField, FormGrid, GridConfig, FieldConditionRule, ComputedFieldState, ComputedGridState } from '$lib/types';
-	import type { UserContext, EvaluationContext } from '$lib/utils/expression-evaluator';
-	import { createEvaluator } from '$lib/utils/expression-evaluator';
+	import type { UserContext, EvaluationContext, ExtendedEvaluationContext, GridContext } from '$lib/utils/expression-evaluator';
 	import { ConditionStateComputer } from '$lib/utils/condition-state-computer';
+	import { createSafeEvaluator, SafeExpressionEvaluator } from '$lib/utils/expression-evaluator';
 	import DynamicGrid from './DynamicGrid.svelte';
     import { Editor } from '@tiptap/core';
     import StarterKit from '@tiptap/starter-kit';
@@ -122,121 +122,64 @@
 	});
 
     /**
-     * Safe expression evaluation using the sandboxed ExpressionEvaluator.
-     * Replaces the insecure new Function() approach.
-     *
-     * @param expression - The expression to evaluate (supports both simple conditions and return statements)
-     * @param context - Evaluation context with value, form, grids, process, task, user
-     * @returns The evaluation result or undefined on error
+     * Create a safe expression evaluator with current context
+     * This replaces the unsafe new Function() approach
      */
-    function safeEvaluate(expression: string, context: any): any {
-        try {
-            // Remove 'return' statement if present (for backward compatibility with old expressions)
-            let cleanExpression = expression.trim();
-            if (cleanExpression.startsWith('return ')) {
-                cleanExpression = cleanExpression.substring(7).trim();
-            }
-            // Remove trailing semicolon
-            if (cleanExpression.endsWith(';')) {
-                cleanExpression = cleanExpression.slice(0, -1).trim();
-            }
-
-            // Create evaluator with enhanced context including grids and task
-            const evaluator = createEvaluator({
-                form: context.form || {},
-                process: {
-                    ...(context.process || {}),
-                    task: context.task
-                },
-                user: context.user || { id: '', username: '', roles: [], groups: [] }
-            });
-
-            // Extend the evaluation context with grids (temporary workaround)
-            // The evaluator doesn't natively support grids context, but we can add it
-            const originalResolveVariable = (evaluator as any).resolveVariable;
-            (evaluator as any).resolveVariable = function(path: string) {
-                const parts = path.split('.');
-                if (parts[0] === 'grids' && context.grids) {
-                    // Handle grids.gridName.property access
-                    if (parts.length >= 2) {
-                        const gridName = parts[1];
-                        const grid = context.grids[gridName];
-                        if (grid && parts.length === 2) {
-                            return grid;
-                        }
-                        if (grid && parts.length > 2) {
-                            let current: any = grid;
-                            for (let i = 2; i < parts.length; i++) {
-                                if (current === null || current === undefined) return undefined;
-                                current = current[parts[i]];
-                            }
-                            return current;
-                        }
-                    }
-                }
-                // Handle 'value' variable (current field value)
-                if (path === 'value') {
-                    return context.value;
-                }
-                return originalResolveVariable.call(this, path);
-            };
-
-            // Evaluate the expression
-            return evaluator.evaluate(cleanExpression);
-        } catch (e) {
-            console.warn('[Security] Expression evaluation failed (using safe evaluator):', expression, e);
-            return undefined;
-        }
+    function createContextEvaluator(): SafeExpressionEvaluator {
+        return createSafeEvaluator({
+            form: formValues,
+            process: processVariables,
+            user: userContext,
+            grids: gridsContext as unknown as Record<string, GridContext>,
+            task: task
+        });
     }
 
-	async function executeFieldLogic(field: FormField) {
+    /**
+     * Safely evaluate an expression without using new Function()
+     * Falls back to the safe expression evaluator
+     */
+    function safeEvaluate(expression: string, context: { value?: unknown }): unknown {
+        const evaluator = createContextEvaluator();
+        
+        // Update with current field value if provided
+        if (context.value !== undefined) {
+            evaluator.updateExtendedContext({ value: context.value });
+        }
+        
+        return evaluator.evaluateCalculation(expression);
+    }
+
+ async function executeFieldLogic(field: FormField) {
         // New calculation expression
         if (field.calculationExpression) {
-             const result = safeEvaluate(field.calculationExpression, {
-                value: formValues[field.name],
-                form: formValues,
-                grids: gridsContext,
-                process: processVariables,
-                task: task,
-                user: userContext
-            });
+            const evaluator = createContextEvaluator();
+            evaluator.updateExtendedContext({ value: formValues[field.name] });
+            
+            const result = evaluator.evaluateCalculation(field.calculationExpression);
 
-             if (result !== undefined && formValues[field.name] !== result) {
-                 handleFieldChange(field.name, result, true);
-             }
+            if (result !== undefined && formValues[field.name] !== result) {
+                handleFieldChange(field.name, result, true);
+            }
         }
-	}
+ }
 
     // Evaluate Visibility Expressions
     function evaluateVisibility(field: FormField): boolean {
         if (!field.visibilityExpression) return !field.hidden;
 
-        const result = safeEvaluate(field.visibilityExpression, {
-            value: formValues[field.name],
-            form: formValues,
-            grids: gridsContext,
-            process: processVariables,
-            task: task,
-            user: userContext
-        });
-
-        return result === true;
+        const evaluator = createContextEvaluator();
+        evaluator.updateExtendedContext({ value: formValues[field.name] });
+        
+        return evaluator.evaluateVisibility(field.visibilityExpression);
     }
 
     // Evaluate Grid Visibility
     function evaluateGridVisibility(grid: FormGrid): boolean {
         if (!grid.visibilityExpression) return true;
 
-        const result = safeEvaluate(grid.visibilityExpression, {
-            value: null,
-            form: formValues,
-            grids: gridsContext,
-            process: processVariables,
-            task: task,
-            user: userContext
-        });
-
-        return result === true;
+        const evaluator = createContextEvaluator();
+        return evaluator.evaluateVisibility(grid.visibilityExpression);
     }
 
 	// Create evaluation context that updates when form values change
@@ -427,16 +370,12 @@
 			return null;
 		}
 
-        // Custom Validation Expression
+        // Custom Validation Expression - using safe evaluator
         if (field.validationExpression) {
-            const isValidOrMsg = safeEvaluate(field.validationExpression, {
-                value: value,
-                form: formValues,
-                grids: gridsContext,
-                process: processVariables,
-                task: task,
-                user: userContext
-            });
+            const evaluator = createContextEvaluator();
+            evaluator.updateExtendedContext({ value: value });
+            
+            const isValidOrMsg = evaluator.evaluateValidation(field.validationExpression);
 
             if (isValidOrMsg === false) {
                 return field.validationMessage || `${field.label} is invalid`;
