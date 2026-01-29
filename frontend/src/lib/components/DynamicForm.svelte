@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { FormField, FormGrid, GridConfig, FieldConditionRule, ComputedFieldState, ComputedGridState } from '$lib/types';
-	import type { UserContext, EvaluationContext } from '$lib/utils/expression-evaluator';
+	import type { UserContext, EvaluationContext, ExtendedEvaluationContext, GridContext } from '$lib/utils/expression-evaluator';
 	import { ConditionStateComputer } from '$lib/utils/condition-state-computer';
+	import { createSafeEvaluator, SafeExpressionEvaluator } from '$lib/utils/expression-evaluator';
 	import DynamicGrid from './DynamicGrid.svelte';
     import { Editor } from '@tiptap/core';
     import StarterKit from '@tiptap/starter-kit';
@@ -120,72 +121,65 @@
 		dependencyMap = map;
 	});
 
-    function safeEvaluate(expression: string, context: any): any {
-        try {
-            // Function signature: (value, form, grids, process, task, user) => result
-            const func = new Function('value', 'form', 'grids', 'process', 'task', 'user', expression);
-            return func(
-                context.value,
-                context.form,
-                context.grids,
-                context.process,
-                context.task,
-                context.user
-            );
-        } catch (e) {
-            console.warn('Expression evaluation failed:', expression, e);
-            return undefined;
-        }
+    /**
+     * Create a safe expression evaluator with current context
+     * This replaces the unsafe new Function() approach
+     */
+    function createContextEvaluator(): SafeExpressionEvaluator {
+        return createSafeEvaluator({
+            form: formValues,
+            process: processVariables,
+            user: userContext,
+            grids: gridsContext as unknown as Record<string, GridContext>,
+            task: task
+        });
     }
 
-	async function executeFieldLogic(field: FormField) {
+    /**
+     * Safely evaluate an expression without using new Function()
+     * Falls back to the safe expression evaluator
+     */
+    function safeEvaluate(expression: string, context: { value?: unknown }): unknown {
+        const evaluator = createContextEvaluator();
+        
+        // Update with current field value if provided
+        if (context.value !== undefined) {
+            evaluator.updateExtendedContext({ value: context.value });
+        }
+        
+        return evaluator.evaluateCalculation(expression);
+    }
+
+ async function executeFieldLogic(field: FormField) {
         // New calculation expression
         if (field.calculationExpression) {
-             const result = safeEvaluate(field.calculationExpression, {
-                value: formValues[field.name],
-                form: formValues,
-                grids: gridsContext,
-                process: processVariables,
-                task: task,
-                user: userContext
-            });
+            const evaluator = createContextEvaluator();
+            evaluator.updateExtendedContext({ value: formValues[field.name] });
+            
+            const result = evaluator.evaluateCalculation(field.calculationExpression);
 
-             if (result !== undefined && formValues[field.name] !== result) {
-                 handleFieldChange(field.name, result, true);
-             }
+            if (result !== undefined && formValues[field.name] !== result) {
+                handleFieldChange(field.name, result, true);
+            }
         }
-	}
+ }
 
     // Evaluate Visibility Expressions
     function evaluateVisibility(field: FormField): boolean {
         if (!field.visibilityExpression) return !field.hidden;
 
-        const result = safeEvaluate(field.visibilityExpression, {
-            value: formValues[field.name],
-            form: formValues,
-            grids: gridsContext,
-            process: processVariables,
-            task: task,
-            user: userContext
-        });
-
-        return result === true;
+        const evaluator = createContextEvaluator();
+        evaluator.updateExtendedContext({ value: formValues[field.name] });
+        
+        return evaluator.evaluateVisibility(field.visibilityExpression);
     }
 
     // Evaluate Grid Visibility
     function evaluateGridVisibility(grid: FormGrid): boolean {
         if (!grid.visibilityExpression) return true;
 
-        const result = safeEvaluate(grid.visibilityExpression, {
-            value: null,
-            form: formValues,
-            grids: gridsContext,
-            process: processVariables,
-            task: task,
-            user: userContext
-        });
-
-        return result === true;
+        const evaluator = createContextEvaluator();
+        return evaluator.evaluateVisibility(grid.visibilityExpression);
     }
 
 	// Create evaluation context that updates when form values change
@@ -376,16 +370,12 @@
 			return null;
 		}
 
-        // Custom Validation Expression
+        // Custom Validation Expression - using safe evaluator
         if (field.validationExpression) {
-            const isValidOrMsg = safeEvaluate(field.validationExpression, {
-                value: value,
-                form: formValues,
-                grids: gridsContext,
-                process: processVariables,
-                task: task,
-                user: userContext
-            });
+            const evaluator = createContextEvaluator();
+            evaluator.updateExtendedContext({ value: value });
+            
+            const isValidOrMsg = evaluator.evaluateValidation(field.validationExpression);
 
             if (isValidOrMsg === false) {
                 return field.validationMessage || `${field.label} is invalid`;

@@ -3,20 +3,22 @@
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api/client';
 	import { processStore } from '$lib/stores/processes.svelte';
-	import type { WorkflowHistory, Page } from '$lib/types';
+	import type { WorkflowHistory, Page, SlaStats } from '$lib/types';
 	import EscalationBadge from '$lib/components/EscalationBadge.svelte';
 	import SLAStats from '$lib/components/SLAStats.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import DurationHistogram from '$lib/components/DurationHistogram.svelte';
 	import UserPerformanceWidget from '$lib/components/UserPerformanceWidget.svelte';
 	import BottleneckWidget from '$lib/components/BottleneckWidget.svelte';
-	import Loading from '$lib/components/Loading.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ProcessDetailsModal from '$lib/components/ProcessDetailsModal.svelte';
+	import DashboardSkeleton from '$lib/components/DashboardSkeleton.svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 
-	let loading = $state(true);
+	// Loading states - separate for initial load vs refresh
+	let initialLoading = $state(true);
+	let refreshing = $state(false);
 	let error = $state<ApiError | string | null>(null);
 	let activeTab = $state<'all' | 'active' | 'completed' | 'my-approvals'>('all');
 	let selectedProcess = $state<WorkflowHistory | null>(null);
@@ -27,17 +29,23 @@
 	// Subscribe to process changes for reactive updates
 	let unsubscribe: (() => void) | null = null;
 
-	// Use dashboard from store
+	// Use dashboard from store - show stale data while refreshing (SWR pattern)
 	const dashboard = $derived(processStore.dashboard);
+	
+	// Show loading skeleton only on initial load when no data exists
+	const showSkeleton = $derived(initialLoading && !dashboard);
+	
+	// Show refresh indicator when we have data but are updating
+	const isRefreshing = $derived(refreshing && dashboard !== null);
 
 	onMount(async () => {
 		// Subscribe to process changes from other components
 		unsubscribe = processStore.onProcessChange(() => {
-			// Force refresh when processes change elsewhere
-			loadDashboard(true, 0);
+			// Force refresh when processes change elsewhere (background refresh)
+			loadDashboard(true, 0, true);
 		});
 
-		await loadDashboard(false, 0);
+		await loadDashboard(false, 0, false);
 	});
 
 	onDestroy(() => {
@@ -46,23 +54,48 @@
 		}
 	});
 
-	async function loadDashboard(forceRefresh = false, page = 0) {
-		loading = true;
-		error = null;
+	/**
+	 * Load dashboard with SWR (stale-while-revalidate) pattern
+	 * - Shows existing data immediately
+	 * - Fetches fresh data in background
+	 * - Updates UI when fresh data arrives
+	 */
+	async function loadDashboard(forceRefresh = false, page = 0, isBackgroundRefresh = false) {
+		// Set appropriate loading state
+		if (isBackgroundRefresh || dashboard) {
+			refreshing = true;
+		} else {
+			initialLoading = true;
+		}
+		
+		// Clear error only on non-background refresh
+		if (!isBackgroundRefresh) {
+			error = null;
+		}
+		
 		try {
 			await processStore.loadDashboard(
 				() => api.getDashboard(page, 10, statusFilter, typeFilter),
 				forceRefresh
 			);
 			currentPage = page;
+			// Clear any previous errors on success
+			error = null;
 		} catch (err) {
-			if (err instanceof ApiError) {
-				error = err;
+			// Only show error if we don't have stale data to show
+			if (!dashboard) {
+				if (err instanceof ApiError) {
+					error = err;
+				} else {
+					error = err instanceof Error ? err.message : 'Failed to load dashboard';
+				}
 			} else {
-				error = err instanceof Error ? err.message : 'Failed to load dashboard';
+				// Log error but don't disrupt the UI if we have stale data
+				console.warn('Dashboard refresh failed, showing stale data:', err);
 			}
 		} finally {
-			loading = false;
+			initialLoading = false;
+			refreshing = false;
 		}
 	}
 
@@ -151,17 +184,28 @@
 	<title>Workflow Dashboard - BPM Demo</title>
 </svelte:head>
 
-<div class="max-w-7xl mx-auto px-4 py-8">
-	<div class="mb-8">
-		<h1 class="text-2xl font-bold text-gray-900">Workflow Dashboard</h1>
-		<p class="text-gray-600 mt-1">Centralized view of all past, ongoing, and planned processes</p>
-	</div>
+<!-- Show skeleton on initial load without data -->
+{#if showSkeleton}
+	<DashboardSkeleton />
+{:else}
+	<div class="max-w-7xl mx-auto px-4 py-8">
+		<!-- Header with refresh indicator -->
+		<div class="mb-8 flex items-center justify-between">
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900">Workflow Dashboard</h1>
+				<p class="text-gray-600 mt-1">Centralized view of all past, ongoing, and planned processes</p>
+			</div>
+			{#if isRefreshing}
+				<div class="flex items-center gap-2 text-sm text-gray-500">
+					<div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+					<span>Updating...</span>
+				</div>
+			{/if}
+		</div>
 
-	{#if loading}
-		<Loading text="Loading dashboard..." />
-	{:else if error}
-		<ErrorDisplay {error} onRetry={() => loadDashboard()} title="Error Loading Dashboard" />
-	{:else if dashboard}
+		{#if error && !dashboard}
+			<ErrorDisplay {error} onRetry={() => loadDashboard()} title="Error Loading Dashboard" />
+		{:else if dashboard}
 		<SLAStats />
 
 		<!-- Stats Overview -->
@@ -462,7 +506,8 @@
 				</div>
 			{/if}
 		</div>
-	{/if}
-</div>
+		{/if}
+	</div>
+{/if}
 
 <ProcessDetailsModal process={selectedProcess} onClose={closeProcessDetails} />
