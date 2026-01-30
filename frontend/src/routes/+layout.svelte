@@ -17,6 +17,16 @@
 	const publicRoutes = ['/login'];
 
 	onMount(async () => {
+		// Initialize dark mode
+		if (
+			localStorage.theme === 'dark' ||
+			(!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+		) {
+			document.documentElement.classList.add('dark');
+		} else {
+			document.documentElement.classList.remove('dark');
+		}
+
 		// Try to get current user on mount
 		try {
 			const user = await api.getCurrentUser();
@@ -43,12 +53,12 @@
 <!-- Backend startup banner - shows when backend is cold starting on Railway -->
 <BackendStartingBanner />
 
-<div class="min-h-screen flex flex-col">
+<div class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
 	{#if authStore.loading}
 		<div class="flex-1 flex items-center justify-center">
 			<div class="text-center">
 				<div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-				<p class="mt-4 text-gray-600">Loading...</p>
+				<p class="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
 			</div>
 		</div>
 	{:else}

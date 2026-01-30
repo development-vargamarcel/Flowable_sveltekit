@@ -80,6 +80,37 @@ public class TaskController {
         }
     }
 
+    @Operation(summary = "Delegate (reassign) a task to another user")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Task delegated successfully",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
+    @PostMapping("/{taskId}/delegate")
+    public ResponseEntity<?> delegateTask(
+            @Parameter(description = "ID of the task to be delegated") @PathVariable String taskId,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            String targetUserId = request.get("targetUserId");
+            if (targetUserId == null || targetUserId.isEmpty()) {
+                throw new IllegalArgumentException("targetUserId is required");
+            }
+
+            taskService.delegateTask(taskId, userDetails.getUsername(), targetUserId);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Task delegated successfully",
+                    "taskId", taskId,
+                    "assignee", targetUserId
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
     @Operation(summary = "Claim a task")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Task claimed successfully",

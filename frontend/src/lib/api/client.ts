@@ -485,6 +485,13 @@ export const api = {
     await fetchApi(`/api/tasks/${taskId}/claim`, { method: 'POST' });
   },
 
+  async delegateTask(taskId: string, targetUserId: string): Promise<void> {
+    await fetchApi(`/api/tasks/${taskId}/delegate`, {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId })
+    });
+  },
+
   async completeTask(taskId: string, variables: Record<string, unknown>): Promise<void> {
     await fetchApi(`/api/tasks/${taskId}/complete`, {
       method: 'POST',

@@ -160,6 +160,44 @@ public class TaskService {
     }
 
     /**
+     * Delegates (reassigns) a task to another user.
+     *
+     * @param taskId the ID of the task
+     * @param currentUserId the ID of the user currently assigned (or admin)
+     * @param targetUserId the ID of the user to delegate to
+     */
+    @Transactional
+    public void delegateTask(String taskId, String currentUserId, String targetUserId) {
+        log.debug("User {} delegating task {} to {}", currentUserId, taskId, targetUserId);
+
+        Task task = flowableTaskService.createTaskQuery()
+                .taskId(taskId)
+                .singleResult();
+
+        if (task == null) {
+            throw new RuntimeException("Task not found: " + taskId);
+        }
+
+        // Validate access - only assignee can delegate (or we could add admin check)
+        if (task.getAssignee() != null && !task.getAssignee().equals(currentUserId)) {
+            // For now, strict check: only assignee can delegate
+            throw new RuntimeException("Only the assignee can delegate the task");
+        }
+
+        // If task is unassigned, maybe allow claiming implicitly?
+        // But usually delegation implies "I have it, I give it to you".
+        if (task.getAssignee() == null) {
+             // For unassigned tasks, users should use "claim" first, or we allow "assign" if we want.
+             // Let's enforce claim first to avoid confusion, or just allow it.
+             // If I am not assignee (and it's null), I can't delegate based on check above.
+             // So this check covers it.
+        }
+
+        flowableTaskService.setAssignee(taskId, targetUserId);
+        log.info("Task {} delegated/reassigned from {} to {}", taskId, currentUserId, targetUserId);
+    }
+
+    /**
      * Claims a task for a user.
      *
      * @param taskId the ID of the task

@@ -261,3 +261,38 @@ A user settings page (`/profile`) allowing users to manage their personal inform
 - View read-only username and roles
 - Update First Name, Last Name, and Email
 - Real-time feedback with toast notifications
+
+# DelegateTaskModal Component
+
+A modal component that facilitates task delegation (reassignment) to other users.
+
+## Features
+
+- Fetches available users from the backend
+- Allows selection of a target user
+- Handles the delegation API call and updates the UI
+
+## Usage
+
+Import and use `DelegateTaskModal` in task pages:
+
+```svelte
+<DelegateTaskModal
+  open={showDelegateModal}
+  taskId={taskId}
+  currentAssignee={currentAssignee}
+  onClose={() => (showDelegateModal = false)}
+  onSuccess={() => {
+    // Refresh or navigate
+  }}
+/>
+```
+
+# Dark Mode
+
+The application supports a light and dark theme.
+
+- **Toggle**: Located in the top navbar.
+- **Persistence**: Preference is saved in `localStorage` (`theme` key).
+- **System Preference**: Defaults to system preference if no manual selection is made.
+- **Implementation**: Uses Tailwind CSS `dark:` variant and CSS variables for specialized components (like shadcn/ui or bits-ui).
