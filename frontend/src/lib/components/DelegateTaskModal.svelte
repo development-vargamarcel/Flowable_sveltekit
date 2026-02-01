@@ -1,14 +1,14 @@
 <script lang="ts">
+	import Modal from './Modal.svelte';
 	import { api } from '$lib/api/client';
 	import type { User } from '$lib/types';
-	import Modal from './Modal.svelte';
-	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
 		open: boolean;
-		taskId: string;
-		currentAssignee?: string;
+		taskId: string | null;
+		currentAssignee?: string | null;
 		onClose: () => void;
 		onSuccess: () => void;
 	}
@@ -21,23 +21,23 @@
 	let submitting = $state(false);
 
 	onMount(async () => {
-		loadUsers();
-	});
-
-	async function loadUsers() {
-		loading = true;
 		try {
+			// api.getUsers() maps to GET /api/processes/users which returns all users
+			// Note: The return type in client.ts says Promise<User[]> but let's verify if response structure matches
+			// In TaskController it returns Map, but client.ts implies User[].
+			// Wait, ProcessController.java: getUsers() returns userService.getAllUsers().
+			// UserService usually returns List<UserDTO>.
+			// client.ts: async getUsers(): Promise<User[]>
+			// So it should be fine.
 			users = await api.getUsers();
 		} catch (e) {
-			console.error(e);
-			toast.error('Failed to load users');
-		} finally {
-			loading = false;
+			console.error('Failed to load users', e);
+			toast.error('Failed to load users list');
 		}
-	}
+	});
 
-	async function handleDelegate() {
-		if (!selectedUserId) return;
+	async function handleSubmit() {
+		if (!taskId || !selectedUserId) return;
 
 		submitting = true;
 		try {
@@ -52,54 +52,54 @@
 			submitting = false;
 		}
 	}
-
-	// Filter out current user from the list if possible, or just show all
-	const availableUsers = $derived(
-		users.filter((u) => u.username !== currentAssignee)
-	);
 </script>
 
-<Modal {open} title="Delegate Task" {onClose} maxWidth="md">
+<Modal
+	{open}
+	title="Delegate Task"
+	{onClose}
+	maxWidth="sm"
+>
 	<div class="space-y-4">
-		<p class="text-sm text-gray-600 dark:text-gray-300">
-			Select a user to reassign this task to. They will become the new owner.
+		<p class="text-sm text-gray-500">
+			Select a user to reassign this task to. You will no longer be responsible for this task.
 		</p>
 
-		{#if loading}
-			<div class="py-4 text-center">Loading users...</div>
-		{:else}
-			<div>
-				<label for="delegate-user" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-					Select User
-				</label>
-				<select
-					id="delegate-user"
-					bind:value={selectedUserId}
-					class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm py-2 px-3 border"
-				>
-					<option value="" disabled>Select a user...</option>
-					{#each availableUsers as user}
+		<div>
+			<label for="delegate-user" class="block text-sm font-medium text-gray-700 mb-1">
+				Assign To
+			</label>
+			<select
+				id="delegate-user"
+				bind:value={selectedUserId}
+				class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+				disabled={loading || submitting}
+			>
+				<option value="">Select a user...</option>
+				{#each users as user}
+					{#if user.username !== currentAssignee}
 						<option value={user.username}>
-							{user.displayName || user.username} ({user.email || user.username})
+							{user.firstName} {user.lastName} ({user.username})
 						</option>
-					{/each}
-				</select>
-			</div>
-		{/if}
+					{/if}
+				{/each}
+			</select>
+		</div>
 
-		<div class="flex justify-end space-x-3 pt-4 border-t border-gray-100 dark:border-gray-700 mt-4">
+		<div class="flex justify-end gap-3 pt-4">
 			<button
 				onclick={onClose}
-				class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
+				class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+				disabled={submitting}
 			>
 				Cancel
 			</button>
 			<button
-				onclick={handleDelegate}
+				onclick={handleSubmit}
+				class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
 				disabled={!selectedUserId || submitting}
-				class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
 			>
-				{submitting ? 'Delegating...' : 'Delegate'}
+				{submitting ? 'Delegating...' : 'Delegate Task'}
 			</button>
 		</div>
 	</div>

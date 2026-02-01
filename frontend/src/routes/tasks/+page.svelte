@@ -3,7 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { toast } from 'svelte-sonner';
 	import TaskList from '$lib/components/TaskList.svelte';
+	import DelegateTaskModal from '$lib/components/DelegateTaskModal.svelte';
 	import type { Task } from '$lib/types';
 	import Loading from '$lib/components/Loading.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
@@ -14,6 +16,9 @@
 	let activeTab = $state<'all' | 'assigned' | 'claimable'>('all');
 	let searchQuery = $state('');
 	let sortOption = $state<'newest' | 'oldest' | 'priority'>('newest');
+
+	let showDelegateModal = $state(false);
+	let delegateTaskId = $state<string | null>(null);
 
 	const filteredTasks = $derived.by(() => {
 		let tasks = allTasks;
@@ -71,6 +76,35 @@
 
 	function handleTaskClick(taskId: string) {
 		goto(`/tasks/${taskId}`);
+	}
+
+	async function handleClaim(taskId: string) {
+		try {
+			await api.claimTask(taskId);
+			toast.success('Task claimed successfully');
+			await loadTasks();
+		} catch (e) {
+			toast.error('Failed to claim task');
+		}
+	}
+
+	async function handleUnclaim(taskId: string) {
+		try {
+			await api.unclaimTask(taskId);
+			toast.success('Task unclaimed successfully');
+			await loadTasks();
+		} catch (e) {
+			toast.error('Failed to unclaim task');
+		}
+	}
+
+	function handleDelegate(taskId: string) {
+		delegateTaskId = taskId;
+		showDelegateModal = true;
+	}
+
+	function onDelegateSuccess() {
+		loadTasks();
 	}
 
 	function getTabClass(tab: string): string {
@@ -149,6 +183,9 @@
 		<TaskList
 			tasks={filteredTasks}
 			onTaskClick={handleTaskClick}
+			onClaim={handleClaim}
+			onUnclaim={handleUnclaim}
+			onDelegate={handleDelegate}
 			emptyMessage={activeTab === 'assigned'
 				? "You don't have any assigned tasks"
 				: activeTab === 'claimable'
@@ -156,4 +193,11 @@
 					: 'No tasks found'}
 		/>
 	{/if}
+
+	<DelegateTaskModal
+		open={showDelegateModal}
+		taskId={delegateTaskId}
+		onClose={() => (showDelegateModal = false)}
+		onSuccess={onDelegateSuccess}
+	/>
 </div>

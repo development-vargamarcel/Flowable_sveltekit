@@ -6,10 +6,20 @@
 	interface Props {
 		tasks: Task[];
 		onTaskClick: (taskId: string) => void;
+		onClaim?: (taskId: string) => void;
+		onUnclaim?: (taskId: string) => void;
+		onDelegate?: (taskId: string) => void;
 		emptyMessage?: string;
 	}
 
-	const { tasks, onTaskClick, emptyMessage = 'No tasks found' }: Props = $props();
+	const {
+		tasks,
+		onTaskClick,
+		onClaim,
+		onUnclaim,
+		onDelegate,
+		emptyMessage = 'No tasks found'
+	}: Props = $props();
 
 	const sortedTasks = $derived(
 		[...tasks].sort((a, b) => {
@@ -27,7 +37,13 @@
 {:else}
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 		{#each sortedTasks as task (task.id)}
-			<TaskCard {task} onclick={() => onTaskClick(task.id)} />
+			<TaskCard
+				{task}
+				onclick={() => onTaskClick(task.id)}
+				{onClaim}
+				{onUnclaim}
+				{onDelegate}
+			/>
 		{/each}
 	</div>
 {/if}

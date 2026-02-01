@@ -223,6 +223,26 @@ public class TaskService {
     }
 
     /**
+     * Unclaims a task (sets assignee to null).
+     *
+     * @param taskId the ID of the task
+     */
+    @Transactional
+    public void unclaimTask(String taskId) {
+        log.debug("Unclaiming task {}", taskId);
+        Task task = flowableTaskService.createTaskQuery()
+                .taskId(taskId)
+                .singleResult();
+
+        if (task == null) {
+            throw new RuntimeException("Task not found: " + taskId);
+        }
+
+        flowableTaskService.unclaim(taskId);
+        log.info("Task {} unclaimed (assignee removed)", taskId);
+    }
+
+    /**
      * Completes a task with the given variables.
      *
      * @param taskId the ID of the task

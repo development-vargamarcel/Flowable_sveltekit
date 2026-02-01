@@ -493,6 +493,10 @@ export const api = {
     await fetchApi(`/api/tasks/${taskId}/claim`, { method: 'POST' });
   },
 
+  async unclaimTask(taskId: string): Promise<void> {
+    await fetchApi(`/api/tasks/${taskId}/unclaim`, { method: 'POST' });
+  },
+
   async delegateTask(taskId: string, targetUserId: string): Promise<void> {
     await fetchApi(`/api/tasks/${taskId}/delegate`, {
       method: 'POST',

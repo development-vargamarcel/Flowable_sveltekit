@@ -135,6 +135,29 @@ public class TaskController {
         }
     }
 
+    @Operation(summary = "Unclaim a task (release assignment)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Task unclaimed successfully",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content) })
+    @PostMapping("/{taskId}/unclaim")
+    public ResponseEntity<?> unclaimTask(
+            @Parameter(description = "ID of the task to be unclaimed") @PathVariable String taskId) {
+        try {
+            taskService.unclaimTask(taskId);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Task unclaimed successfully",
+                    "taskId", taskId
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
     @Operation(summary = "Complete a task")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Task completed successfully",
