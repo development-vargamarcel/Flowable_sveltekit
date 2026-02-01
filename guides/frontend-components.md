@@ -296,3 +296,35 @@ The application supports a light and dark theme.
 - **Persistence**: Preference is saved in `localStorage` (`theme` key).
 - **System Preference**: Defaults to system preference if no manual selection is made.
 - **Implementation**: Uses Tailwind CSS `dark:` variant and CSS variables for specialized components (like shadcn/ui or bits-ui).
+
+# ProcessDiagram Component
+
+A reusable component for visualizing BPMN 2.0 process diagrams using `bpmn-js`.
+
+## Features
+
+- Renders BPMN 2.0 XML
+- Highlights active activities (tasks, gateways, etc.)
+- Zoom and pan support via `bpmn-js` NavigatedViewer
+- Responsive container
+
+## Usage
+
+```svelte
+<script lang="ts">
+  import ProcessDiagram from '$lib/components/ProcessDiagram.svelte';
+
+  let bpmnXml = '...'; // BPMN 2.0 XML string
+  let activeActivityIds = ['Activity_1', 'Activity_2']; // IDs of currently active elements
+</script>
+
+<div style="height: 500px;">
+  <ProcessDiagram {bpmnXml} {activeActivityIds} />
+</div>
+```
+
+## Props
+
+- `bpmnXml` (string, required): The BPMN 2.0 XML content.
+- `activeActivityIds` (string[]): List of activity IDs to highlight (e.g., current task).
+- `height` (string, default: '500px'): Height of the diagram container.

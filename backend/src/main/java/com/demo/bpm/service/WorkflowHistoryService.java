@@ -45,6 +45,7 @@ public class WorkflowHistoryService {
         String status;
         LocalDateTime startTime;
         LocalDateTime endTime = null;
+        String processDefId;
         String processDefKey;
         String processDefName;
         String businessKey;
@@ -57,6 +58,7 @@ public class WorkflowHistoryService {
             startTime = activeInstance.getStartTime().toInstant()
                     .atZone(ZoneId.systemDefault())
                     .toLocalDateTime();
+            processDefId = activeInstance.getProcessDefinitionId();
             processDefKey = activeInstance.getProcessDefinitionKey();
             businessKey = activeInstance.getBusinessKey();
 
@@ -94,6 +96,7 @@ public class WorkflowHistoryService {
                         .toLocalDateTime();
                 durationInMillis = historicInstance.getDurationInMillis();
             }
+            processDefId = historicInstance.getProcessDefinitionId();
             processDefKey = historicInstance.getProcessDefinitionKey();
             processDefName = historicInstance.getProcessDefinitionName();
             businessKey = historicInstance.getBusinessKey();
@@ -128,6 +131,7 @@ public class WorkflowHistoryService {
 
         return WorkflowHistoryDTO.builder()
                 .processInstanceId(processInstanceId)
+                .processDefinitionId(processDefId)
                 .processDefinitionKey(processDefKey)
                 .processDefinitionName(processDefName)
                 .businessKey(businessKey)

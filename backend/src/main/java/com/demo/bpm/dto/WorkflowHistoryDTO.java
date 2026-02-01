@@ -15,6 +15,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class WorkflowHistoryDTO {
     private String processInstanceId;
+    private String processDefinitionId;
     private String processDefinitionKey;
     private String processDefinitionName;
     private String businessKey;

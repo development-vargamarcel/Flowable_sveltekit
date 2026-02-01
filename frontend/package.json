@@ -69,7 +69,7 @@
     "@tiptap/extension-link": "^3.14.0",
     "@tiptap/starter-kit": "^3.14.0",
     "@types/sortablejs": "^1.15.9",
-    "bpmn-js": "^18.9.1",
+    "bpmn-js": "^18.10.1",
     "bpmn-js-differ": "^3.1.0",
     "bpmn-js-token-simulation": "^0.38.2",
     "clsx": "^2.1.1",

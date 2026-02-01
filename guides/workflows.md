@@ -94,3 +94,14 @@ Users can add comments to any active process instance to provide updates, ask qu
 4. Click **Add** to submit the comment.
 
 Comments are visible to all users with access to the process instance and are included in the process history.
+
+## Feature: Diagram Visualization
+
+Users can view the live BPMN diagram of a process instance to understand the current progress and pending activities.
+
+### Usage
+1. Open the **Process Details** modal for any active or completed process.
+2. Click the **Diagram** tab at the top of the modal.
+3. The application will render the BPMN 2.0 diagram.
+   - **Active Activities**: Highlighted in green.
+   - **Zoom/Pan**: Use mouse wheel to zoom, drag to pan.

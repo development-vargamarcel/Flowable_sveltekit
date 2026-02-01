@@ -217,6 +217,7 @@ export interface WorkflowActivity {
  */
 export interface WorkflowHistory {
     processInstanceId: string;
+    processDefinitionId: string;
     processDefinitionKey: string;
     processDefinitionName?: string;
     startTime: string;
