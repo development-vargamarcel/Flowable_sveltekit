@@ -383,3 +383,29 @@ A component to manage documents associated with a task.
 
 - `taskId` (string, required): The ID of the task.
 - `readonly` (boolean, default: false): If true, hides upload/delete actions.
+
+# TaskTimeline Component
+
+A component to visualize the audit trail/history of a task.
+
+## Features
+
+- Vertical timeline visualization
+- Icons for different event types (created, assigned, commented, etc.)
+- Relative time formatting
+
+## Usage
+
+```svelte
+<script>
+  import TaskTimeline from '$lib/components/TaskTimeline.svelte';
+  
+  let taskId = 'task-123';
+</script>
+
+<TaskTimeline taskId={taskId} />
+```
+
+## Props
+
+- `taskId` (string, required): The ID of the task.

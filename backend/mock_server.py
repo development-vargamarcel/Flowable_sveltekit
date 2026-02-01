@@ -45,6 +45,15 @@ class BPMBackendHandler(http.server.SimpleHTTPRequestHandler):
                 response = {"id": "d_new_" + str(parsed_path.path), "name": "uploaded_file.png", "type": "image/png", "size": 5000, "createdBy": "me", "createdAt": "2024-02-01T12:00:00Z"}
             elif self.command == 'DELETE':
                  response = {"message": "Document deleted"}
+        elif parsed_path.path.endswith('/history'):
+            # Task history/audit log
+            taskId = parsed_path.path.split('/')[-2]
+            response = [
+                {"id": "h1", "taskId": taskId, "type": "CREATED", "userId": "system", "userName": "System", "timestamp": "2024-02-01T09:00:00Z", "details": "Task created"},
+                {"id": "h2", "taskId": taskId, "type": "ASSIGNED", "userId": "manager1", "userName": "Manager", "timestamp": "2024-02-01T09:05:00Z", "details": "Assigned to user"},
+                {"id": "h3", "taskId": taskId, "type": "COMMENT", "userId": "user2", "userName": "User Two", "timestamp": "2024-02-01T10:00:00Z", "details": "Added a comment"},
+                {"id": "h4", "taskId": taskId, "type": "DOCUMENT_UPLOAD", "userId": "user1", "userName": "User One", "timestamp": "2024-02-01T11:00:00Z", "details": "Uploaded invoice_feb.pdf"}
+            ]
         elif parsed_path.path.startswith('/api/tasks'):
             response = {
                 "total": 5,

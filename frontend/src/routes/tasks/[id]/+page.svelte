@@ -9,6 +9,7 @@
 	import DelegateTaskModal from '$lib/components/DelegateTaskModal.svelte';
     import Comments from '$lib/components/Comments.svelte';
     import TaskDocuments from '$lib/components/TaskDocuments.svelte';
+    import TaskTimeline from '$lib/components/TaskTimeline.svelte';
 	import type { TaskDetails, FormDefinition, TaskFormWithConfig, FormField, FormGrid, GridConfig } from '$lib/types';
 
 	let taskDetails = $state<TaskDetails | null>(null);
@@ -447,13 +448,18 @@
 			</div>
 		{/if}
 
-        <!-- Comments Section -->
-        <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Comments -->
                 <Comments taskId={task.id} />
-            </div>
-            <div>
+                
+                <!-- Documents -->
                 <TaskDocuments taskId={task.id} />
+            </div>
+            
+            <!-- Sidebar: Timeline -->
+            <div>
+                <TaskTimeline taskId={task.id} />
             </div>
         </div>
 

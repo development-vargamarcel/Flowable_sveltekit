@@ -131,6 +131,36 @@ export interface TaskAction {
   variables?: ProcessVariables;
 }
 
+/**
+ * Task history event types
+ */
+export type HistoryEventType =
+  | 'CREATED'
+  | 'ASSIGNED'
+  | 'CLAIMED'
+  | 'UNCLAIMED'
+  | 'DELEGATED'
+  | 'COMPLETED'
+  | 'COMMENT'
+  | 'DOCUMENT_UPLOAD'
+  | 'DOCUMENT_DELETE'
+  | 'STATUS_CHANGE'
+  | 'UPDATE';
+
+/**
+ * Audit log event for a task
+ */
+export interface TaskHistoryEvent {
+  id: string;
+  taskId: string;
+  type: HistoryEventType;
+  userId: string;
+  userName?: string;
+  timestamp: string;
+  details?: string;
+  metadata?: Record<string, unknown>;
+}
+
 // ============================================
 // User Types
 // ============================================

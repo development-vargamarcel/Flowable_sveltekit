@@ -8,6 +8,7 @@ import type {
   RegisterRequest,
   Dashboard,
   WorkflowHistory,
+  TaskHistoryEvent,
   EscalationRequest,
   Escalation,
   EscalationOptions,
@@ -583,6 +584,16 @@ export const api = {
     await fetchApi(`/api/tasks/${taskId}/documents/${documentId}`, {
       method: 'DELETE'
     });
+  },
+
+  /**
+
+     * Fetch the audit log/history for a specific task.
+
+     */
+
+  async getTaskHistory(taskId: string): Promise<TaskHistoryEvent[]> {
+    return fetchApi(`/api/tasks/${taskId}/history`);
   },
 
   // Processes
