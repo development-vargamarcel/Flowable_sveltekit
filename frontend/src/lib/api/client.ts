@@ -237,7 +237,11 @@ function getRetryDelay(attempt: number): number {
   return Math.min(delay, STARTUP_RETRY_CONFIG.maxDelayMs);
 }
 
-async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+interface FetchOptions extends RequestInit {
+  responseType?: 'json' | 'blob' | 'text';
+}
+
+async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   const method = options.method || 'GET';
 
@@ -330,6 +334,12 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
       const contentLength = response.headers.get('content-length');
       if (response.status === 204 || contentLength === '0') {
         return {} as T;
+      }
+
+      if (options.responseType === 'blob') {
+        const data = await response.blob();
+        log.debug(`${method} ${url} success (blob)`);
+        return data as unknown as T;
       }
 
       const data = await response.json();
@@ -532,6 +542,12 @@ export const api = {
 
   async getProcessInstance(processInstanceId: string): Promise<ProcessInstance> {
     return fetchApi(`/api/processes/instance/${processInstanceId}`);
+  },
+
+  async exportProcessInstance(processInstanceId: string): Promise<Blob> {
+    return fetchApi(`/api/processes/instance/${processInstanceId}/export`, {
+      responseType: 'blob'
+    });
   },
 
   async getMyProcesses(page: number = 0, size: number = 10): Promise<Page<ProcessInstance>> {

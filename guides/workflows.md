@@ -105,3 +105,12 @@ Users can view the live BPMN diagram of a process instance to understand the cur
 3. The application will render the BPMN 2.0 diagram.
    - **Active Activities**: Highlighted in green.
    - **Zoom/Pan**: Use mouse wheel to zoom, drag to pan.
+
+## Feature: Process Export
+
+Users can export the full history of a process instance, including details, variables, tasks, approvals, escalations, and comments, to a CSV file.
+
+### Usage
+1. Open the **Process Details** modal for any active or completed process.
+2. Click the **Export CSV** button in the header.
+3. The browser will download a CSV file named `process_export_{id}.csv`.

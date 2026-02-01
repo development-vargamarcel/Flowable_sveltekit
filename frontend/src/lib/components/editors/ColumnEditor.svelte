@@ -90,12 +90,19 @@
 				type: column.type as typeof columnForm.type,
 				required: column.required || false,
 				placeholder: column.placeholder || '',
-				options: column.options || [],
+				options: (column.options || []).map(o => typeof o === 'string' ? o : o.value),
 				hiddenExpression: column.hiddenExpression || '',
 				readonlyExpression: column.readonlyExpression || '',
 				requiredExpression: column.requiredExpression || '',
 				calculationExpression: column.calculationExpression || '',
-				validation: column.validation ? { ...column.validation } : {
+				validation: column.validation ? {
+					minLength: column.validation.minLength,
+					maxLength: column.validation.maxLength,
+					min: column.validation.min,
+					max: column.validation.max,
+					pattern: column.validation.pattern || '',
+					patternMessage: column.validation.patternMessage || ''
+				} : {
 					minLength: undefined,
 					maxLength: undefined,
 					min: undefined,

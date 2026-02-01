@@ -4,6 +4,7 @@ import com.demo.bpm.dto.FormDefinitionDTO;
 import com.demo.bpm.dto.ProcessDTO;
 import com.demo.bpm.dto.ProcessInstanceDTO;
 import com.demo.bpm.dto.StartProcessRequest;
+import com.demo.bpm.service.ExportService;
 import com.demo.bpm.service.FormDefinitionService;
 import com.demo.bpm.service.ProcessService;
 import com.demo.bpm.service.UserService;
@@ -36,6 +37,7 @@ public class ProcessController {
     private final ProcessService processService;
     private final UserService userService;
     private final FormDefinitionService formDefinitionService;
+    private final ExportService exportService;
 
     @Operation(summary = "Get available processes for starting")
     @ApiResponses(value = {
@@ -126,6 +128,21 @@ public class ProcessController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @Operation(summary = "Export process instance details")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Found the process instance",
+                    content = { @Content(mediaType = "text/csv") }),
+            @ApiResponse(responseCode = "404", description = "Process instance not found",
+                    content = @Content) })
+    @GetMapping("/instance/{processInstanceId}/export")
+    public ResponseEntity<byte[]> exportProcessInstance(@Parameter(description = "ID of the process instance") @PathVariable String processInstanceId) {
+        byte[] csvData = exportService.exportProcessInstance(processInstanceId);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"process_export_" + processInstanceId + ".csv\"")
+                .header("Content-Type", "text/csv")
+                .body(csvData);
     }
 
     @Operation(summary = "Get active processes for the current user")

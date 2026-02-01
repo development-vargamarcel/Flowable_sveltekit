@@ -30,6 +30,9 @@ class ProcessControllerTest {
     @MockBean
     private com.demo.bpm.service.FormDefinitionService formDefinitionService;
 
+    @MockBean
+    private com.demo.bpm.service.ExportService exportService;
+
     @Test
     @WithMockUser
     void getProcessById_whenProcessExists_shouldReturnProcess() throws Exception {

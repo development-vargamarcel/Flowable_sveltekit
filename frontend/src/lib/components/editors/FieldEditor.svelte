@@ -20,7 +20,7 @@
 		type: 'text' as FormField['type'],
 		required: false,
 		placeholder: '',
-		defaultValue: '',
+		defaultValue: '' as any,
 		tooltip: '',
 		readonly: false,
 		hidden: false,
@@ -115,12 +115,12 @@
 				hidden: field.hidden || false,
                 richText: field.richText || false,
                 signature: field.signature || false,
-                pickerType: field.pickerType || 'user',
+                pickerType: (field.pickerType as 'user' | 'group') || 'user',
 				hiddenExpression: field.hiddenExpression || '',
 				readonlyExpression: field.readonlyExpression || '',
 				requiredExpression: field.requiredExpression || '',
 				calculationExpression: field.calculationExpression || '',
-				options: field.options || [],
+				options: (field.options || []).map(o => typeof o === 'string' ? { label: o, value: o } : o),
 				validation: field.validation ? {
                     minLength: field.validation.minLength || null,
                     maxLength: field.validation.maxLength || null,
@@ -192,7 +192,7 @@
                 allowedMimeTypes: fieldForm.validation.allowedMimeTypes.length ? fieldForm.validation.allowedMimeTypes : undefined,
                 maxFileSize: fieldForm.validation.maxFileSize || undefined
 			},
-			options: ['select', 'multiselect', 'radio'].includes(fieldForm.type) ? fieldForm.options : null,
+			options: ['select', 'multiselect', 'radio'].includes(fieldForm.type) ? fieldForm.options : undefined,
 			placeholder: fieldForm.placeholder,
 			defaultValue: fieldForm.defaultValue,
 			defaultExpression: '',
@@ -209,9 +209,7 @@
 			gridColumn: 1,
 			gridRow: library.fields.length + 1,
 			gridWidth: 1,
-			cssClass: '',
-			onChange: '',
-			onBlur: ''
+			cssClass: ''
 		};
 		onSave(newField);
 	}

@@ -76,6 +76,25 @@
 		}
 	}
 
+	async function handleExport() {
+		if (!process) return;
+		try {
+			const blob = await api.exportProcessInstance(process.processInstanceId);
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `process_export_${process.processInstanceId}.csv`;
+			document.body.appendChild(a);
+			a.click();
+			window.URL.revokeObjectURL(url);
+			document.body.removeChild(a);
+			toast.success('Export downloaded successfully');
+		} catch (e) {
+			console.error('Export failed:', e);
+			toast.error('Failed to export process');
+		}
+	}
+
 	function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
 		switch (status) {
 			case 'ACTIVE':
@@ -127,7 +146,15 @@
 	{#if process}
 		<div class="mb-4">
 			<div class="flex justify-between items-center">
-				<p class="text-sm text-gray-500">Business Key: {process.businessKey}</p>
+				<div class="flex items-center gap-4">
+					<p class="text-sm text-gray-500">Business Key: {process.businessKey}</p>
+					<button
+						class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+						onclick={handleExport}
+					>
+						<span>⬇️</span> Export CSV
+					</button>
+				</div>
 
 				<div class="bg-gray-100 p-1 rounded-lg inline-flex">
 					<button
