@@ -14,6 +14,7 @@
 	let submitting = $state(false);
 	let error = $state('');
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
+	let businessKey = $state('');
 
 	// Form data
 	let formValues = $state<Record<string, unknown>>({});
@@ -77,9 +78,15 @@
 				? dynamicFormRef.getValues()
 				: formValues;
 
-			const result = await api.startProcess(processDefinition.key, variables);
+			const trimmedBusinessKey = businessKey.trim();
+			const result = await api.startProcess(
+				processDefinition.key,
+				variables,
+				trimmedBusinessKey.length > 0 ? trimmedBusinessKey : undefined
+			);
 
-			toast = { message: `Process started successfully! Reference: ${result.processInstance.businessKey}`, type: 'success' };
+			const reference = result.processInstance.businessKey || result.processInstance.id;
+			toast = { message: `Process started successfully! Reference: ${reference}`, type: 'success' };
 
 			// Redirect to tasks after short delay
 			setTimeout(() => goto('/tasks'), 2000);
@@ -184,6 +191,20 @@
 						</div>
 					</div>
 				{/if}
+
+				<div>
+					<label for="businessKey" class="mb-1 block text-sm font-medium text-gray-700">
+						Business Key <span class="text-gray-400">(optional)</span>
+					</label>
+					<input
+						id="businessKey"
+						type="text"
+						bind:value={businessKey}
+						class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						placeholder="e.g., ORDER-001, REQ-2024-001"
+					/>
+					<p class="mt-1 text-xs text-gray-500">Provide a human-friendly identifier for this process instance.</p>
+				</div>
 
 				<div class="flex justify-end space-x-3 pt-4 border-t">
 					<a href="/processes/manage" class="btn btn-secondary">Cancel</a>

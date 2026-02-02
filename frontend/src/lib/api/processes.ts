@@ -20,11 +20,17 @@ export const processesApi = {
 
   async startProcess(
     processKey: string,
-    variables: Record<string, unknown>
+    variables: Record<string, unknown> = {},
+    businessKey?: string
   ): Promise<{ message: string; processInstance: ProcessInstance }> {
+    const payload: { variables: Record<string, unknown>; businessKey?: string } = { variables };
+    if (businessKey) {
+      payload.businessKey = businessKey;
+    }
+
     return fetchApi(`/api/processes/${processKey}/start`, {
       method: 'POST',
-      body: JSON.stringify({ variables })
+      body: JSON.stringify(payload)
     });
   },
 

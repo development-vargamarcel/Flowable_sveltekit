@@ -166,19 +166,18 @@
     variablesError = '';
     let variables: Record<string, unknown> = {};
     try {
-      const parsed = JSON.parse(variablesJson);
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        variablesError = 'Variables must be a JSON object';
-        return;
+      const trimmed = variablesJson.trim();
+      if (trimmed.length > 0) {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          variablesError = 'Variables must be a JSON object';
+          return;
+        }
+        variables = parsed;
       }
-      variables = parsed;
     } catch (e) {
       variablesError = 'Invalid JSON format';
       return;
-    }
-
-    if (businessKey.trim()) {
-      variables.businessKey = businessKey.trim();
     }
 
     isStarting = true;
@@ -186,7 +185,12 @@
     success = '';
 
     try {
-      const result = await api.startProcess(startProcessKey, variables);
+      const trimmedBusinessKey = businessKey.trim();
+      const result = await api.startProcess(
+        startProcessKey,
+        variables,
+        trimmedBusinessKey.length > 0 ? trimmedBusinessKey : undefined
+      );
       success = `Process instance started successfully! Instance ID: ${result.processInstance?.id || 'unknown'}`;
       closeStartModal();
     } catch (err) {
@@ -195,6 +199,30 @@
     } finally {
       isStarting = false;
     }
+  }
+
+  function formatVariablesJson() {
+    variablesError = '';
+    try {
+      const trimmed = variablesJson.trim();
+      if (!trimmed) {
+        variablesJson = '{\n  \n}';
+        return;
+      }
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        variablesError = 'Variables must be a JSON object';
+        return;
+      }
+      variablesJson = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+      variablesError = 'Invalid JSON format';
+    }
+  }
+
+  function resetVariablesJson() {
+    variablesError = '';
+    variablesJson = '{\n  \n}';
   }
 
   function toggleCompareSelection(id: string) {
@@ -539,10 +567,27 @@
               class="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder='&#123;"amount": 100, "description": "Test"&#125;'
             ></textarea>
+            <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+              <span>Enter process variables as a JSON object</span>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  onclick={formatVariablesJson}
+                >
+                  Format JSON
+                </button>
+                <button
+                  type="button"
+                  class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  onclick={resetVariablesJson}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
             {#if variablesError}
               <p class="mt-1 text-xs text-red-600">{variablesError}</p>
-            {:else}
-              <p class="mt-1 text-xs text-gray-500">Enter process variables as a JSON object</p>
             {/if}
           </div>
 
