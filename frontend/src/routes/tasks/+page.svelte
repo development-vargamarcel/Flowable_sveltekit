@@ -1,5 +1,4 @@
 <script lang="ts">
-	/* eslint-disable no-console */
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
@@ -12,10 +11,14 @@
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import { Download } from '@lucide/svelte';
 	import { exportToCSV } from '$lib/utils';
+	import { createLogger } from '$lib/utils/logger';
 
 	let allTasks = $state<Task[]>([]);
 	let loading = $state(true);
 	let error = $state('');
+
+	const logger = createLogger('TasksPage');
+	const filtersStorageKey = 'taskFilters:lastUsed';
 	
 	let filters = $state({
 		text: '',
@@ -28,8 +31,35 @@
 	let delegateTaskId = $state<string | null>(null);
 
 	onMount(async () => {
+		const persistedFilters = loadStoredFilters();
+		if (persistedFilters) {
+			filters = persistedFilters;
+		}
 		await loadTasks();
 	});
+
+	/**
+	 * Restore last-used filters from localStorage to keep task reviews consistent
+	 * across refreshes. This avoids users reapplying filters repeatedly.
+	 */
+	function loadStoredFilters() {
+		if (typeof window === 'undefined') return null;
+		try {
+			const stored = localStorage.getItem(filtersStorageKey);
+			if (!stored) return null;
+			const parsed = JSON.parse(stored) as typeof filters;
+			if (!parsed || typeof parsed !== 'object') return null;
+			return parsed;
+		} catch (err) {
+			logger.warn('Failed to load stored task filters', { err });
+			return null;
+		}
+	}
+
+	function persistFilters(nextFilters: typeof filters) {
+		if (typeof window === 'undefined') return;
+		localStorage.setItem(filtersStorageKey, JSON.stringify(nextFilters));
+	}
 
 	async function loadTasks() {
 		loading = true;
@@ -45,9 +75,12 @@
 			if (filters.assignee) apiFilters.assignee = filters.assignee;
 			if (filters.priority) apiFilters.priority = Number(filters.priority);
 
+			logger.info('Loading tasks with filters', { filters: apiFilters });
 			allTasks = await api.getTasks(apiFilters);
+			logger.info('Loaded tasks', { count: allTasks.length });
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load tasks';
+			logger.error('Failed to load tasks', err);
 		} finally {
 			loading = false;
 		}
@@ -56,6 +89,7 @@
 	function handleExport() {
 		if (allTasks.length === 0) {
 			toast.error('No tasks to export');
+			logger.warn('Export skipped because no tasks are available');
 			return;
 		}
 		const exportData = allTasks.map(t => ({
@@ -67,15 +101,18 @@
 		}));
 		exportToCSV(exportData, `tasks_export_${new Date().toISOString().split('T')[0]}.csv`);
 		toast.success('Tasks exported successfully');
+		logger.info('Exported tasks to CSV', { count: exportData.length });
 	}
 
 	function handleFilterChange(event: CustomEvent) {
-		console.log('[TasksPage] Filters changed:', event.detail);
 		filters = event.detail;
+		persistFilters(filters);
+		logger.info('Task filters updated', { filters });
 		loadTasks();
 	}
 
 	function handleTaskClick(taskId: string) {
+		logger.info('Navigating to task details', { taskId });
 		goto(`/tasks/${taskId}`);
 	}
 
@@ -83,9 +120,11 @@
 		try {
 			await api.claimTask(taskId);
 			toast.success('Task claimed successfully');
+			logger.info('Task claimed', { taskId });
 			await loadTasks();
 		} catch (e) {
 			toast.error('Failed to claim task');
+			logger.error('Failed to claim task', e, { taskId });
 		}
 	}
 
@@ -93,19 +132,23 @@
 		try {
 			await api.unclaimTask(taskId);
 			toast.success('Task unclaimed successfully');
+			logger.info('Task unclaimed', { taskId });
 			await loadTasks();
 		} catch (e) {
 			toast.error('Failed to unclaim task');
+			logger.error('Failed to unclaim task', e, { taskId });
 		}
 	}
 
 	function handleDelegate(taskId: string) {
 		delegateTaskId = taskId;
 		showDelegateModal = true;
+		logger.info('Opened delegate modal', { taskId });
 	}
 
 	function onDelegateSuccess() {
 		loadTasks();
+		logger.info('Task delegation completed');
 	}
 
 	async function handleBulkClaim(taskIds: string[]) {
@@ -113,12 +156,13 @@
 		
 		loading = true;
 		try {
+			logger.info('Bulk claim started', { count: taskIds.length });
 			await Promise.all(taskIds.map(id => api.claimTask(id)));
 			toast.success(`Successfully claimed ${taskIds.length} tasks`);
 			await loadTasks();
 		} catch (e) {
-			console.error('Bulk claim failed:', e);
 			toast.error('Failed to claim some tasks');
+			logger.error('Bulk claim failed', e, { count: taskIds.length });
 			await loadTasks(); // Reload to reflect partial success
 		} finally {
 			loading = false;
@@ -130,12 +174,13 @@
 
 		loading = true;
 		try {
+			logger.info('Bulk unclaim started', { count: taskIds.length });
 			await Promise.all(taskIds.map(id => api.unclaimTask(id)));
 			toast.success(`Successfully unclaimed ${taskIds.length} tasks`);
 			await loadTasks();
 		} catch (e) {
-			console.error('Bulk unclaim failed:', e);
 			toast.error('Failed to unclaim some tasks');
+			logger.error('Bulk unclaim failed', e, { count: taskIds.length });
 			await loadTasks();
 		} finally {
 			loading = false;
@@ -165,7 +210,7 @@
 		</div>
 	</div>
 
-    <TaskFilters on:change={handleFilterChange} />
+	<TaskFilters initialFilters={filters} on:change={handleFilterChange} />
 
 	{#if loading}
 		<Loading text="Loading tasks..." />

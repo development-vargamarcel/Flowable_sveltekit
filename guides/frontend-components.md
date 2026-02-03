@@ -452,6 +452,8 @@ A reusable component for filtering and searching tasks.
 - Priority filter
 - **Sort By option (Newest, Priority, Due Date)**
 - Clear filters button
+- Save filter presets to reuse common searches
+- Auto-restore last used filters on page refresh
 
 ## Usage
 
@@ -471,6 +473,12 @@ A reusable component for filtering and searching tasks.
 ## Events
 
 - `change`: Dispatched when any filter changes. Payload: `{ text: string, assignee: string, priority: string, sortBy: string }`.
+
+## Presets & Persistence
+
+- Use the "Save Preset" input to store the current filter combination in `localStorage`.
+- Click a preset chip to apply it instantly.
+- The last-used filters are stored automatically so reloading the page restores them.
 
 # TaskCard Component
 
