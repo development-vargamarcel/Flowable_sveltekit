@@ -3,6 +3,7 @@ package com.demo.bpm.service;
 import com.demo.bpm.dto.ProcessDTO;
 import com.demo.bpm.dto.ProcessInstanceDTO;
 import com.demo.bpm.entity.ProcessConfig;
+import com.demo.bpm.exception.InvalidOperationException;
 import com.demo.bpm.exception.ResourceNotFoundException;
 import com.demo.bpm.repository.ProcessConfigRepository;
 import com.demo.bpm.util.VariableStorageUtil;
@@ -322,5 +323,25 @@ public class ProcessService {
     public void updateProcessDefinitionCategory(String processDefinitionId, String category) {
         repositoryService.setProcessDefinitionCategory(processDefinitionId, category);
         log.info("Updated category for process definition {}: {}", processDefinitionId, category);
+    }
+
+    @Transactional
+    public void cancelProcessInstance(String processInstanceId, String reason, String userId, boolean isAdmin) {
+        ProcessInstance instance = runtimeService.createProcessInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .singleResult();
+
+        if (instance == null) {
+            throw new ResourceNotFoundException("Active process instance not found: " + processInstanceId);
+        }
+
+        String startedBy = (String) runtimeService.getVariable(processInstanceId, "_startedBy");
+
+        if (!isAdmin && (startedBy == null || !startedBy.equals(userId))) {
+            throw new InvalidOperationException("You are not authorized to cancel this process instance.");
+        }
+
+        runtimeService.deleteProcessInstance(processInstanceId, reason != null ? reason : "Cancelled by user");
+        log.info("Process instance {} cancelled by user {} (Admin: {}). Reason: {}", processInstanceId, userId, isAdmin, reason);
     }
 }

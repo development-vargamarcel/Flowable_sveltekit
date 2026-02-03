@@ -9,7 +9,7 @@
 
 	let instances = $state<ProcessInstance[]>([]);
 
-	onMount(async () => {
+	async function loadProcesses() {
 		try {
 			const page = await api.getMyProcesses();
 			instances = page.content;
@@ -17,7 +17,22 @@
 			toast.error('Failed to fetch process instances.');
 			console.error(error);
 		}
-	});
+	}
+
+	onMount(loadProcesses);
+
+	async function handleCancel(id: string) {
+		if (!confirm('Are you sure you want to cancel this process instance?')) return;
+
+		try {
+			await api.cancelProcessInstance(id, 'User cancelled via My Processes');
+			toast.success('Process instance cancelled.');
+			await loadProcesses();
+		} catch (error: any) {
+			toast.error('Failed to cancel process instance: ' + (error?.message || 'Unknown error'));
+			console.error(error);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -37,6 +52,7 @@
 						<TableHead>Process Definition ID</TableHead>
 						<TableHead>Start Time</TableHead>
 						<TableHead>Status</TableHead>
+						<TableHead>Actions</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -46,6 +62,13 @@
 							<TableCell>{instance.processDefinitionId}</TableCell>
 							<TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
 							<TableCell>{instance.ended ? 'Ended' : 'Active'}</TableCell>
+							<TableCell>
+								{#if !instance.ended}
+									<Button variant="destructive" size="sm" onclick={() => handleCancel(instance.id)}>
+										Cancel
+									</Button>
+								{/if}
+							</TableCell>
 						</TableRow>
 					{/each}
 				</TableBody>

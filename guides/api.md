@@ -38,6 +38,7 @@ The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 | GET | `/api/processes/{id}` | Get process definition details. |
 | POST | `/api/processes/{key}/start` | Start a process instance. Body: `StartProcessRequest`. |
 | GET | `/api/processes/instance/{id}` | Get process instance details. |
+| DELETE | `/api/processes/instance/{id}` | Cancel (delete) a process instance. Params: `reason`. |
 | GET | `/api/processes/instance/{id}/export` | Export process instance details to CSV. |
 | GET | `/api/processes/my-processes` | List processes started by the current user. |
 | POST | `/api/processes/deploy` | Deploy a new process (BPMN XML). |

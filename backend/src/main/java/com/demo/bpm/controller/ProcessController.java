@@ -4,6 +4,7 @@ import com.demo.bpm.dto.FormDefinitionDTO;
 import com.demo.bpm.dto.ProcessDTO;
 import com.demo.bpm.dto.ProcessInstanceDTO;
 import com.demo.bpm.dto.StartProcessRequest;
+import com.demo.bpm.exception.ResourceNotFoundException;
 import com.demo.bpm.service.ExportService;
 import com.demo.bpm.service.FormDefinitionService;
 import com.demo.bpm.service.ProcessService;
@@ -369,6 +370,35 @@ public class ProcessController {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));
+        }
+    }
+
+    @Operation(summary = "Cancel a process instance")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Process instance cancelled successfully",
+                    content = { @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)) }),
+            @ApiResponse(responseCode = "400", description = "Invalid request or unauthorized",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "Process instance not found",
+                    content = @Content) })
+    @DeleteMapping("/instance/{processInstanceId}")
+    public ResponseEntity<?> cancelProcessInstance(
+            @Parameter(description = "ID of the process instance") @PathVariable String processInstanceId,
+            @RequestParam(required = false) String reason,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            boolean isAdmin = userDetails.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+            processService.cancelProcessInstance(processInstanceId, reason, userDetails.getUsername(), isAdmin);
+
+            return ResponseEntity.ok(Map.of("message", "Process instance cancelled successfully"));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error cancelling process instance: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }

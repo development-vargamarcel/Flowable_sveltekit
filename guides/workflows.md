@@ -170,3 +170,14 @@ The task list now supports advanced sorting and provides visual cues for upcomin
    - **Overdue** (Red): The task due date has passed.
    - **Due Today** (Amber): The task is due by the end of today.
    - **Due Soon** (Yellow): The task is due within the next 48 hours.
+
+## Feature: Process Cancellation
+
+Users can cancel their own active process instances if they are no longer needed. Administrators can cancel any process instance.
+
+### Usage
+1. Navigate to the **Process Instances** page (My Processes).
+2. Locate the active process instance you wish to cancel.
+3. Click the **Cancel** button in the **Actions** column.
+4. Confirm the cancellation in the popup dialog.
+5. The process instance will be deleted and removed from the list of active processes.

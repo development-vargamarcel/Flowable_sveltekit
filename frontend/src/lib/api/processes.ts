@@ -83,6 +83,29 @@ export const processesApi = {
   },
 
   /**
+   * Cancel (delete) a process instance.
+   * @param processInstanceId - The ID of the process instance.
+   * @param reason - The reason for cancellation.
+   * @returns A promise that resolves to a success message.
+   */
+  async cancelProcessInstance(
+    processInstanceId: string,
+    reason: string = 'User cancellation'
+  ): Promise<{ message: string }> {
+    console.log(
+      '[processesApi] cancelProcessInstance called with id:',
+      processInstanceId,
+      'reason:',
+      reason
+    );
+    const params = new URLSearchParams();
+    if (reason) params.append('reason', reason);
+    return fetchApi(`/api/processes/instance/${processInstanceId}?${params.toString()}`, {
+      method: 'DELETE'
+    });
+  },
+
+  /**
    * Fetch processes initiated by the current user.
    * @param page - Page number (default 0).
    * @param size - Page size (default 10).
