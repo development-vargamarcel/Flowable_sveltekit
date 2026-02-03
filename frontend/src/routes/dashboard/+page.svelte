@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api/client';
 	import { processStore } from '$lib/stores/processes.svelte';
-	import type { WorkflowHistory, Page, SlaStats } from '$lib/types';
+	import type { WorkflowHistory, Page } from '$lib/types';
 	import EscalationBadge from '$lib/components/EscalationBadge.svelte';
 	import SLAStats from '$lib/components/SLAStats.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -24,7 +24,6 @@
 	let selectedProcess = $state<WorkflowHistory | null>(null);
 	let statusFilter = $state<string>('');
 	let typeFilter = $state<string>('');
-	let currentPage = $state(0);
 
 	// Subscribe to process changes for reactive updates
 	let unsubscribe: (() => void) | null = null;
@@ -78,7 +77,6 @@
 				() => api.getDashboard(page, 10, statusFilter, typeFilter),
 				forceRefresh
 			);
-			currentPage = page;
 			// Clear any previous errors on success
 			error = null;
 		} catch (err) {
@@ -173,7 +171,7 @@
 		goto(`/tasks/${taskId}`);
 	}
 
-	let displayProcesses = $derived(getDisplayProcesses());
+	const displayProcesses = $derived(getDisplayProcesses());
 
 	function handlePageChange(page: number) {
 		loadDashboard(false, page);
@@ -330,7 +328,7 @@
 
 		<!-- Tab Navigation - Scrollable on mobile -->
 		<div class="border-b border-gray-200 mb-4 sm:mb-6 -mx-4 sm:mx-0 px-4 sm:px-0">
-			<nav class="flex space-x-4 sm:space-x-8 overflow-x-auto pb-px scrollbar-hide" role="tablist" aria-label="Process filters">
+			<div class="flex space-x-4 sm:space-x-8 overflow-x-auto pb-px scrollbar-hide" role="tablist" aria-label="Process filters">
 				{#each [{ id: 'all', label: 'All Processes', shortLabel: 'All', count: dashboard.activeProcesses.totalElements + dashboard.recentCompleted.totalElements }, { id: 'active', label: 'Active', shortLabel: 'Active', count: dashboard.activeProcesses.totalElements }, { id: 'completed', label: 'Completed', shortLabel: 'Done', count: dashboard.recentCompleted.totalElements }, { id: 'my-approvals', label: 'My Pending Approvals', shortLabel: 'My Approvals', count: dashboard.myPendingApprovals.totalElements }] as tab}
 					<button
 						role="tab"
@@ -355,7 +353,7 @@
 						</span>
 					</button>
 				{/each}
-			</nav>
+			</div>
 		</div>
 
 		<!-- Filter Bar - Stack on mobile -->
@@ -448,7 +446,7 @@
 									>
 										{process.status}
 									</span>
-									{#if process.escalationCount != null && process.escalationCount > 0}
+									{#if process.escalationCount && process.escalationCount > 0}
 										<EscalationBadge count={process.escalationCount} />
 									{/if}
 								</td>

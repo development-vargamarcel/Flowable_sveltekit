@@ -9,6 +9,8 @@
 	import type { Task } from '$lib/types';
 	import Loading from '$lib/components/Loading.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
+	import { Download } from '@lucide/svelte';
+	import { exportToCSV } from '$lib/utils';
 
 	let allTasks = $state<Task[]>([]);
 	let loading = $state(true);
@@ -49,6 +51,22 @@
 		}
 	}
 
+	function handleExport() {
+		if (allTasks.length === 0) {
+			toast.error('No tasks to export');
+			return;
+		}
+		const exportData = allTasks.map(t => ({
+			ID: t.id,
+			Name: t.name,
+			Assignee: t.assignee || 'Unassigned',
+			Priority: t.priority,
+			Created: t.createTime
+		}));
+		exportToCSV(exportData, `tasks_export_${new Date().toISOString().split('T')[0]}.csv`);
+		toast.success('Tasks exported successfully');
+	}
+
 	function handleFilterChange(event: CustomEvent) {
 		filters = event.detail;
 		loadTasks();
@@ -86,6 +104,40 @@
 	function onDelegateSuccess() {
 		loadTasks();
 	}
+
+	async function handleBulkClaim(taskIds: string[]) {
+		if (!confirm(`Are you sure you want to claim ${taskIds.length} tasks?`)) return;
+		
+		loading = true;
+		try {
+			await Promise.all(taskIds.map(id => api.claimTask(id)));
+			toast.success(`Successfully claimed ${taskIds.length} tasks`);
+			await loadTasks();
+		} catch (e) {
+			console.error('Bulk claim failed:', e);
+			toast.error('Failed to claim some tasks');
+			await loadTasks(); // Reload to reflect partial success
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleBulkUnclaim(taskIds: string[]) {
+		if (!confirm(`Are you sure you want to unclaim ${taskIds.length} tasks?`)) return;
+
+		loading = true;
+		try {
+			await Promise.all(taskIds.map(id => api.unclaimTask(id)));
+			toast.success(`Successfully unclaimed ${taskIds.length} tasks`);
+			await loadTasks();
+		} catch (e) {
+			console.error('Bulk unclaim failed:', e);
+			toast.error('Failed to unclaim some tasks');
+			await loadTasks();
+		} finally {
+			loading = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -99,9 +151,15 @@
 			<p class="text-gray-600 mt-1">Manage your workflow tasks</p>
 		</div>
 
-		<button onclick={loadTasks} class="btn btn-secondary" disabled={loading}>
-			{loading ? 'Refreshing...' : 'Refresh'}
-		</button>
+		<div class="flex gap-2">
+			<button onclick={handleExport} class="btn btn-outline flex items-center gap-2" disabled={loading || allTasks.length === 0}>
+				<Download class="w-4 h-4" />
+				Export CSV
+			</button>
+			<button onclick={loadTasks} class="btn btn-secondary" disabled={loading}>
+				{loading ? 'Refreshing...' : 'Refresh'}
+			</button>
+		</div>
 	</div>
 
     <TaskFilters on:change={handleFilterChange} />
@@ -117,6 +175,8 @@
 			onClaim={handleClaim}
 			onUnclaim={handleUnclaim}
 			onDelegate={handleDelegate}
+			onBulkClaim={handleBulkClaim}
+			onBulkUnclaim={handleBulkUnclaim}
 			emptyMessage="No tasks found matching your filters."
 		/>
 	{/if}

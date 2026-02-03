@@ -1,8 +1,7 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type {
 		FieldConditionRule,
-		ConditionEffect,
-		ConditionTargetType,
 		ConditionTarget,
 		FormField,
 		FormGrid
@@ -21,21 +20,21 @@
 	const { rule, availableFields, availableGrids, onSave, onCancel, onDelete }: Props = $props();
 
 	// Form state
-	let name = $state(rule?.name ?? 'New Rule');
-	let description = $state(rule?.description ?? '');
-	let enabled = $state(rule?.enabled ?? true);
-	let priority = $state(rule?.priority ?? 0);
-	let ruleEffect = $state(rule?.effect ?? 'readonly');
-	let targetType = $state(rule?.target.type ?? 'all');
-	let selectedFields = $state(rule?.target.type === 'field' ? rule.target.fieldNames : []);
-	let selectedGrids = $state(rule?.target.type === 'grid' ? rule.target.gridNames : []);
+	let name = $state(untrack(() => rule?.name) ?? 'New Rule');
+	let description = $state(untrack(() => rule?.description) ?? '');
+	let enabled = $state(untrack(() => rule?.enabled) ?? true);
+	let priority = $state(untrack(() => rule?.priority) ?? 0);
+	let ruleEffect = $state(untrack(() => rule?.effect) ?? 'readonly');
+	let targetType = $state(untrack(() => rule?.target.type) ?? 'all');
+	let selectedFields = $state(untrack(() => rule?.target.type === 'field' ? rule?.target.fieldNames : []));
+	let selectedGrids = $state(untrack(() => rule?.target.type === 'grid' ? rule?.target.gridNames : []));
 	
-	const defaultColumns = rule?.target.type === 'column' ? rule.target.columnTargets : [];
+	const defaultColumns = untrack(() => rule?.target.type === 'column' ? rule?.target.columnTargets : []);
 	let selectedColumns = $state(defaultColumns);
 
 	// Condition builder state
 	let useSimpleBuilder = $state(true);
-	let conditionExpression = $state(rule?.condition ?? '');
+	let conditionExpression = $state(untrack(() => rule?.condition) ?? '');
 
 	// Simple builder fields
 	let conditionField = $state('');
@@ -255,16 +254,6 @@
 		const gridTarget = selectedColumns.find((c: { gridName: string; columnNames: string[] }) => c.gridName === gridName);
 		return gridTarget?.columnNames.includes(columnName) ?? false;
 	}
-
-	// Get all available variables for condition builder
-	const allVariables = $derived([
-		...availableFields.map((f) => ({ name: f.name, label: f.label, source: 'field' })),
-		{ name: 'user.id', label: 'User ID', source: 'user' },
-		{ name: 'user.username', label: 'Username', source: 'user' },
-		{ name: 'user.roles', label: 'User Roles', source: 'user' },
-		{ name: 'user.groups', label: 'User Groups', source: 'user' },
-		{ name: 'process.initiator', label: 'Process Initiator', source: 'process' }
-	]);
 </script>
 
 <div class="bg-white border rounded-lg shadow-sm">

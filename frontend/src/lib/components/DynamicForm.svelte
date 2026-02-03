@@ -134,7 +134,7 @@
 						{:else if field.type === 'file'}
 							<FileField {field} {isReadonly} {error} onchange={(val) => controller.handleFieldChange(field.name, val)} />
 						{:else if field.type === 'signature'}
-							<SignatureField {field} {value} {isReadonly} {error} onchange={(val) => controller.handleFieldChange(field.name, val)} />
+							<SignatureField {field} value={value as string | null} {isReadonly} {error} onchange={(val) => controller.handleFieldChange(field.name, val)} />
                         {:else if field.type === 'userPicker' || field.type === 'groupPicker'}
                             <UserGroupPickerField {field} {value} {isReadonly} {error} onchange={(val) => controller.handleFieldChange(field.name, val)} />
 						{:else if field.type === 'expression'}

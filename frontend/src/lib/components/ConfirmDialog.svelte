@@ -119,6 +119,7 @@
 	<div
 		class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn"
 		onclick={handleBackdropClick}
+        onkeydown={(e) => e.key === 'Escape' && !loading && onCancel()}
 		role="alertdialog"
 		aria-modal="true"
 		aria-labelledby="confirm-dialog-title"

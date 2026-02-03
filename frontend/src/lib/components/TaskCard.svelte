@@ -6,13 +6,15 @@
 
 	interface Props {
 		task: Task;
+		selected?: boolean;
 		onclick?: () => void;
 		onClaim?: (taskId: string) => void;
 		onUnclaim?: (taskId: string) => void;
 		onDelegate?: (taskId: string) => void;
+		onSelect?: (taskId: string, selected: boolean) => void;
 	}
 
-	const { task, onclick, onClaim, onUnclaim, onDelegate }: Props = $props();
+	const { task, selected = false, onclick, onClaim, onUnclaim, onDelegate, onSelect }: Props = $props();
 
 	import { getVariableDisplay } from '$lib/utils';
 	const displays = $derived(getVariableDisplay(task.variables || null));
@@ -20,6 +22,12 @@
 	function handleAction(e: Event, action?: (id: string) => void) {
 		e.stopPropagation();
 		if (action) action(task.id);
+	}
+
+	function handleSelection(e: Event) {
+		e.stopPropagation();
+		const checked = (e.target as HTMLInputElement).checked;
+		if (onSelect) onSelect(task.id, checked);
 	}
 </script>
 
@@ -33,11 +41,22 @@
 		}
 	}}
 	{onclick}
-	class="w-full text-left card border-2 hover:shadow-lg transition-all dark:bg-gray-800 dark:border-gray-700 {getProcessCardClasses(
+	class="relative w-full text-left card border-2 hover:shadow-lg transition-all dark:bg-gray-800 dark:border-gray-700 {getProcessCardClasses(
 		task.processDefinitionKey || ''
-	)} cursor-pointer"
+	)} cursor-pointer {selected ? 'ring-2 ring-blue-500 border-blue-500' : ''}"
 >
-	<div class="flex justify-between items-start mb-3">
+	{#if onSelect}
+		<div class="absolute top-3 right-3 z-10">
+			<input
+				type="checkbox"
+				checked={selected}
+				onclick={handleSelection}
+				class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+			/>
+		</div>
+	{/if}
+
+	<div class="flex justify-between items-start mb-3 pr-8">
 		<div class="flex-1">
 			<h3 class="font-semibold text-gray-900 dark:text-gray-100">{task.name}</h3>
 			<p class="text-sm text-gray-600 dark:text-gray-400">{task.processName}</p>

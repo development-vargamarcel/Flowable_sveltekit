@@ -22,6 +22,11 @@ export interface FormControllerOptions {
   onValuesChange?: (values: Record<string, unknown>) => void;
 }
 
+interface GridComponent {
+  validate(): boolean;
+  getData(): any[];
+}
+
 export class FormController {
   // State
   formValues = $state<Record<string, unknown>>({});
@@ -314,7 +319,7 @@ export class FormController {
     for (const grid of this.options.grids) {
       const gridState = this.getGridState(grid);
       if (gridState.isHidden) continue;
-      const gridRef = gridRefs[grid.name];
+      const gridRef = gridRefs[grid.name] as GridComponent;
       if (gridRef && !gridRef.validate()) isValid = false;
     }
 
@@ -326,7 +331,7 @@ export class FormController {
   getValues(gridRefs: Record<string, unknown>): Record<string, unknown> {
     const result = { ...this.formValues };
     for (const grid of this.options.grids) {
-      const gridRef = gridRefs[grid.name];
+      const gridRef = gridRefs[grid.name] as GridComponent;
       if (gridRef) result[grid.name] = gridRef.getData();
     }
     return result;

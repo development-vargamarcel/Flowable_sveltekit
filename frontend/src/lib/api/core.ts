@@ -214,6 +214,13 @@ export interface FetchOptions extends RequestInit {
   responseType?: 'json' | 'blob' | 'text';
 }
 
+/**
+ * Perform an API request with automatic error handling, logging, and retry logic.
+ * @param endpoint - The API endpoint path (e.g., "/api/tasks").
+ * @param options - Fetch options including method, headers, and body.
+ * @returns A promise that resolves to the response data.
+ * @throws {ApiError} If the request fails or returns an error status.
+ */
 export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   const method = options.method || 'GET';

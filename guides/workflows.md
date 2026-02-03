@@ -114,3 +114,25 @@ Users can export the full history of a process instance, including details, vari
 1. Open the **Process Details** modal for any active or completed process.
 2. Click the **Export CSV** button in the header.
 3. The browser will download a CSV file named `process_export_{id}.csv`.
+
+## Feature: Task Export
+
+Users can export the list of tasks visible in the task list to a CSV file. This is useful for reporting or offline analysis.
+
+### Usage
+1. Navigate to the **Tasks** page.
+2. (Optional) Apply filters for text, assignee, or priority to narrow down the list.
+3. Click the **Export CSV** button located next to the Refresh button.
+4. The browser will download a CSV file containing the ID, Name, Assignee, Priority, and Creation Date of the filtered tasks.
+
+## Feature: Bulk Task Actions
+
+Users can select multiple tasks to perform bulk operations, such as claiming or unclaiming tasks in batches.
+
+### Usage
+1. Navigate to the **Tasks** page.
+2. Click the **Checkbox** icon on the top right of any task card to select it.
+3. A **Bulk Actions Toolbar** will appear at the top of the list.
+4. You can use **Select All** to select all visible tasks.
+5. Click **Claim Selected** to claim all selected tasks (if they are unassigned).
+6. Click **Unclaim Selected** to release all selected tasks (if you are assigned to them).
