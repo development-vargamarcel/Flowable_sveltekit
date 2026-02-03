@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { ProcessDefinition, ProcessInstance, Dashboard, Page } from '$lib/types';
 
 /**
@@ -83,9 +84,11 @@ class ProcessStore {
   ): Promise<ProcessDefinition[]> {
     // Return cached data if valid and not forcing refresh
     if (!forceRefresh && this.isCacheValid(this.definitionsLastFetched)) {
+      console.log('[ProcessStore] Using cached definitions');
       return this.definitions;
     }
 
+    console.log('[ProcessStore] Loading definitions');
     this.definitionsLoading = true;
     this.definitionsError = null;
 
@@ -95,6 +98,7 @@ class ProcessStore {
       this.definitionsLastFetched = Date.now();
       return data;
     } catch (err) {
+      console.error('[ProcessStore] Failed to load definitions:', err);
       const message = err instanceof Error ? err.message : 'Failed to load processes';
       this.definitionsError = message;
       throw err;
@@ -111,9 +115,11 @@ class ProcessStore {
     forceRefresh = false
   ): Promise<Page<ProcessInstance>> {
     if (!forceRefresh && this.myInstances && this.isCacheValid(this.myInstancesLastFetched)) {
+      console.log('[ProcessStore] Using cached instances');
       return this.myInstances;
     }
 
+    console.log('[ProcessStore] Loading my instances');
     this.myInstancesLoading = true;
     this.myInstancesError = null;
 
@@ -123,6 +129,7 @@ class ProcessStore {
       this.myInstancesLastFetched = Date.now();
       return data;
     } catch (err) {
+      console.error('[ProcessStore] Failed to load instances:', err);
       const message = err instanceof Error ? err.message : 'Failed to load process instances';
       this.myInstancesError = message;
       throw err;
@@ -134,14 +141,13 @@ class ProcessStore {
   /**
    * Load dashboard data with caching
    */
-  async loadDashboard(
-    fetchFn: () => Promise<Dashboard>,
-    forceRefresh = false
-  ): Promise<Dashboard> {
+  async loadDashboard(fetchFn: () => Promise<Dashboard>, forceRefresh = false): Promise<Dashboard> {
     if (!forceRefresh && this.dashboard && this.isCacheValid(this.dashboardLastFetched)) {
+      console.log('[ProcessStore] Using cached dashboard');
       return this.dashboard;
     }
 
+    console.log('[ProcessStore] Loading dashboard');
     this.dashboardLoading = true;
     this.dashboardError = null;
 
@@ -151,6 +157,7 @@ class ProcessStore {
       this.dashboardLastFetched = Date.now();
       return data;
     } catch (err) {
+      console.error('[ProcessStore] Failed to load dashboard:', err);
       const message = err instanceof Error ? err.message : 'Failed to load dashboard';
       this.dashboardError = message;
       throw err;
@@ -163,6 +170,7 @@ class ProcessStore {
    * Invalidate all caches - call after deploying or deleting a process
    */
   invalidateAll() {
+    console.log('[ProcessStore] Invalidating all caches');
     this.definitionsLastFetched = null;
     this.myInstancesLastFetched = null;
     this.dashboardLastFetched = null;

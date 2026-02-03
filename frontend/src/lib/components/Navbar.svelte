@@ -7,6 +7,7 @@
 	import NavLink from './NavLink.svelte';
 	import { Menu, Sun, Moon } from '@lucide/svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
+	import GlobalSearch from './GlobalSearch.svelte';
 
 	let open = $state(false);
 	let isDark = $state(false);
@@ -84,6 +85,7 @@
 
 			{#if authStore.isAuthenticated && authStore.user}
 				<div class="flex items-center space-x-4">
+					<GlobalSearch />
 					<div class="hidden sm:flex items-center space-x-4">
 						<button
 							onclick={toggleDarkMode}

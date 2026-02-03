@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import type { User } from '$lib/types';
 import { api } from '$lib/api/client';
 
@@ -28,6 +29,7 @@ class AuthStore {
   }
 
   setUser(user: User | null) {
+    console.log('[AuthStore] Setting user:', user?.username);
     this.user = user;
     this.loading = false;
   }
@@ -37,12 +39,14 @@ class AuthStore {
   }
 
   clear() {
+    console.log('[AuthStore] Clearing session');
     this.user = null;
     this.loading = false;
   }
 
   // Add login method here to fix types
   async login(username: string, password: string) {
+    console.log('[AuthStore] Logging in user:', username);
     this.setLoading(true);
     try {
       const response = await api.login({ username, password });
@@ -55,6 +59,7 @@ class AuthStore {
 
   // Add logout method here to fix types
   async logout() {
+    console.log('[AuthStore] Logging out');
     this.setLoading(true);
     try {
       await api.logout();

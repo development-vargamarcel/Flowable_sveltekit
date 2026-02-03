@@ -470,3 +470,22 @@ A reusable component for filtering and searching tasks.
 ## Events
 
 - `change`: Dispatched when any filter changes. Payload: `{ text: string, assignee: string, priority: string }`.
+
+# GlobalSearch Component
+
+A navbar-integrated search component for quickly finding tasks.
+
+## Features
+
+- Real-time text search with debounce
+- Dropdown result list
+- Navigation to task details
+- Responsive design (hidden on mobile, visible on desktop)
+
+## Usage
+
+Automatically integrated into the `Navbar` component.
+
+```svelte
+<GlobalSearch />
+```
