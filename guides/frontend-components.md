@@ -450,6 +450,7 @@ A reusable component for filtering and searching tasks.
 - Text search (debounced)
 - Assignee filter
 - Priority filter
+- **Sort By option (Newest, Priority, Due Date)**
 - Clear filters button
 
 ## Usage
@@ -469,7 +470,29 @@ A reusable component for filtering and searching tasks.
 
 ## Events
 
-- `change`: Dispatched when any filter changes. Payload: `{ text: string, assignee: string, priority: string }`.
+- `change`: Dispatched when any filter changes. Payload: `{ text: string, assignee: string, priority: string, sortBy: string }`.
+
+# TaskCard Component
+
+A card component representing a single task in a list.
+
+## Features
+
+- Visual indicators for **Overdue**, **Due Today**, and **Due Soon** tasks.
+- Priority badges.
+- Selection support for bulk actions.
+- Process name and creation date display.
+
+## Usage
+
+```svelte
+<TaskCard
+  task={task}
+  selected={isSelected}
+  onSelect={handleSelect}
+  onclick={handleClick}
+/>
+```
 
 # GlobalSearch Component
 

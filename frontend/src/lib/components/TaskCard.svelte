@@ -3,6 +3,8 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { getProcessCardClasses, getPriorityClasses, getPriorityLabel } from '$lib/utils/theme';
 	import { formatDate } from '$lib/utils/form-helpers';
+	import { isPast, isToday, addDays, isBefore } from 'date-fns';
+	import { Clock, AlertCircle } from '@lucide/svelte';
 
 	interface Props {
 		task: Task;
@@ -29,6 +31,17 @@
 		const checked = (e.target as HTMLInputElement).checked;
 		if (onSelect) onSelect(task.id, checked);
 	}
+
+	function getDueDateStatus(dueDate: string | undefined) {
+		if (!dueDate) return null;
+		const date = new Date(dueDate);
+		if (isPast(date) && !isToday(date)) return 'overdue';
+		if (isToday(date)) return 'today';
+		if (isBefore(date, addDays(new Date(), 2))) return 'soon';
+		return 'future';
+	}
+
+	const dueStatus = $derived(getDueDateStatus(task.dueDate));
 </script>
 
 <div
@@ -58,7 +71,24 @@
 
 	<div class="flex justify-between items-start mb-3 pr-8">
 		<div class="flex-1">
-			<h3 class="font-semibold text-gray-900 dark:text-gray-100">{task.name}</h3>
+			<div class="flex items-center gap-2 mb-1">
+				<h3 class="font-semibold text-gray-900 dark:text-gray-100">{task.name}</h3>
+				{#if dueStatus === 'overdue'}
+					<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+						<AlertCircle class="w-3 h-3 mr-1" />
+						Overdue
+					</span>
+				{:else if dueStatus === 'today'}
+					<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+						<Clock class="w-3 h-3 mr-1" />
+						Due Today
+					</span>
+				{:else if dueStatus === 'soon'}
+					<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+						Due Soon
+					</span>
+				{/if}
+			</div>
 			<p class="text-sm text-gray-600 dark:text-gray-400">{task.processName}</p>
 		</div>
 		<span class="px-2 py-1 text-xs font-medium rounded border {getPriorityClasses(task.priority)}">

@@ -6,12 +6,14 @@
 		text: string;
 		assignee: string;
 		priority: string;
+		sortBy: string;
 	}
 
 	let filters = $state<Filters>({
 		text: '',
 		assignee: '',
-		priority: ''
+		priority: '',
+		sortBy: 'created_desc'
 	});
 
 	const dispatch = createEventDispatcher<{
@@ -31,12 +33,13 @@
 		filters = {
 			text: '',
 			assignee: '',
-			priority: ''
+			priority: '',
+			sortBy: 'created_desc'
 		};
 		dispatch('change', filters);
 	}
 
-    const hasActiveFilters = $derived(!!filters.text || !!filters.assignee || !!filters.priority);
+    const hasActiveFilters = $derived(!!filters.text || !!filters.assignee || !!filters.priority || filters.sortBy !== 'created_desc');
 </script>
 
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
@@ -56,7 +59,7 @@
 		</div>
 
 		<!-- Filters -->
-		<div class="flex gap-4">
+		<div class="flex flex-wrap gap-4">
 			<div class="w-40">
 				<select
 					bind:value={filters.assignee}
@@ -81,6 +84,21 @@
 					<option value="50">Medium</option>
 					<option value="75">High</option>
                     <option value="100">Critical</option>
+				</select>
+			</div>
+
+			<div class="w-40">
+				<select
+					bind:value={filters.sortBy}
+					onchange={handleChange}
+					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+				>
+					<option value="created_desc">Newest First</option>
+					<option value="created_asc">Oldest First</option>
+					<option value="priority_desc">Highest Priority</option>
+					<option value="priority_asc">Lowest Priority</option>
+					<option value="due_asc">Due Date (Earliest)</option>
+					<option value="due_desc">Due Date (Latest)</option>
 				</select>
 			</div>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable no-console */
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api/client';
@@ -19,7 +20,8 @@
 	let filters = $state({
 		text: '',
 		assignee: '',
-		priority: ''
+		priority: '',
+		sortBy: 'created_desc'
 	});
 
 	let showDelegateModal = $state(false);
@@ -38,7 +40,7 @@
 			// The original "Tabs" logic was client-side or specific endpoints.
 			// Now we use the powerful search endpoint.
 			
-			const apiFilters: any = {};
+			const apiFilters: Record<string, string | number> = {};
 			if (filters.text) apiFilters.text = filters.text;
 			if (filters.assignee) apiFilters.assignee = filters.assignee;
 			if (filters.priority) apiFilters.priority = Number(filters.priority);
@@ -68,6 +70,7 @@
 	}
 
 	function handleFilterChange(event: CustomEvent) {
+		console.log('[TasksPage] Filters changed:', event.detail);
 		filters = event.detail;
 		loadTasks();
 	}
@@ -171,6 +174,7 @@
 	{:else}
 		<TaskList
 			tasks={allTasks}
+			sortBy={filters.sortBy}
 			onTaskClick={handleTaskClick}
 			onClaim={handleClaim}
 			onUnclaim={handleUnclaim}

@@ -2,11 +2,13 @@
 	import type { WorkflowHistory, Comment } from '$lib/types';
 	import ProcessTimeline from './ProcessTimeline.svelte';
 	import ProcessDiagram from './ProcessDiagram.svelte';
+	import ProcessDocuments from './ProcessDocuments.svelte';
 	import Modal from './Modal.svelte';
 	import { formatDate, formatDuration } from '$lib/utils';
 	import { Badge } from '$lib/components/ui/badge';
 	import { api } from '$lib/api/client';
 	import { toast } from 'svelte-sonner';
+	import { Printer } from '@lucide/svelte';
 
 	interface Props {
 		process: WorkflowHistory | null;
@@ -19,13 +21,17 @@
 	let newComment = $state('');
 	let isSubmittingComment = $state(false);
 
-	let activeTab: 'details' | 'diagram' = $state('details');
+	let activeTab: 'details' | 'diagram' | 'documents' = $state('details');
 	let bpmnXml: string | null = $state(null);
 	let activeActivityIds: string[] = $state([]);
 
 	$effect(() => {
-		if (process?.comments) {
-			comments = [...process.comments];
+		if (process?.processInstanceId) {
+			comments = process.comments ? [...process.comments] : [];
+			// Reset tab and diagram state when process changes
+			activeTab = 'details';
+			bpmnXml = null;
+			activeActivityIds = [];
 		} else {
 			comments = [];
 		}
@@ -95,17 +101,8 @@
 		}
 	}
 
-	function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-		switch (status) {
-			case 'ACTIVE':
-				return 'default'; // Blue-ish in many themes or use a custom one
-			case 'COMPLETED':
-				return 'secondary'; // Green-ish often
-			case 'TERMINATED':
-				return 'destructive';
-			default:
-				return 'outline';
-		}
+	function handlePrint() {
+		window.print();
 	}
 
 	function getStatusClass(status: string | undefined): string {
@@ -154,6 +151,12 @@
 					>
 						<span>⬇️</span> Export CSV
 					</button>
+					<button
+						class="text-sm text-gray-600 hover:text-gray-800 font-medium flex items-center gap-1"
+						onclick={handlePrint}
+					>
+						<Printer class="w-4 h-4" /> Print
+					</button>
 				</div>
 
 				<div class="bg-gray-100 p-1 rounded-lg inline-flex">
@@ -168,6 +171,12 @@
 						onclick={() => activeTab = 'diagram'}
 					>
 						Diagram
+					</button>
+					<button
+						class="px-3 py-1 text-sm font-medium rounded-md transition-all {activeTab === 'documents' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-900'}"
+						onclick={() => activeTab = 'documents'}
+					>
+						Documents
 					</button>
 				</div>
 			</div>
@@ -315,6 +324,8 @@
 					<pre class="text-sm text-gray-700">{JSON.stringify(process.variables, null, 2)}</pre>
 				</div>
 			</div>
+		{:else if activeTab === 'documents'}
+			<ProcessDocuments processInstanceId={process.processInstanceId} />
 		{:else}
 			{#if bpmnXml}
 				<div class="h-[600px] bg-white border rounded">

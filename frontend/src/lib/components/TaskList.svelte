@@ -6,6 +6,7 @@
 
 	interface Props {
 		tasks: Task[];
+		sortBy?: string;
 		onTaskClick: (taskId: string) => void;
 		onClaim?: (taskId: string) => void;
 		onUnclaim?: (taskId: string) => void;
@@ -17,6 +18,7 @@
 
 	const {
 		tasks,
+		sortBy = 'created_desc',
 		onTaskClick,
 		onClaim,
 		onUnclaim,
@@ -30,11 +32,22 @@
 
 	const sortedTasks = $derived(
 		[...tasks].sort((a, b) => {
-			// Sort by priority (high first), then by creation time (newest first)
-			if (b.priority !== a.priority) {
-				return b.priority - a.priority;
+			switch (sortBy) {
+				case 'created_asc':
+					return new Date(a.createTime).getTime() - new Date(b.createTime).getTime();
+				case 'created_desc':
+					return new Date(b.createTime).getTime() - new Date(a.createTime).getTime();
+				case 'priority_desc':
+					return b.priority - a.priority;
+				case 'priority_asc':
+					return a.priority - b.priority;
+				case 'due_asc':
+					return (new Date(a.dueDate || '9999-12-31').getTime()) - (new Date(b.dueDate || '9999-12-31').getTime());
+				case 'due_desc':
+					return (new Date(b.dueDate || '1970-01-01').getTime()) - (new Date(a.dueDate || '1970-01-01').getTime());
+				default:
+					return new Date(b.createTime).getTime() - new Date(a.createTime).getTime();
 			}
-			return new Date(b.createTime).getTime() - new Date(a.createTime).getTime();
 		})
 	);
 

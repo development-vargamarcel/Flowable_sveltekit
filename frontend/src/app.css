@@ -130,3 +130,44 @@
   stroke-width: 2px !important;
   stroke-dasharray: 4;
 }
+
+@media print {
+  /* Hide everything by default */
+  body > *:not(.fixed) {
+    display: none !important;
+  }
+
+  /* But show the modal container */
+  .fixed.inset-0 {
+    display: flex !important;
+    position: static !important;
+    background: white !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  /* Modal content */
+  .fixed.inset-0 > div {
+    box-shadow: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  /* Hide print buttons and close buttons inside modal */
+  button {
+    display: none !important;
+  }
+
+  /* Ensure text is black */
+  * {
+    color: black !important;
+    background-color: transparent !important;
+  }
+
+  /* Ensure diagrams and timelines are visible */
+  svg {
+    max-width: 100% !important;
+  }
+}
