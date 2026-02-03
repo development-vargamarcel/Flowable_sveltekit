@@ -66,8 +66,40 @@ public class TaskService {
      * @return list of tasks
      */
     public List<TaskDTO> getGroupTasks(String userId) {
-        log.debug("Fetching group tasks for user: {}", userId);
-        return getTasks(flowableTaskService.createTaskQuery().taskCandidateOrAssigned(userId));
+        return getGroupTasks(userId, null, null, null);
+    }
+
+    /**
+     * Retrieves tasks assigned to the user or their groups with filtering.
+     *
+     * @param userId the ID of the user
+     * @param text filter by task name (partial)
+     * @param assignee filter by assignee
+     * @param priority filter by priority
+     * @return list of tasks
+     */
+    public List<TaskDTO> getGroupTasks(String userId, String text, String assignee, Integer priority) {
+        log.debug("Fetching group tasks for user: {}, text: {}, assignee: {}, priority: {}", userId, text, assignee, priority);
+        org.flowable.task.api.TaskQuery query = flowableTaskService.createTaskQuery()
+                .taskCandidateOrAssigned(userId);
+
+        if (text != null && !text.isBlank()) {
+            query.taskNameLikeIgnoreCase("%" + text.trim() + "%");
+        }
+
+        if (priority != null) {
+            query.taskPriority(priority);
+        }
+
+        if (assignee != null && !assignee.isBlank()) {
+             if ("unassigned".equalsIgnoreCase(assignee)) {
+                 query.taskUnassigned();
+             } else {
+                 query.taskAssignee(assignee);
+             }
+        }
+
+        return getTasks(query);
     }
 
     public TaskDTO getTaskById(String taskId) {
