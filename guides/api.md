@@ -21,7 +21,7 @@ The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 
 | Method | Endpoint | Description |
 | hum | hum | hum |
-| GET | `/api/tasks` | Get all tasks assigned to the user or their groups. |
+| GET | `/api/tasks` | Get tasks with optional filtering. Params: `text` (name), `assignee` (username or 'unassigned'), `priority` (number). |
 | GET | `/api/tasks/{id}` | Get details of a specific task. |
 | POST | `/api/tasks/{id}/claim` | Claim a candidate task (assign to self). |
 | POST | `/api/tasks/{id}/unclaim` | Unclaim a task (remove assignment). |

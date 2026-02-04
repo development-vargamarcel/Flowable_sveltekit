@@ -31,14 +31,19 @@ public class TaskController {
     private final TaskService taskService;
     private final FormDefinitionService formDefinitionService;
 
-    @Operation(summary = "Get tasks for the current user")
+    @Operation(summary = "Get tasks for the current user with optional filtering")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Found the tasks",
                     content = { @Content(mediaType = "application/json",
                             array = @ArraySchema(schema = @Schema(implementation = TaskDTO.class))) }) })
     @GetMapping
-    public ResponseEntity<List<TaskDTO>> getMyTasks(@AuthenticationPrincipal UserDetails userDetails) {
-        List<TaskDTO> tasks = taskService.getGroupTasks(userDetails.getUsername());
+    public ResponseEntity<List<TaskDTO>> getMyTasks(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Parameter(description = "Filter by task name (partial match)") @RequestParam(required = false) String text,
+            @Parameter(description = "Filter by assignee username or 'Unassigned'") @RequestParam(required = false) String assignee,
+            @Parameter(description = "Filter by priority") @RequestParam(required = false) Integer priority) {
+
+        List<TaskDTO> tasks = taskService.getGroupTasks(userDetails.getUsername(), text, assignee, priority);
         return ResponseEntity.ok(tasks);
     }
 
