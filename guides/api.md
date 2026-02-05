@@ -2,6 +2,36 @@
 
 The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 
+## Frontend API Client Usage
+
+The Svelte frontend uses `fetchApi` from `frontend/src/lib/api/core.ts` for consistent request behavior (credentials, typed responses, retries, and standardized `ApiError` handling).
+
+### Common options
+
+- `responseType`: `'json'` (default), `'blob'`, or `'text'`.
+- `timeoutMs`: optional timeout in milliseconds for slow network protection.
+
+### Example
+
+```ts
+import { fetchApi } from "$lib/api/client";
+
+const report = await fetchApi<string>("/api/processes/instance/123/export", {
+  responseType: "text",
+  timeoutMs: 8000,
+});
+```
+
+### Timeout behavior
+
+- When `timeoutMs` is omitted, existing behavior is preserved (no forced timeout).
+- When a timeout is reached, the request is aborted and an `ApiError` is thrown with:
+  - `message`: `"Request timeout"`
+  - `status`: `408`
+  - `statusText`: `"Request Timeout"`
+
+This makes slow-network failures explicit and easier to diagnose.
+
 ## Authentication
 
 | Method | Endpoint | Description |
@@ -12,10 +42,10 @@ The backend provides a RESTful API. All endpoints are prefixed with `/api`.
 
 ## Users
 
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| GET | `/api/users/{id}` | Get user details by ID. |
-| PUT | `/api/users/profile` | Update current user profile. Body: `UpdateProfileRequest`. |
+| Method | Endpoint             | Description                                                |
+| :----- | :------------------- | :--------------------------------------------------------- |
+| GET    | `/api/users/{id}`    | Get user details by ID.                                    |
+| PUT    | `/api/users/profile` | Update current user profile. Body: `UpdateProfileRequest`. |
 
 ## Tasks
 

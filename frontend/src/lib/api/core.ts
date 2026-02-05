@@ -212,6 +212,14 @@ function getRetryDelay(attempt: number): number {
 
 export interface FetchOptions extends RequestInit {
   responseType?: 'json' | 'blob' | 'text';
+  /**
+   * Optional request timeout in milliseconds.
+   *
+   * When set, the request will be aborted if the backend does not respond before
+   * this duration. This helps avoid hanging UI states on very slow networks while
+   * preserving default behavior for existing callers (no timeout by default).
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -222,22 +230,25 @@ export interface FetchOptions extends RequestInit {
  * @throws {ApiError} If the request fails or returns an error status.
  */
 export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+  const { timeoutMs, signal: callerSignal, ...requestOptions } = options;
   const url = `${API_BASE}${endpoint}`;
-  const method = options.method || 'GET';
+  const method = requestOptions.method || 'GET';
+  const requestBody = formatRequestBodyForLogs(requestOptions.body);
 
-  log.debug(`${method} ${url}`, {
-    body: options.body ? JSON.parse(options.body as string) : undefined
-  });
+  log.debug(`${method} ${url}`, { body: requestBody, timeoutMs });
 
   for (let attempt = 0; attempt <= STARTUP_RETRY_CONFIG.maxRetries; attempt++) {
+    const signalController = createRequestSignal(timeoutMs, callerSignal);
+
     try {
       const response = await fetch(url, {
-        ...options,
+        ...requestOptions,
+        signal: signalController.signal,
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          ...options.headers
+          ...requestOptions.headers
         }
       });
 
@@ -322,13 +333,36 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         return data as unknown as T;
       }
 
-      const data = await response.json();
+      if (options.responseType === 'text') {
+        const data = await response.text();
+        log.debug(`${method} ${url} success (text)`);
+        return data as unknown as T;
+      }
+
+      const data = await parseJsonResponse<T>(response, method, url);
       log.debug(`${method} ${url} success`, { data });
       return data;
     } catch (error) {
       // Re-throw ApiErrors as-is (they're already processed)
       if (error instanceof ApiError) {
         throw error;
+      }
+
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        if (signalController.wasTimedOut()) {
+          const message = `The request to ${endpoint} timed out after ${timeoutMs}ms.`;
+          log.warn('Request timed out', { url, method, timeoutMs, attempt });
+          backendStatus.setError('Request timeout');
+
+          if (browser) {
+            toast.error('Request Timed Out', { description: message });
+          }
+
+          throw new ApiError('Request timeout', 408, 'Request Timeout', message);
+        }
+
+        log.info('Request aborted by caller', { url, method, attempt });
+        throw new ApiError('Request cancelled', 0, 'Aborted', 'The request was cancelled.');
       }
 
       // For network errors during startup, retry
@@ -380,6 +414,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         'Unknown Error',
         `An unexpected error occurred: ${errorMessage}`
       );
+    } finally {
+      signalController.cleanup();
     }
   }
 
@@ -391,4 +427,101 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     'Service Unavailable',
     `Backend is still starting after ${STARTUP_RETRY_CONFIG.maxRetries + 1} attempts. Please try again in a moment.`
   );
+}
+
+interface RequestSignalController {
+  signal?: AbortSignal;
+  cleanup: () => void;
+  wasTimedOut: () => boolean;
+}
+
+/**
+ * Creates a request signal that combines caller cancellation with an optional timeout.
+ *
+ * We keep this logic centralized to make cancellation behavior explicit and testable.
+ */
+function createRequestSignal(
+  timeoutMs?: number,
+  callerSignal?: AbortSignal | null
+): RequestSignalController {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return {
+      signal: callerSignal ?? undefined,
+      cleanup: () => {},
+      wasTimedOut: () => false
+    };
+  }
+
+  const abortController = new AbortController();
+  let timeoutTriggered = false;
+
+  const timeoutId = setTimeout(() => {
+    timeoutTriggered = true;
+    abortController.abort();
+  }, timeoutMs);
+
+  const onCallerAbort = () => abortController.abort();
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      onCallerAbort();
+    } else {
+      callerSignal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+  }
+
+  return {
+    signal: abortController.signal,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      if (callerSignal) {
+        callerSignal.removeEventListener('abort', onCallerAbort);
+      }
+    },
+    wasTimedOut: () => timeoutTriggered
+  };
+}
+
+function formatRequestBodyForLogs(body: BodyInit | null | undefined): unknown {
+  if (!body) return undefined;
+
+  if (typeof body === 'string') {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return body;
+    }
+  }
+
+  if (body instanceof URLSearchParams) {
+    return Object.fromEntries(body.entries());
+  }
+
+  if (body instanceof FormData) {
+    return Object.fromEntries(body.entries());
+  }
+
+  return `[${body.constructor.name}]`;
+}
+
+async function parseJsonResponse<T>(response: Response, method: string, url: string): Promise<T> {
+  const raw = await response.text();
+  if (!raw.trim()) {
+    log.warn(`${method} ${url} returned an empty response body for JSON payload`);
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    const preview = raw.substring(0, 200);
+    log.error(`${method} ${url} returned invalid JSON`, error, {
+      responsePreview: preview
+    });
+    throw new ApiError(
+      'Invalid server response',
+      response.status,
+      response.statusText,
+      'The server returned malformed JSON.'
+    );
+  }
 }
