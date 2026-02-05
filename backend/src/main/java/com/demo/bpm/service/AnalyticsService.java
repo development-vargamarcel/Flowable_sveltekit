@@ -47,6 +47,13 @@ public class AnalyticsService {
         private long totalInstances;
     }
 
+    @Data
+    @Builder
+    public static class TrendMetric {
+        private String date;
+        private long count;
+    }
+
     /**
      * Get process duration distribution for finished processes
      */
@@ -181,5 +188,48 @@ public class AnalyticsService {
         // Sort by Average Duration Descending
         bottlenecks.sort(Comparator.comparing(BottleneckMetric::getAvgDurationHours).reversed());
         return bottlenecks;
+    }
+
+    /**
+     * Get process completion trend for the last N days
+     */
+    public List<TrendMetric> getProcessCompletionTrend(int days) {
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DAY_OF_YEAR, -days);
+        Date startDate = cal.getTime();
+
+        List<HistoricProcessInstance> instances = historyService.createHistoricProcessInstanceQuery()
+                .finished()
+                .finishedAfter(startDate)
+                .orderByProcessInstanceEndTime().asc()
+                .list();
+
+        Map<String, Long> dailyCounts = new TreeMap<>();
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+
+        // Initialize all days with 0 to ensure continuity
+        Calendar c = Calendar.getInstance();
+        for (int i = 0; i < days; i++) {
+            dailyCounts.put(sdf.format(c.getTime()), 0L);
+            c.add(Calendar.DAY_OF_YEAR, -1);
+        }
+
+        for (HistoricProcessInstance instance : instances) {
+            if (instance.getEndTime() != null) {
+                String dateStr = sdf.format(instance.getEndTime());
+                // Only count if it falls within our range (safe guard)
+                if (dailyCounts.containsKey(dateStr)) {
+                    dailyCounts.put(dateStr, dailyCounts.get(dateStr) + 1);
+                }
+            }
+        }
+
+        return dailyCounts.entrySet().stream()
+                .map(e -> TrendMetric.builder()
+                        .date(e.getKey())
+                        .count(e.getValue())
+                        .build())
+                .sorted(Comparator.comparing(TrendMetric::getDate))
+                .collect(Collectors.toList());
     }
 }

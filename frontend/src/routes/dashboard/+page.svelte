@@ -10,6 +10,7 @@
 	import DurationHistogram from '$lib/components/DurationHistogram.svelte';
 	import UserPerformanceWidget from '$lib/components/UserPerformanceWidget.svelte';
 	import BottleneckWidget from '$lib/components/BottleneckWidget.svelte';
+	import ProcessCompletionTrendWidget from '$lib/components/ProcessCompletionTrendWidget.svelte';
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ProcessDetailsModal from '$lib/components/ProcessDetailsModal.svelte';
@@ -294,9 +295,10 @@
 			<UserPerformanceWidget />
 		</div>
 
-		<!-- Row 4: Bottleneck Analysis -->
-		<div class="mb-8">
+		<!-- Row 4: Bottleneck Analysis & Trend -->
+		<div class="mb-8 grid gap-6 lg:grid-cols-2">
 			<BottleneckWidget />
+			<ProcessCompletionTrendWidget />
 		</div>
 
 		<!-- Process Type Distribution -->

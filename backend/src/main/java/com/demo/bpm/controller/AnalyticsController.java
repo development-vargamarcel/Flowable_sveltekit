@@ -29,4 +29,10 @@ public class AnalyticsController {
     public ResponseEntity<List<AnalyticsService.BottleneckMetric>> getBottlenecks() {
         return ResponseEntity.ok(analyticsService.getBottlenecks());
     }
+
+    @GetMapping("/completion-trend")
+    public ResponseEntity<List<AnalyticsService.TrendMetric>> getProcessCompletionTrend(
+            @RequestParam(defaultValue = "7") int days) {
+        return ResponseEntity.ok(analyticsService.getProcessCompletionTrend(days));
+    }
 }

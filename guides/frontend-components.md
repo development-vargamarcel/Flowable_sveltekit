@@ -526,3 +526,24 @@ Automatically integrated into the `Navbar` component.
 ```svelte
 <GlobalSearch />
 ```
+
+# ProcessCompletionTrendWidget
+
+A widget for the dashboard to visualize process completions over time.
+
+## Features
+
+- Bar chart visualization of completed processes.
+- Filters for last 7, 14, or 30 days.
+- Interactive tooltips showing exact counts and dates.
+- Responsive design.
+
+## Usage
+
+```svelte
+<script>
+  import ProcessCompletionTrendWidget from '$lib/components/ProcessCompletionTrendWidget.svelte';
+</script>
+
+<ProcessCompletionTrendWidget />
+```

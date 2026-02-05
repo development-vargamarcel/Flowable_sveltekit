@@ -79,6 +79,15 @@ This makes slow-network failures explicit and easier to diagnose.
 | hum | hum | hum |
 | GET | `/api/dashboard` | Returns `DashboardDTO` with statistics (active tasks, completed processes, etc.). |
 
+## Analytics
+
+| Method | Endpoint | Description |
+| hum | hum | hum |
+| GET | `/api/analytics/process-duration` | Get process duration distribution. |
+| GET | `/api/analytics/user-performance` | Get user performance metrics. |
+| GET | `/api/analytics/bottlenecks` | Get bottleneck tasks. |
+| GET | `/api/analytics/completion-trend` | Get process completion trend. Params: `days` (default 7). |
+
 ## SLA
 
 | Method | Endpoint | Description |
