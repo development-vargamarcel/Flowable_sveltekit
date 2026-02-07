@@ -2,6 +2,7 @@ package com.demo.bpm.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.groups.Default;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,8 +26,13 @@ public class DocumentTypeDefinition {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    public interface ValidationGroups {
+        interface Create extends Default {}
+        interface Update extends Default {}
+    }
+
     @Column(name = "key_id", unique = true, nullable = false)
-    @NotBlank(message = "key is required")
+    @NotBlank(message = "key is required", groups = ValidationGroups.Create.class)
     private String key;
 
     @Column(nullable = false)
