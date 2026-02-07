@@ -9,6 +9,8 @@ import com.demo.bpm.service.ExportService;
 import com.demo.bpm.service.FormDefinitionService;
 import com.demo.bpm.service.ProcessService;
 import com.demo.bpm.service.UserService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -24,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,6 +36,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/processes")
 @RequiredArgsConstructor
+@Validated
 public class ProcessController {
 
     private final ProcessService processService;
@@ -182,24 +186,9 @@ public class ProcessController {
             @ApiResponse(responseCode = "400", description = "Invalid request",
                     content = @Content) })
     @PostMapping("/deploy")
-    public ResponseEntity<?> deployProcess(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> deployProcess(@Valid @RequestBody DeployProcessRequest request) {
         try {
-            String processName = request.get("processName");
-            String bpmnXml = request.get("bpmnXml");
-
-            if (processName == null || processName.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Process name is required"
-                ));
-            }
-
-            if (bpmnXml == null || bpmnXml.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "BPMN XML is required"
-                ));
-            }
-
-            ProcessDTO deployedProcess = processService.deployProcess(processName, bpmnXml);
+            ProcessDTO deployedProcess = processService.deployProcess(request.getProcessName(), request.getBpmnXml());
 
             return ResponseEntity.ok(Map.of(
                     "message", "Process deployed successfully",
@@ -303,10 +292,9 @@ public class ProcessController {
     @PutMapping("/{processDefinitionId}/category")
     public ResponseEntity<?> updateCategory(
             @Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId,
-            @RequestBody Map<String, String> body) {
+            @Valid @RequestBody UpdateCategoryRequest body) {
         try {
-            String category = body.get("category");
-            processService.updateProcessDefinitionCategory(processDefinitionId, category);
+            processService.updateProcessDefinitionCategory(processDefinitionId, body.getCategory());
             return ResponseEntity.ok(Map.of("message", "Category updated"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -459,5 +447,20 @@ public class ProcessController {
             log.error("Error activating process instance: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    // Request DTOs
+    @lombok.Data
+    public static class DeployProcessRequest {
+        @NotBlank(message = "processName is required")
+        private String processName;
+        @NotBlank(message = "bpmnXml is required")
+        private String bpmnXml;
+    }
+
+    @lombok.Data
+    public static class UpdateCategoryRequest {
+        @NotBlank(message = "category is required")
+        private String category;
     }
 }

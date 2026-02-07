@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,10 +24,13 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ProcessController.class)
+@AutoConfigureMockMvc(addFilters = false)
+@Import(com.demo.bpm.exception.GlobalExceptionHandler.class)
 class ProcessControllerTest {
 
     @Autowired
@@ -102,5 +107,28 @@ class ProcessControllerTest {
 
         verify(processService, times(1))
                 .startProcess(eq("demo"), eq("BK-1"), any(Map.class), eq("jane"));
+    }
+
+    @Test
+    @WithMockUser
+    void deployProcess_requiresNameAndXml() throws Exception {
+        mockMvc.perform(post("/api/processes/deploy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.processName").value("processName is required"))
+                .andExpect(jsonPath("$.fieldErrors.bpmnXml").value("bpmnXml is required"))
+                .andExpect(jsonPath("$.path").value("/api/processes/deploy"));
+    }
+
+    @Test
+    @WithMockUser
+    void updateCategory_requiresCategory() throws Exception {
+        mockMvc.perform(put("/api/processes/def-1/category")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ }"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.category").value("category is required"))
+                .andExpect(jsonPath("$.path").value("/api/processes/def-1/category"));
     }
 }
