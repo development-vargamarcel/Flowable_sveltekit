@@ -7,11 +7,15 @@ import com.demo.bpm.dto.ProcessInstanceDTO;
 import com.demo.bpm.entity.ProcessConfig;
 import com.demo.bpm.service.BusinessTableService;
 import com.demo.bpm.service.ProcessService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,6 +29,7 @@ import java.util.Map;
 @RequestMapping("/api/business")
 @RequiredArgsConstructor
 @Slf4j
+@Validated
 public class BusinessTableController {
 
     private final BusinessTableService businessTableService;
@@ -65,7 +70,7 @@ public class BusinessTableController {
     public ResponseEntity<DocumentDTO> saveDocumentWithType(
             @PathVariable String processInstanceId,
             @PathVariable String type,
-            @RequestBody SaveDocumentRequest request) {
+            @Valid @RequestBody SaveDocumentRequest request) {
 
         businessTableService.saveDocument(
                 processInstanceId,
@@ -123,7 +128,7 @@ public class BusinessTableController {
      * Save document data (legacy - saves as main type).
      */
     @PostMapping("/document-types")
-    public ResponseEntity<DocumentDTO> saveDocument(@RequestBody SaveDocumentRequest request) {
+    public ResponseEntity<DocumentDTO> saveDocument(@Valid @RequestBody SaveDocumentRequest request) {
         businessTableService.saveDocument(
                 request.getProcessInstanceId(),
                 request.getBusinessKey(),
@@ -146,7 +151,7 @@ public class BusinessTableController {
      * Save draft - creates a process instance if needed and saves all data (document + grids).
      */
     @PostMapping("/save-draft")
-    public ResponseEntity<?> saveDraft(@RequestBody SaveDraftRequest request) {
+    public ResponseEntity<?> saveDraft(@Valid @RequestBody SaveDraftRequest request) {
         try {
             String processInstanceId = request.getProcessInstanceId();
 
@@ -216,7 +221,7 @@ public class BusinessTableController {
             @PathVariable String processInstanceId,
             @PathVariable String type,
             @PathVariable String gridName,
-            @RequestBody SaveGridRowsRequest request) {
+            @Valid @RequestBody SaveGridRowsRequest request) {
 
         businessTableService.saveGridRows(
                 processInstanceId,
@@ -264,7 +269,7 @@ public class BusinessTableController {
     public ResponseEntity<Page<GridRowDTO>> saveGridRows(
             @PathVariable String processInstanceId,
             @PathVariable String gridName,
-            @RequestBody SaveGridRowsRequest request) {
+            @Valid @RequestBody SaveGridRowsRequest request) {
 
         String docType = request.getDocumentType() != null ? request.getDocumentType() : "main";
         businessTableService.saveGridRows(
@@ -312,7 +317,7 @@ public class BusinessTableController {
     @PutMapping("/config/{processDefinitionKey}")
     public ResponseEntity<ProcessConfigDTO> updateProcessConfig(
             @PathVariable String processDefinitionKey,
-            @RequestBody UpdateProcessConfigRequest request) {
+            @Valid @RequestBody UpdateProcessConfigRequest request) {
 
         ProcessConfig config = businessTableService.updateProcessConfig(
                 processDefinitionKey,
@@ -339,6 +344,7 @@ public class BusinessTableController {
     public static class SaveDocumentRequest {
         private String processInstanceId;
         private String businessKey;
+        @NotBlank(message = "processDefinitionKey is required")
         private String processDefinitionKey;
         private String processDefinitionName;
         private String documentType;
@@ -348,8 +354,10 @@ public class BusinessTableController {
 
     @lombok.Data
     public static class SaveGridRowsRequest {
+        @NotBlank(message = "processDefinitionKey is required")
         private String processDefinitionKey;
         private String documentType;
+        @NotNull(message = "rows are required")
         private List<Map<String, Object>> rows;
     }
 
@@ -363,6 +371,7 @@ public class BusinessTableController {
     public static class SaveDraftRequest {
         private String processInstanceId;
         private String businessKey;
+        @NotBlank(message = "processDefinitionKey is required")
         private String processDefinitionKey;
         private String processDefinitionName;
         private String documentType;
