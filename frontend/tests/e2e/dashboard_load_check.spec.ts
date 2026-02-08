@@ -57,6 +57,33 @@ test('login and monitor dashboard load', async ({ page, log }, testInfo) => {
 
   if (state === 'success') {
     log.info('Dashboard loaded successfully within 80 seconds.');
+    await test.step('Verify dashboard controls', async () => {
+      await expect(
+        page.getByPlaceholder('Search by key, initiator, task, or process')
+      ).toBeVisible();
+      await expect(page.getByRole('combobox', { name: 'Filter by status' })).toBeVisible();
+      await expect(page.getByRole('combobox', { name: 'Sort processes' })).toBeVisible();
+      await expect(page.getByLabel('Escalated only')).toBeVisible();
+      await expect(page.getByLabel('Auto refresh')).toBeVisible();
+      await expect(page.getByRole('combobox', { name: 'Auto refresh interval' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Copy link' })).toBeVisible();
+    });
+    await test.step('Verify per-page summary stats', async () => {
+      await expect(page.getByText(/Showing \\d+ of/)).toBeVisible();
+      await expect(page.getByText(/escalated/)).toBeVisible();
+    });
+    await test.step('Verify auto refresh toggles', async () => {
+      const autoRefreshToggle = page.getByLabel('Auto refresh');
+      await autoRefreshToggle.check();
+      await expect(autoRefreshToggle).toBeChecked();
+
+      const intervalSelect = page.getByRole('combobox', { name: 'Auto refresh interval' });
+      await intervalSelect.selectOption('120');
+      await expect(intervalSelect).toHaveValue('120');
+
+      await expect(page.getByText(/Next refresh in/)).toBeVisible();
+    });
     return;
   }
 

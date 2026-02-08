@@ -38,6 +38,16 @@ Detailed documentation is available in the `guides/` directory:
 - **Shareable Filter Links**: Copy a URL that preserves active task filters for team handoff.
 - **Persistent Context**: Last-used filters are restored automatically after refresh.
 
+### Dashboard Productivity Enhancements
+
+- **Search + Sorting**: Quickly scan workflows using search, sort-by duration, and escalation ordering.
+- **Escalation Focus**: Toggle escalated-only views to zero in on urgent work.
+- **Exportable Views**: Download the current dashboard list as CSV for reporting.
+- **Shareable Links**: Copy the current dashboard filters into a URL for quick sharing.
+- **Auto Refresh Controls**: Keep dashboards fresh with an optional timed refresh interval.
+- **Refresh Status**: See the next refresh countdown and pause state while monitoring queues.
+- **Per-page Insights**: View average duration and newest/oldest timestamps for the current filtered page.
+
 See [Workflows Guide](guides/workflows.md) for detailed diagrams and logic.
 
 ### Key Implementation Details
