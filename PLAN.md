@@ -1,302 +1,64 @@
-# Implementation Plan: Flowable + SvelteKit Demo
+# Consolidated Improvement Todo Plan
 
-## Overview
-A production-ready demo application featuring Flowable BPM engine with a SvelteKit (Svelte 5 runes) frontend, deployable to Railway via Docker.
+> Scope: prioritized engineering improvements with implementation notes.  
+> Status legend: `[x] done`, `[~] in progress`, `[ ] queued`.
 
----
+- [x] **1. Consolidate planning artifacts into one actionable plan file.**  
+  **Notes:** Removed legacy plan markdown files and replaced them with this single source of truth to reduce drift.
 
-## Architecture
+- [x] **2. Harden variable display amount parsing in shared frontend utilities.**  
+  **Notes:** Added safe finite-number parsing so malformed values no longer render as `$NaN`.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Docker Compose                        │
-├─────────────────────────────────────────────────────────┤
-│  ┌─────────────────────┐    ┌─────────────────────────┐ │
-│  │   SvelteKit App     │    │   Spring Boot + Flowable│ │
-│  │   (Node.js)         │───▶│   (Java 17)             │ │
-│  │   Port: 3000        │    │   Port: 8080            │ │
-│  │                     │    │   H2 Database (embedded)│ │
-│  └─────────────────────┘    └─────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+- [x] **3. Improve date formatting resilience for invalid payloads.**  
+  **Notes:** `formatDate` now returns `Invalid date` when parsing fails rather than surfacing raw invalid locale output.
 
----
+- [x] **4. Correct duration formatting edge cases (0, negative, day boundary).**  
+  **Notes:** `formatDuration` now treats `0` as valid, rejects negatives, and uses `>=24h` day conversion.
 
-## User Roles (3 Levels)
+- [x] **5. Extract pure CSV serialization utility for safer reuse/testing.**  
+  **Notes:** Added `toCSV` helper to separate serialization from browser download side effects.
 
-| Role | Username | Password | Capabilities |
-|------|----------|----------|--------------|
-| User | user1 | password | Submit expenses, leave requests, work on assigned tasks |
-| Supervisor | supervisor1 | password | Approve user requests, escalate to executive, manage team |
-| Executive | executive1 | password | Final approval for high-value items, override decisions |
+- [x] **6. Prevent memory leaks during CSV export downloads.**  
+  **Notes:** Added `URL.revokeObjectURL` call after click lifecycle.
 
----
+- [x] **7. Add focused unit tests for shared utility regressions.**  
+  **Notes:** Added coverage for amount parsing, invalid dates, duration edge cases, and CSV escaping.
 
-## Workflows
+- [x] **8. Publish implementation notes for team handoff in `notes.md`.**  
+  **Notes:** Added concise team-facing guidance, risk notes, and follow-up recommendations.
 
-### 1. Expense Approval (Threshold-based)
-```
-User submits expense
-       │
-       ▼
-   Amount > $500?
-   ┌────┴────┐
-   No       Yes
-   │         │
-   ▼         ▼
-Supervisor  Supervisor
- Approves    Reviews
-   │         │
-   │    Approves/Escalates
-   │         │
-   │         ▼
-   │    Executive
-   │     Approves
-   │         │
-   └────┬────┘
-        ▼
-   Process Complete
-```
+- [ ] **9. Introduce centralized i18n/date-time formatting strategy.**  
+  **Notes:** Queued; current utility improvements are locale-ready but not yet locale-configurable.
 
-### 2. Leave Request (Sequential)
-```
-User submits leave request
-       │
-       ▼
-   Supervisor Reviews
-       │
-   Approve/Reject/Escalate
-       │
-       ▼ (if escalated or > 5 days)
-   Executive Reviews
-       │
-   Approve/Reject
-       │
-       ▼
-   Process Complete
-```
+- [ ] **10. Add frontend error-boundary UX for API failures.**  
+  **Notes:** Queued for route-level fallback standardization.
 
-### 3. Task Assignment (Simple)
-```
-Any user creates task
-       │
-       ▼
-   Assign to user
-       │
-       ▼
-   Assignee works on task
-       │
-       ▼
-   Mark complete
-       │
-       ▼
-   Process Complete
-```
+- [ ] **11. Add optimistic-update rollback helpers in API client layer.**  
+  **Notes:** Queued; requires mutation catalog and rollback contracts.
 
----
+- [ ] **12. Implement reusable table virtualization for large datasets.**  
+  **Notes:** Queued pending UX acceptance criteria.
 
-## Project Structure
+- [ ] **13. Add backend request/response correlation IDs for tracing.**  
+  **Notes:** Queued; requires logging filter + propagation through services.
 
-```
-/Flowable_sveltekit/
-├── docker-compose.yml
-├── Dockerfile.frontend
-├── Dockerfile.backend
-├── railway.json
-│
-├── /backend/                    # Spring Boot + Flowable
-│   ├── pom.xml
-│   ├── /src/main/java/com/demo/bpm/
-│   │   ├── BpmApplication.java
-│   │   ├── /config/
-│   │   │   ├── SecurityConfig.java
-│   │   │   ├── CorsConfig.java
-│   │   │   └── FlowableConfig.java
-│   │   ├── /controller/
-│   │   │   ├── AuthController.java
-│   │   │   ├── TaskController.java
-│   │   │   └── ProcessController.java
-│   │   ├── /service/
-│   │   │   ├── TaskService.java
-│   │   │   ├── ProcessService.java
-│   │   │   └── UserService.java
-│   │   ├── /dto/
-│   │   │   ├── TaskDTO.java
-│   │   │   ├── ProcessDTO.java
-│   │   │   ├── LoginRequest.java
-│   │   │   └── UserDTO.java
-│   │   └── /delegate/
-│   │       ├── ExpenseValidationDelegate.java
-│   │       └── NotificationDelegate.java
-│   └── /src/main/resources/
-│       ├── application.yml
-│       └── /processes/
-│           ├── expense-approval.bpmn20.xml
-│           ├── leave-request.bpmn20.xml
-│           └── task-assignment.bpmn20.xml
-│
-├── /frontend/                   # SvelteKit + Svelte 5
-│   ├── package.json
-│   ├── svelte.config.js
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   ├── /src/
-│   │   ├── app.html
-│   │   ├── app.css
-│   │   ├── /lib/
-│   │   │   ├── /api/
-│   │   │   │   └── client.ts
-│   │   │   ├── /components/
-│   │   │   │   ├── TaskCard.svelte
-│   │   │   │   ├── TaskList.svelte
-│   │   │   │   ├── ProcessCard.svelte
-│   │   │   │   ├── DynamicForm.svelte
-│   │   │   │   ├── Navbar.svelte
-│   │   │   │   └── Toast.svelte
-│   │   │   ├── /stores/
-│   │   │   │   └── auth.svelte.ts
-│   │   │   └── /types/
-│   │   │       └── index.ts
-│   │   └── /routes/
-│   │       ├── +layout.svelte
-│   │       ├── +layout.server.ts
-│   │       ├── +page.svelte           # Dashboard
-│   │       ├── /login/
-│   │       │   └── +page.svelte
-│   │       ├── /tasks/
-│   │       │   ├── +page.svelte       # Task inbox
-│   │       │   └── /[id]/
-│   │       │       └── +page.svelte   # Task detail
-│   │       └── /processes/
-│   │           ├── +page.svelte       # Start new process
-│   │           ├── /expense/
-│   │           │   └── +page.svelte
-│   │           ├── /leave/
-│   │           │   └── +page.svelte
-│   │           └── /task/
-│   │               └── +page.svelte
-│   └── /static/
-│       └── favicon.png
-│
-└── /docs/
-    └── API.md
-```
+- [ ] **14. Expand backend integration tests around process escalation paths.**  
+  **Notes:** Queued; requires deterministic BPM fixtures.
 
----
+- [ ] **15. Add audit event schema validation before persistence.**  
+  **Notes:** Queued to reduce malformed history records.
 
-## Implementation Steps
+- [ ] **16. Add security regression tests for role-protected endpoints.**  
+  **Notes:** Queued with negative-path matrix.
 
-### Phase 1: Backend Setup
-1. Create Spring Boot project structure
-2. Add Flowable dependency and configuration
-3. Create BPMN process definitions (3 workflows)
-4. Implement REST controllers (Auth, Tasks, Processes)
-5. Configure H2 database and security
-6. Add service delegates for business logic
+- [ ] **17. Optimize dashboard query fan-out in analytics service.**  
+  **Notes:** Queued after baseline instrumentation is collected.
 
-### Phase 2: Frontend Setup
-7. Create SvelteKit project with Svelte 5
-8. Configure Tailwind CSS
-9. Create TypeScript types
-10. Build API client
-11. Create auth store (Svelte 5 runes)
+- [ ] **18. Add frontend accessibility pass for form field components.**  
+  **Notes:** Queued; target ARIA labeling and keyboard flows.
 
-### Phase 3: Frontend Components
-12. Build Navbar component
-13. Build TaskCard and TaskList components
-14. Build DynamicForm component
-15. Build ProcessCard component
-16. Build Toast notification component
+- [ ] **19. Add CI gate for formatting/lint/test split reporting.**  
+  **Notes:** Queued to improve failure diagnostics in pipelines.
 
-### Phase 4: Frontend Routes
-17. Create layout with auth check
-18. Build login page
-19. Build dashboard page
-20. Build task inbox page
-21. Build task detail page
-22. Build process starter pages (expense, leave, task)
-
-### Phase 5: Docker & Deployment
-23. Create Dockerfile for backend
-24. Create Dockerfile for frontend
-25. Create docker-compose.yml
-26. Create railway.json configuration
-27. Test local Docker deployment
-28. Document deployment steps
-
----
-
-## Demo Data
-
-Pre-populated on startup:
-- 3 users (user1, supervisor1, executive1)
-- 2 sample expense requests (one pending supervisor, one pending executive)
-- 1 sample leave request (pending approval)
-- 2 sample tasks (one assigned, one unassigned)
-
----
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Backend Runtime | Java 17 |
-| Backend Framework | Spring Boot 3.2 |
-| BPM Engine | Flowable 7.0 |
-| Database | H2 (embedded) |
-| Frontend Runtime | Node.js 20 |
-| Frontend Framework | SvelteKit 2.x |
-| UI Library | Svelte 5 (runes mode) |
-| CSS Framework | Tailwind CSS 3.x |
-| Containerization | Docker |
-| Deployment | Railway |
-
----
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/login` - Login
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Get current user
-
-### Tasks
-- `GET /api/tasks` - Get user's tasks
-- `GET /api/tasks/claimable` - Get claimable tasks
-- `GET /api/tasks/{id}` - Get task details
-- `POST /api/tasks/{id}/complete` - Complete task
-- `POST /api/tasks/{id}/claim` - Claim task
-
-### Processes
-- `GET /api/processes` - List available processes
-- `POST /api/processes/expense/start` - Start expense process
-- `POST /api/processes/leave/start` - Start leave process
-- `POST /api/processes/task/start` - Start task assignment
-- `GET /api/processes/{id}` - Get process status
-
----
-
-## Estimated File Count
-- Backend: ~20 files
-- Frontend: ~25 files
-- Config/Docker: ~5 files
-- **Total: ~50 files**
-
----
-
-## Questions Resolved
-- ✅ 3 workflows: Expense, Leave, Task
-- ✅ H2 database (in-memory)
-- ✅ 3 roles: User, Supervisor, Executive
-- ✅ Mixed approval: Threshold for expense, Sequential for leave
-- ✅ Railway deployment
-- ✅ Standard UI with Tailwind
-
----
-
-## Ready to Implement?
-
-Please review this plan and confirm:
-1. Does the workflow logic look correct?
-2. Is the project structure acceptable?
-3. Any features to add or remove?
+- [ ] **20. Create deployment readiness checklist with rollback playbook.**  
+  **Notes:** Queued; depends on infra and release ownership review.
