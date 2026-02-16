@@ -48,6 +48,15 @@ const resolveBaseOrigin = (testInfo: TestInfo) => {
   }
 };
 
+export const resolveTitlePath = (testInfo: TestInfo): string[] => {
+  const maybeTitlePath = (testInfo as unknown as { titlePath?: string[] | (() => string[]) })
+    .titlePath;
+  if (typeof maybeTitlePath === 'function') {
+    return maybeTitlePath();
+  }
+  return Array.isArray(maybeTitlePath) ? maybeTitlePath : [];
+};
+
 export const createTestLogger = (testInfo: TestInfo): TestLogger => {
   const terminalLogPath = testInfo.outputPath('logs', 'terminal.log');
   const terminalWriter = createWriter(terminalLogPath);
@@ -63,7 +72,7 @@ export const createTestLogger = (testInfo: TestInfo): TestLogger => {
   if (enabled) {
     terminalWriter.write(
       formatMessage('info', [
-        `Test started: ${testInfo.titlePath().join(' > ')} (${testInfo.file})`
+        `Test started: ${resolveTitlePath(testInfo).join(' > ')} (${testInfo.file})`
       ])
     );
   }
@@ -94,7 +103,9 @@ export const attachBrowserLogging = (page: Page, testInfo: TestInfo) => {
   const errorEntries: string[] = [];
   if (enabled) {
     browserWriter.write(
-      formatMessage('info', [`Browser logging enabled for: ${testInfo.titlePath().join(' > ')}`])
+      formatMessage('info', [
+        `Browser logging enabled for: ${resolveTitlePath(testInfo).join(' > ')}`
+      ])
     );
   }
 
