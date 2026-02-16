@@ -102,9 +102,14 @@ describe('fetchApi', () => {
       body: 'plain-text-body'
     });
 
-    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('POST'), {
-      body: 'plain-text-body'
-    });
+    expect(logger.debug).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('POST'),
+      expect.objectContaining({
+        body: 'plain-text-body',
+        requestId: expect.any(String)
+      })
+    );
   });
 
   it('does not force a JSON content type for FormData requests', async () => {
@@ -127,6 +132,22 @@ describe('fetchApi', () => {
       method: 'POST',
       body: formData
     });
+  });
+
+  it('attaches a correlation header to outgoing requests', async () => {
+    mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get('X-Request-ID')).toBeTruthy();
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11' })
+      });
+    });
+
+    await fetchApi('/api/request-id-test');
   });
 
   it('returns text payload when responseType is text', async () => {
@@ -237,8 +258,55 @@ describe('fetchApi', () => {
     });
     expect(logger.info).toHaveBeenCalledWith(
       'Request aborted by caller',
-      expect.objectContaining({ url: expect.stringContaining('/api/cancelled') })
+      expect.objectContaining({
+        url: expect.stringContaining('/api/cancelled'),
+        requestId: expect.any(String)
+      })
     );
+  });
+
+  it('does not retry non-idempotent network failures', async () => {
+    mockFetch.mockRejectedValue(new TypeError('network error'));
+
+    await expect(
+      fetchApi('/api/mutations', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'test' })
+      })
+    ).rejects.toMatchObject({
+      message: 'Connection failed',
+      status: 0
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries GET requests on 429 using retry-after header', async () => {
+    vi.useFakeTimers();
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        text: () => Promise.resolve('{"message":"slow down"}'),
+        headers: new Headers({ 'retry-after': '0', 'content-length': '23' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11' })
+      });
+
+    const requestPromise = fetchApi<{ ok: boolean }>('/api/rate-limited');
+    await vi.runAllTimersAsync();
+    const data = await requestPromise;
+
+    expect(data).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 
   it('shows server toast for HTTP 500 responses and sets backend ready when server responds', async () => {

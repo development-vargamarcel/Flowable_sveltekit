@@ -3,6 +3,7 @@ import { captureScreenshot } from './support/attachments';
 import {
   attachBrowserLogging,
   createTestLogger,
+  resolveTitlePath,
   shouldCaptureLogs,
   type TestLogger
 } from './support/test-logger';
@@ -16,7 +17,7 @@ export const test = base.extend<Fixtures>({
     const logger = createTestLogger(testInfo);
     if (shouldCaptureLogs()) {
       const metadata = {
-        titlePath: testInfo.titlePath(),
+        titlePath: resolveTitlePath(testInfo),
         file: testInfo.file,
         project: testInfo.project.name,
         baseURL: testInfo.project.use?.baseURL ?? null,

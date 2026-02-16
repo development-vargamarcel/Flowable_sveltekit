@@ -18,6 +18,47 @@ const STARTUP_RETRY_CONFIG = {
   backoffMultiplier: 1.5
 };
 
+const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
+
+function createRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function isRetryableRequest(method: string, status?: number): boolean {
+  const normalizedMethod = method.toUpperCase();
+  if (!RETRYABLE_METHODS.has(normalizedMethod)) {
+    return false;
+  }
+
+  if (status === undefined) {
+    return true;
+  }
+
+  return RETRYABLE_STATUS_CODES.has(status);
+}
+
+function parseRetryAfterMs(retryAfterValue: string | null): number | null {
+  if (!retryAfterValue) return null;
+
+  const asSeconds = Number(retryAfterValue);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return asSeconds * 1000;
+  }
+
+  const asDate = new Date(retryAfterValue);
+  if (Number.isNaN(asDate.getTime())) {
+    return null;
+  }
+
+  const diff = asDate.getTime() - Date.now();
+  return diff > 0 ? diff : 0;
+}
+
 /**
  * Custom API error with detailed information
  */
@@ -27,6 +68,7 @@ export class ApiError extends Error {
   public readonly details?: string;
   public readonly fieldErrors?: Record<string, string>;
   public readonly timestamp?: string;
+  public readonly requestId?: string;
 
   constructor(
     message: string,
@@ -34,7 +76,8 @@ export class ApiError extends Error {
     statusText: string,
     details?: string,
     fieldErrors?: Record<string, string>,
-    timestamp?: string
+    timestamp?: string,
+    requestId?: string
   ) {
     super(message);
     this.name = 'ApiError';
@@ -43,6 +86,7 @@ export class ApiError extends Error {
     this.details = details;
     this.fieldErrors = fieldErrors;
     this.timestamp = timestamp;
+    this.requestId = requestId;
   }
 
   /**
@@ -70,7 +114,8 @@ function parseErrorResponse(
   status: number,
   statusText: string,
   errorBody: Record<string, unknown> | null,
-  rawResponse?: string
+  rawResponse?: string,
+  requestId?: string
 ): ApiError {
   // Default error messages by status code with more helpful descriptions
   const defaultMessages: Record<number, { error: string; details: string }> = {
@@ -107,7 +152,15 @@ function parseErrorResponse(
       ? `${defaultInfo.details}. Server response: ${rawResponse.substring(0, 200)}${rawResponse.length > 200 ? '...' : ''}`
       : defaultInfo.details;
 
-    return new ApiError(defaultInfo.error, status, statusText, detailsWithRaw);
+    return new ApiError(
+      defaultInfo.error,
+      status,
+      statusText,
+      detailsWithRaw,
+      undefined,
+      undefined,
+      requestId
+    );
   }
 
   const extractString = (value: unknown): string | undefined =>
@@ -180,7 +233,15 @@ function parseErrorResponse(
     errorDetails = errorDetails ? `${errorDetails} (path: ${path})` : `Path: ${path}`;
   }
 
-  return new ApiError(errorMessage, status, statusText, errorDetails, fieldErrors, timestamp);
+  return new ApiError(
+    errorMessage,
+    status,
+    statusText,
+    errorDetails,
+    fieldErrors,
+    timestamp,
+    requestId
+  );
 }
 
 /**
@@ -223,10 +284,15 @@ function sleep(ms: number): Promise<void> {
 /**
  * Calculate delay for next retry using exponential backoff
  */
-function getRetryDelay(attempt: number): number {
+function getRetryDelay(attempt: number, retryAfterMs?: number | null): number {
+  if (typeof retryAfterMs === 'number' && retryAfterMs >= 0) {
+    return Math.min(retryAfterMs, STARTUP_RETRY_CONFIG.maxDelayMs);
+  }
+
   const delay =
     STARTUP_RETRY_CONFIG.initialDelayMs * Math.pow(STARTUP_RETRY_CONFIG.backoffMultiplier, attempt);
-  return Math.min(delay, STARTUP_RETRY_CONFIG.maxDelayMs);
+  const jitter = Math.floor(Math.random() * 250);
+  return Math.min(delay + jitter, STARTUP_RETRY_CONFIG.maxDelayMs);
 }
 
 export interface FetchOptions extends RequestInit {
@@ -284,8 +350,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   const method = requestOptions.method || 'GET';
   const requestBody = formatRequestBodyForLogs(requestOptions.body);
   const requestHeaders = buildRequestHeaders(requestOptions);
+  const requestId = createRequestId();
+  if (!requestHeaders.has('X-Request-ID')) {
+    requestHeaders.set('X-Request-ID', requestId);
+  }
 
-  const logContext: Record<string, unknown> = { body: requestBody };
+  const logContext: Record<string, unknown> = { body: requestBody, requestId };
   if (timeoutMs && timeoutMs > 0) {
     logContext.timeoutMs = timeoutMs;
   }
@@ -324,14 +394,20 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         }
 
         // Check if backend is still starting up or unavailable - retry with exponential backoff
-        if (isBackendStartingError(errorBody, response.status)) {
-          const delay = getRetryDelay(attempt);
+        const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'));
+
+        if (
+          isBackendStartingError(errorBody, response.status) ||
+          isRetryableRequest(method, response.status)
+        ) {
+          const delay = getRetryDelay(attempt, retryAfterMs);
           log.info(
             `Backend is starting, retrying in ${delay}ms (attempt ${attempt + 1}/${STARTUP_RETRY_CONFIG.maxRetries + 1})`,
             {
               url,
               method,
-              attempt
+              attempt,
+              requestId
             }
           );
 
@@ -345,7 +421,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           log.warn('Backend startup retries exhausted', {
             url,
             method,
-            attempts: STARTUP_RETRY_CONFIG.maxRetries + 1
+            attempts: STARTUP_RETRY_CONFIG.maxRetries + 1,
+            requestId
           });
           // Max retries reached, fall through to throw error
         }
@@ -354,7 +431,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           status: response.status,
           statusText: response.statusText,
           errorBody,
-          rawText: rawText.substring(0, 500)
+          rawText: rawText.substring(0, 500),
+          requestId
         });
 
         // Mark backend as ready if we got a response (even an error)
@@ -370,7 +448,13 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           });
         }
 
-        throw parseErrorResponse(response.status, response.statusText, errorBody, rawText);
+        throw parseErrorResponse(
+          response.status,
+          response.statusText,
+          errorBody,
+          rawText,
+          requestId
+        );
       }
 
       // Success - mark backend as ready
@@ -406,7 +490,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       if (error instanceof DOMException && error.name === 'AbortError') {
         if (signalController.wasTimedOut()) {
           const message = `The request to ${endpoint} timed out after ${timeoutMs}ms.`;
-          log.warn('Request timed out', { url, method, timeoutMs, attempt });
+          log.warn('Request timed out', { url, method, timeoutMs, attempt, requestId });
           backendStatus.setError('Request timeout');
 
           if (browser) {
@@ -416,12 +500,16 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           throw new ApiError('Request timeout', 408, 'Request Timeout', message);
         }
 
-        log.info('Request aborted by caller', { url, method, attempt });
+        log.info('Request aborted by caller', { url, method, attempt, requestId });
         throw new ApiError('Request cancelled', 0, 'Aborted', 'The request was cancelled.');
       }
 
       // For network errors during startup, retry
-      if (error instanceof TypeError && attempt < STARTUP_RETRY_CONFIG.maxRetries) {
+      if (
+        error instanceof TypeError &&
+        attempt < STARTUP_RETRY_CONFIG.maxRetries &&
+        isRetryableRequest(method)
+      ) {
         const delay = getRetryDelay(attempt);
         log.info(
           `Network error, backend may be starting. Retrying in ${delay}ms (attempt ${attempt + 1}/${STARTUP_RETRY_CONFIG.maxRetries + 1})`,
@@ -429,7 +517,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             url,
             method,
             error: error.message,
-            attempt
+            attempt,
+            requestId
           }
         );
         backendStatus.setStarting(attempt + 1, STARTUP_RETRY_CONFIG.maxRetries + 1);
@@ -441,7 +530,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       if (error instanceof TypeError) {
         const isConnectionRefused =
           error.message.includes('fetch') || error.message.includes('network');
-        log.error('Network error occurred', error, { url, method });
+        log.error('Network error occurred', error, { url, method, requestId });
         backendStatus.setError('Connection failed');
 
         const message = isConnectionRefused
@@ -457,7 +546,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
       // Handle other errors
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      log.error('Unexpected error', error, { url, method });
+      log.error('Unexpected error', error, { url, method, requestId });
 
       if (browser) {
         toast.error('Unexpected Error', { description: errorMessage });
@@ -480,7 +569,10 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     'Backend unavailable',
     503,
     'Service Unavailable',
-    `Backend is still starting after ${STARTUP_RETRY_CONFIG.maxRetries + 1} attempts. Please try again in a moment.`
+    `Backend is still starting after ${STARTUP_RETRY_CONFIG.maxRetries + 1} attempts. Please try again in a moment.`,
+    undefined,
+    undefined,
+    requestId
   );
 }
 
