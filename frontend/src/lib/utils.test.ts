@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   exportToCSV,
   formatCurrency,
@@ -25,30 +25,28 @@ describe('utils', () => {
       ]);
     });
 
-    it('skips invalid amount values', () => {
-      const output = getVariableDisplay({
-        amount: 'invalid-number',
-        title: 'Request'
-      });
-
-      expect(output).toEqual([{ label: 'Title', value: 'Request' }]);
-    });
-
-    it('supports priority labels and custom limits', () => {
+    it('supports dynamic keys, label mapping and remaining count summary', () => {
       const output = getVariableDisplay(
         {
-          amount: 50,
-          category: 'A very long category name that should be truncated for compact display',
-          priority: 82,
-          title: 'ignored due to max items'
+          amount: 5,
+          approved: true,
+          custom_field: 'value',
+          team: 'Operations',
+          metadata: { code: 'A1' }
         },
-        { maxItems: 3, maxTextLength: 22 }
+        {
+          maxItems: 4,
+          showRemainingCount: true,
+          preferredOrder: ['approved', 'team'],
+          labelMap: { custom_field: 'Custom Field' }
+        }
       );
 
       expect(output).toEqual([
-        { label: 'Amount', value: '$50.00' },
-        { label: 'Category', value: 'A very long category …' },
-        { label: 'Priority', value: 'High (82)' }
+        { label: 'Amount', value: '$5.00' },
+        { label: 'Approved', value: 'Yes' },
+        { label: 'Team', value: 'Operations' },
+        { label: 'More', value: '+2 more' }
       ]);
     });
   });
@@ -57,6 +55,18 @@ describe('utils', () => {
     it('formats known numeric values and falls back for invalid values', () => {
       expect(formatCurrency(123.456, { locale: 'en-US', currency: 'USD' })).toBe('$123.46');
       expect(formatCurrency('bad-input')).toBe('N/A');
+    });
+
+    it('supports accounting style and comma-delimited numeric strings', () => {
+      expect(
+        formatCurrency('-1,200.5', {
+          locale: 'en-US',
+          currency: 'USD',
+          currencySign: 'accounting',
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1
+        })
+      ).toBe('($1,200.5)');
     });
   });
 
@@ -71,8 +81,38 @@ describe('utils', () => {
       );
 
       expect(
-        formatDate(new Date(Date.now() - 45 * 60000).toISOString(), { mode: 'relative' })
-      ).toBe('45m ago');
+        formatDate(new Date(Date.now() - 45 * 60000).toISOString(), {
+          mode: 'relative',
+          locale: 'en-US'
+        })
+      ).toBe('45 minutes ago');
+    });
+
+    it('supports UTC output for deterministic formatting', () => {
+      expect(
+        formatDate('2024-01-01T03:45:00Z', {
+          mode: 'time',
+          locale: 'en-US',
+          useUTC: true,
+          hour12: false
+        })
+      ).toBe('03:45:00');
+    });
+
+    it('supports month and year relative formatting for long distances', () => {
+      expect(
+        formatDate(new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(), {
+          mode: 'relative',
+          locale: 'en-US'
+        })
+      ).toContain('month');
+
+      expect(
+        formatDate(new Date(Date.now() - 800 * 24 * 60 * 60 * 1000).toISOString(), {
+          mode: 'relative',
+          locale: 'en-US'
+        })
+      ).toContain('year');
     });
   });
 
@@ -88,6 +128,9 @@ describe('utils', () => {
 
     it('supports compact mode and optional seconds', () => {
       expect(formatDuration(3723000, { compact: true, includeSeconds: true })).toBe('1h 2m 3s');
+      expect(formatDuration(3723000, { compact: true, includeSeconds: true, padUnits: true })).toBe(
+        '0d 1h 2m 3s'
+      );
     });
   });
 
@@ -109,11 +152,39 @@ describe('utils', () => {
         ],
         {
           includeHeader: false,
-          delimiter: ';'
+          delimiter: ';',
+          quoteAllFields: false
         }
       );
 
-      expect(csv).toBe('"Alice";"20"\n"Bob";"21"');
+      expect(csv).toBe('Alice;20\nBob;21');
+    });
+
+    it('serializes objects, null values and sorted headers', () => {
+      const csv = toCSV(
+        [
+          { z: null, a: { nested: true }, b: true },
+          { z: 'x', a: { nested: false }, b: false }
+        ],
+        { nullValue: 'NULL', sortHeaders: true }
+      );
+
+      expect(csv).toBe(
+        'a,b,z\n"{""nested"":true}","true","NULL"\n"{""nested"":false}","false","x"'
+      );
+    });
+
+    it('serializes date instances and applies custom null values', () => {
+      const csv = toCSV(
+        [
+          { createdAt: new Date('2024-01-01T00:00:00.000Z'), status: null },
+          { createdAt: new Date('2024-01-02T00:00:00.000Z'), status: 'done' }
+        ],
+        { nullValue: 'none' }
+      );
+
+      expect(csv).toContain('2024-01-01T00:00:00.000Z');
+      expect(csv).toContain('"none"');
     });
   });
 
@@ -124,6 +195,49 @@ describe('utils', () => {
         success: false,
         reason: 'CSV export is not supported in this environment'
       });
+    });
+
+    it('returns browser-safe sanitized filename when export succeeds', () => {
+      const createObjectURL = vi.fn(() => 'blob:download');
+      const revokeObjectURL = vi.fn();
+      const click = vi.fn();
+
+      Object.defineProperty(window, 'URL', {
+        value: { createObjectURL, revokeObjectURL },
+        configurable: true
+      });
+
+      const nativeCreateElement = document.createElement.bind(document);
+      const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        if (tag === 'a') {
+          return {
+            setAttribute: vi.fn(),
+            click,
+            remove: vi.fn()
+          } as unknown as HTMLAnchorElement;
+        }
+        return nativeCreateElement(tag);
+      });
+
+      const appendChildSpy = vi
+        .spyOn(document.body, 'appendChild')
+        .mockImplementation((node) => node);
+      const removeChildSpy = vi
+        .spyOn(document.body, 'removeChild')
+        .mockImplementation((node) => node);
+
+      const result = exportToCSV([{ name: 'Alice' }], 'report:/2024?.csv', {
+        filenamePrefix: 'team report '
+      });
+
+      expect(result).toEqual({ success: true, filename: 'team_report_report-2024-.csv' });
+      expect(createObjectURL).toHaveBeenCalled();
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:download');
+      expect(click).toHaveBeenCalled();
+
+      createElementSpy.mockRestore();
+      appendChildSpy.mockRestore();
+      removeChildSpy.mockRestore();
     });
   });
 });
