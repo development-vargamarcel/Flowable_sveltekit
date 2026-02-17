@@ -84,6 +84,23 @@ export class ExpressionEvaluator {
   }
 
   private evaluateExpression(expr: string): ExpressionResult {
+    // Ternary operator support enables richer validation and visibility rules
+    // without falling back to unsafe dynamic code execution.
+    const ternaryParts = this.splitTernary(expr);
+    if (ternaryParts) {
+      const condition = this.toBoolean(this.evaluateExpression(ternaryParts.condition));
+      return this.evaluateExpression(condition ? ternaryParts.whenTrue : ternaryParts.whenFalse);
+    }
+
+    // Nullish coalescing provides resilient fallback behavior for optional fields.
+    const nullishParts = this.splitByOperator(expr, '??');
+    if (nullishParts.length === 2) {
+      const primary = this.evaluateExpression(nullishParts[0].trim());
+      return primary === null || primary === undefined
+        ? this.evaluateExpression(nullishParts[1].trim())
+        : primary;
+    }
+
     // Handle logical OR (lowest precedence)
     const orParts = this.splitByOperator(expr, '||');
     if (orParts.length > 1) {
@@ -181,6 +198,73 @@ export class ExpressionEvaluator {
     if (isNotEmptyMatch) {
       const value = this.resolveValue(isNotEmptyMatch[1].trim());
       return !this.isEmpty(value);
+    }
+
+    const startsWithMatch = expr.match(/^startsWith\((.+?),(.+)\)$/);
+    if (startsWithMatch) {
+      const value = this.resolveValue(startsWithMatch[1].trim());
+      const prefix = this.resolveValue(startsWithMatch[2].trim());
+      return String(value ?? '').startsWith(String(prefix ?? ''));
+    }
+
+    const endsWithMatch = expr.match(/^endsWith\((.+?),(.+)\)$/);
+    if (endsWithMatch) {
+      const value = this.resolveValue(endsWithMatch[1].trim());
+      const suffix = this.resolveValue(endsWithMatch[2].trim());
+      return String(value ?? '').endsWith(String(suffix ?? ''));
+    }
+
+    const includesMatch = expr.match(/^includes\((.+?),(.+)\)$/);
+    if (includesMatch) {
+      const value = this.resolveValue(includesMatch[1].trim());
+      const needle = this.resolveValue(includesMatch[2].trim());
+      if (Array.isArray(value)) {
+        return value.some((item) => this.looseEquals(item, needle));
+      }
+      return String(value ?? '').includes(String(needle ?? ''));
+    }
+
+    const lenMatch = expr.match(/^len\((.+)\)$/);
+    if (lenMatch) {
+      const value = this.resolveValue(lenMatch[1].trim());
+      return this.getLength(value);
+    }
+
+    const lowerMatch = expr.match(/^lower\((.+)\)$/);
+    if (lowerMatch) {
+      const value = this.resolveValue(lowerMatch[1].trim());
+      return String(value ?? '').toLowerCase();
+    }
+
+    const upperMatch = expr.match(/^upper\((.+)\)$/);
+    if (upperMatch) {
+      const value = this.resolveValue(upperMatch[1].trim());
+      return String(value ?? '').toUpperCase();
+    }
+
+    const trimMatch = expr.match(/^trim\((.+)\)$/);
+    if (trimMatch) {
+      const value = this.resolveValue(trimMatch[1].trim());
+      return String(value ?? '').trim();
+    }
+
+    const betweenMatch = expr.match(/^between\((.+?),(.+?),(.+)\)$/);
+    if (betweenMatch) {
+      const value = this.toNumber(this.resolveValue(betweenMatch[1].trim()));
+      const min = this.toNumber(this.resolveValue(betweenMatch[2].trim()));
+      const max = this.toNumber(this.resolveValue(betweenMatch[3].trim()));
+      return value >= min && value <= max;
+    }
+
+    const matchesMatch = expr.match(/^matches\((.+?),(.+)\)$/);
+    if (matchesMatch) {
+      const value = String(this.resolveValue(matchesMatch[1].trim()) ?? '');
+      const pattern = this.parseStringLiteral(matchesMatch[2].trim());
+      try {
+        return new RegExp(pattern).test(value);
+      } catch {
+        return false;
+      }
     }
 
     // Resolve as a value (variable reference or literal)
@@ -416,6 +500,62 @@ export class ExpressionEvaluator {
       return str.slice(1, -1);
     }
     return str;
+  }
+
+  private getLength(value: unknown): number {
+    if (typeof value === 'string' || Array.isArray(value)) {
+      return value.length;
+    }
+    if (value && typeof value === 'object') {
+      return Object.keys(value).length;
+    }
+    return 0;
+  }
+
+  private splitTernary(
+    expr: string
+  ): { condition: string; whenTrue: string; whenFalse: string } | null {
+    let depth = 0;
+    let inString = false;
+    let stringChar = '';
+    let questionIndex = -1;
+    let nestedTernary = 0;
+
+    for (let i = 0; i < expr.length; i++) {
+      const char = expr[i];
+      if ((char === '"' || char === "'") && expr[i - 1] !== '\\') {
+        if (!inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar) {
+          inString = false;
+        }
+      }
+      if (inString) continue;
+
+      if (char === '(' || char === '[') depth++;
+      if (char === ')' || char === ']') depth--;
+
+      if (depth !== 0) continue;
+
+      if (char === '?' && questionIndex === -1) {
+        questionIndex = i;
+      } else if (char === '?' && questionIndex !== -1) {
+        nestedTernary++;
+      } else if (char === ':' && questionIndex !== -1) {
+        if (nestedTernary > 0) {
+          nestedTernary--;
+          continue;
+        }
+        return {
+          condition: expr.slice(0, questionIndex).trim(),
+          whenTrue: expr.slice(questionIndex + 1, i).trim(),
+          whenFalse: expr.slice(i + 1).trim()
+        };
+      }
+    }
+
+    return null;
   }
 
   /**
