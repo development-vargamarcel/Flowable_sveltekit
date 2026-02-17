@@ -309,6 +309,15 @@ export class ExpressionEvaluator {
     if (value === undefined) {
       value = this.getNestedValue(this.context.process, parts);
     }
+
+    // Safe evaluator contexts can include additional top-level values
+    // such as `value`, `task`, or future metadata objects used by
+    // validation and visibility expressions. This fallback keeps
+    // expression support extensible without introducing eval-like behavior.
+    if (value === undefined) {
+      value = this.getNestedValue(this.context as unknown as Record<string, unknown>, parts);
+    }
+
     return value;
   }
 
@@ -415,6 +424,10 @@ export class ExpressionEvaluator {
    */
   evaluateArithmetic(expr: string): number {
     try {
+      if (!this.isValidArithmeticExpression(expr)) {
+        return 0;
+      }
+
       // First resolve all variables in the expression
       const resolvedExpr = this.resolveVariablesInExpression(expr);
       return this.parseArithmeticExpression(resolvedExpr);
@@ -422,6 +435,16 @@ export class ExpressionEvaluator {
       console.warn(`Failed to evaluate arithmetic expression: ${expr}`, error);
       return 0;
     }
+  }
+
+  private isValidArithmeticExpression(expr: string): boolean {
+    const trimmed = expr.trim();
+    if (trimmed === '') return false;
+    if (/[^0-9a-zA-Z_.\s+\-*/%()]/.test(trimmed)) return false;
+    if (/[*+/%-]\s*$/.test(trimmed)) return false;
+    if (/^[*+/%]/.test(trimmed)) return false;
+    if (/\([^()]*$/.test(trimmed)) return false;
+    return true;
   }
 
   private resolveVariablesInExpression(expr: string): string {
@@ -468,7 +491,7 @@ export class ExpressionEvaluator {
         const left = this.parseArithmeticExpression(expr.slice(0, i));
         const right = this.parseArithmeticExpression(expr.slice(i + 1));
         if (char === '*') return left * right;
-        if (char === '/') return right !== 0 ? left / right : 0;
+        if (char === '/') return left / right;
         return right !== 0 ? left % right : 0;
       }
     }
@@ -514,6 +537,34 @@ export class ExpressionEvaluator {
         return grid.rows.length;
       }
       return 0;
+    }
+
+    const countFnMatch = expr.match(/^grids\.([a-zA-Z_][a-zA-Z0-9_]*)\.count\(\)$/);
+    if (countFnMatch) {
+      const grid = grids[countFnMatch[1]];
+      return Array.isArray(grid?.rows) ? grid.rows.length : 0;
+    }
+
+    const aggregateMatch = expr.match(
+      /^grids\.([a-zA-Z_][a-zA-Z0-9_]*)\.(avg|min|max)\(['"]([a-zA-Z_][a-zA-Z0-9_]*)['"]\)$/
+    );
+    if (aggregateMatch) {
+      const [, gridName, operator, columnName] = aggregateMatch;
+      const grid = grids[gridName];
+      const rows = grid?.rows ?? [];
+      const values = rows
+        .map((row) => Number(row[columnName]))
+        .filter((value) => !Number.isNaN(value));
+
+      if (values.length === 0) {
+        return 0;
+      }
+
+      if (operator === 'avg') {
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+      }
+
+      return operator === 'min' ? Math.min(...values) : Math.max(...values);
     }
 
     return undefined;
@@ -585,7 +636,8 @@ export class SafeExpressionEvaluator extends ExpressionEvaluator {
       }
 
       // Try boolean expression
-      return this.evaluate(expr);
+      const result = this.evaluate(expr);
+      return result === undefined || result === null ? 0 : result;
     } catch (error) {
       console.warn(`SafeExpressionEvaluator: Failed to evaluate calculation: ${expression}`, error);
       return undefined;

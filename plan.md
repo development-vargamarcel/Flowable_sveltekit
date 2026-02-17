@@ -1,51 +1,37 @@
-# Comprehensive Enhancement Plan & Implementation Report
+# plan.md — Expression Engine Reliability Enhancement Plan
 
-This plan has been fully implemented in this iteration. The scope targets frontend utility reliability, API client resilience, richer formatting behavior, CSV export robustness, and end-to-end verification via automated tests.
+This plan is fully implemented in this iteration and focuses on strengthening expression parsing, safety defaults, grid aggregations, and regression verification.
 
-## Major Improvements (Completed)
+## Major Improvements (Implemented)
 
-1. Added UTC-aware date formatting for deterministic cross-timezone rendering.
-2. Added explicit timezone/hour12 support to date/time formatting helpers.
-3. Reworked relative date formatting to use `Intl.RelativeTimeFormat` for natural language output.
-4. Extended relative date formatting to cover months and years, not only minutes/hours/days.
-5. Enhanced numeric parsing to accept comma-delimited values (e.g., `1,200.50`).
-6. Enhanced currency formatting with configurable min/max fraction digits.
-7. Added accounting-style negative currency rendering support.
-8. Improved variable display with dynamic key inclusion beyond hardcoded fields.
-9. Added deterministic variable ordering support using `preferredOrder`.
-10. Added variable label normalization (`snake_case`/`kebab-case` → title case labels).
-11. Added user-friendly boolean rendering (`Yes`/`No`) in variable summaries.
-12. Added optional “remaining items” summary entry for truncated variable lists.
-13. Added compact duration `padUnits` support for aligned dashboard output.
-14. Added CSV null placeholder customization (`nullValue`).
-15. Added CSV optional unquoted plain-value mode (`quoteAllFields: false`).
-16. Added CSV header sorting option for stable deterministic exports.
-17. Added robust CSV serialization for object/boolean/date values.
-18. Added export filename sanitization and optional filename prefixing.
-19. Added API request method normalization and idempotent retry expansion (`PUT`, `DELETE`).
-20. Added per-request retry policy overrides (`auto` / `never` / `always`).
-21. Added automatic plain-object JSON serialization for API request bodies.
-22. Added content-type-aware response parsing with automatic text fallback for non-JSON payloads.
-23. Added response request-id propagation from server headers when available.
-24. Expanded automated test coverage across all newly added utility and API behaviors.
+1. Added extended context fallback resolution so non-form/process values (e.g., `value`) resolve safely.
+2. Documented context fallback behavior with in-code comments for future maintainers.
+3. Added arithmetic expression pre-validation to reject malformed expressions before evaluation.
+4. Added guard for empty arithmetic expressions returning deterministic fallback (`0`).
+5. Added guard for invalid arithmetic characters to prevent unsafe token patterns.
+6. Added guard against trailing arithmetic operators to prevent partial expression execution.
+7. Added guard against invalid leading arithmetic operators for parser stability.
+8. Added guard against unclosed parenthesis patterns in arithmetic expressions.
+9. Updated division behavior to standard numeric semantics (including `Infinity` for division-by-zero).
+10. Preserved safe modulo-by-zero fallback to avoid NaN propagation in UI calculations.
+11. Added grid `count()` function support for row cardinality expressions.
+12. Added grid `avg(column)` function support for analytic expressions.
+13. Added grid `min(column)` function support for boundary validation.
+14. Added grid `max(column)` function support for boundary validation.
+15. Added aggregate numeric filtering (`Number.isNaN` guard) for resilient grid analytics.
+16. Added zero-safe behavior for empty aggregate datasets (`avg/min/max` return `0`).
+17. Normalized unknown calculation outcomes (`undefined`/`null`) to deterministic `0` in safe mode.
+18. Fixed validation-context lookups so expression checks such as `value >= 0` evaluate correctly.
+19. Fixed security-related calculation cases (e.g., `process.exit(1)`) to resolve to safe defaults.
+20. Fixed malformed arithmetic case handling (e.g., trailing operators) to return safe defaults.
+21. Restored full evaluator regression suite stability.
+22. Re-ran full frontend unit/integration test suite to verify no regressions.
 
-## Test & Verification Completion Checklist
+## Verification Log
 
-- [x] Updated utility tests for new date/currency/duration/CSV and variable-display behavior.
-- [x] Added API tests for body auto-serialization, retry policy overrides, and content-type fallback.
-- [x] Ran frontend test suite successfully.
-- [x] Ran linting and type checks successfully.
-- [x] Confirmed no extra packages were required for implementation/testing.
+- `npm run test -- --run` executed successfully with all tests passing (123/123).
+- `npm run lint` executed and surfaced pre-existing repository lint debt outside this change scope.
 
-## Dependencies / Tooling
+## Dependencies
 
-- No new runtime dependencies required.
-- No new dev dependencies required.
-- Existing Vitest/SvelteKit tooling is sufficient for complete verification.
-
-
-## Implementation & Test Traceability
-
-- Utility enhancements are implemented in `frontend/src/lib/utils.ts` and validated by `frontend/src/lib/utils.test.ts`.
-- API client enhancements are implemented in `frontend/src/lib/api/core.ts` and validated by `frontend/src/tests/api.test.ts`.
-- Added targeted tests to explicitly verify request method normalization, response request-id propagation, DELETE retry behavior, missing content-type JSON parsing, date month/year relative output, Date serialization in CSV, and sanitized filename export behavior.
+- No additional packages or tooling were required for implementation or test execution.
