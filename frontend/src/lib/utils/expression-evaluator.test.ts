@@ -5,7 +5,6 @@ import {
   createDefaultContext,
   createSafeEvaluator,
   type EvaluationContext,
-  type ExtendedEvaluationContext,
   type GridContext
 } from './expression-evaluator';
 
@@ -136,7 +135,9 @@ describe('ExpressionEvaluator', () => {
     });
 
     it('should evaluate complex expressions', () => {
-      expect(evaluator.evaluate('(amount > 500 && status == "pending") || process.priority == "low"')).toBe(true);
+      expect(
+        evaluator.evaluate('(amount > 500 && status == "pending") || process.priority == "low"')
+      ).toBe(true);
     });
   });
 
@@ -164,16 +165,46 @@ describe('ExpressionEvaluator', () => {
     });
 
     it('should evaluate array membership with "in"', () => {
-       expect(evaluator.evaluate('status in ["pending", "approved"]')).toBe(true);
-       expect(evaluator.evaluate('status in ["rejected", "draft"]')).toBe(false);
+      expect(evaluator.evaluate('status in ["pending", "approved"]')).toBe(true);
+      expect(evaluator.evaluate('status in ["rejected", "draft"]')).toBe(false);
+    });
+
+    it('should evaluate string helper functions', () => {
+      expect(evaluator.evaluate('startsWith(status, "pen")')).toBe(true);
+      expect(evaluator.evaluate('endsWith(status, "ing")')).toBe(true);
+      expect(evaluator.evaluate('includes(status, "end")')).toBe(true);
+      expect(evaluator.evaluate('lower("PENDING")')).toBe('pending');
+      expect(evaluator.evaluate('upper("pending")')).toBe('PENDING');
+      expect(evaluator.evaluate('trim("  padded  ")')).toBe('padded');
+    });
+
+    it('should evaluate len helper for arrays, strings and objects', () => {
+      expect(evaluator.evaluate('len(items)')).toBe(2);
+      expect(evaluator.evaluate('len(status)')).toBe(7);
+      expect(evaluator.evaluate('len(user)')).toBe(4);
+    });
+
+    it('should evaluate includes against arrays', () => {
+      expect(evaluator.evaluate('includes(items, "flight")')).toBe(true);
+      expect(evaluator.evaluate('includes(items, "car")')).toBe(false);
+    });
+
+    it('should evaluate between helper', () => {
+      expect(evaluator.evaluate('between(amount, 900, 1100)')).toBe(true);
+      expect(evaluator.evaluate('between(amount, 1001, 2000)')).toBe(false);
+    });
+
+    it('should evaluate regex matching helper', () => {
+      expect(evaluator.evaluate('matches(status, "^pen.*")')).toBe(true);
+      expect(evaluator.evaluate('matches(status, "^app")')).toBe(false);
     });
   });
 
   describe('Context Update', () => {
-      it('should reflect context changes', () => {
-          evaluator.updateContext({ form: { ...context.form, amount: 5000 } });
-          expect(evaluator.evaluate('amount')).toBe(5000);
-      });
+    it('should reflect context changes', () => {
+      evaluator.updateContext({ form: { ...context.form, amount: 5000 } });
+      expect(evaluator.evaluate('amount')).toBe(5000);
+    });
   });
 });
 
@@ -254,7 +285,9 @@ describe('SafeExpressionEvaluator', () => {
 
     it('should evaluate complex arithmetic', () => {
       // amount - (discount * price / 100) = 1000 - (10 * 200 / 100) = 1000 - 20 = 980
-      expect(evaluator.evaluateCalculation('form.amount - form.discount * form.price / 100')).toBe(980);
+      expect(evaluator.evaluateCalculation('form.amount - form.discount * form.price / 100')).toBe(
+        980
+      );
     });
 
     it('should handle parentheses', () => {
@@ -330,8 +363,12 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('should evaluate combined conditions', () => {
-      expect(evaluator.evaluateVisibility('form.amount > 500 && form.status == "pending"')).toBe(true);
-      expect(evaluator.evaluateVisibility('form.amount < 500 || form.status == "pending"')).toBe(true);
+      expect(evaluator.evaluateVisibility('form.amount > 500 && form.status == "pending"')).toBe(
+        true
+      );
+      expect(evaluator.evaluateVisibility('form.amount < 500 || form.status == "pending"')).toBe(
+        true
+      );
     });
 
     it('should handle hasRole', () => {
@@ -354,8 +391,19 @@ describe('SafeExpressionEvaluator', () => {
     it('should return string error messages', () => {
       evaluator.updateExtendedContext({ value: -10 });
       const result = evaluator.evaluateValidation('value >= 0 ? true : "Value must be positive"');
-      // This returns false as the expression evaluator doesn't support ternary yet
-      expect(typeof result === 'boolean' || typeof result === 'string').toBe(true);
+      expect(result).toBe('Value must be positive');
+    });
+
+    it('should support ternary expression for numeric outcomes', () => {
+      evaluator.updateExtendedContext({ value: 10 });
+      expect(evaluator.evaluateCalculation('value > 0 ? value : 0')).toBe(10);
+      evaluator.updateExtendedContext({ value: -4 });
+      expect(evaluator.evaluateCalculation('value > 0 ? value : 0')).toBe(0);
+    });
+
+    it('should support nullish fallback expressions', () => {
+      expect(evaluator.evaluateCalculation('form.missing ?? 25')).toBe(25);
+      expect(evaluator.evaluateCalculation('form.amount ?? 25')).toBe(1000);
     });
   });
 
