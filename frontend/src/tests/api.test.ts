@@ -150,6 +150,23 @@ describe('fetchApi', () => {
     await fetchApi('/api/request-id-test');
   });
 
+  it('normalizes request methods before logging and retry evaluation', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/normalize-method', { method: ' get ' });
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringContaining('GET'),
+      expect.objectContaining({ requestId: expect.any(String) })
+    );
+  });
+
   it('returns text payload when responseType is text', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -341,6 +358,137 @@ describe('fetchApi', () => {
     });
   });
 
+  it('auto-serializes plain object request bodies', async () => {
+    mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      expect(init?.body).toBe(JSON.stringify({ hello: 'world' }));
+      const headers = new Headers(init?.headers);
+      expect(headers.get('content-type')).toBe('application/json');
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+      });
+    });
+
+    await fetchApi('/api/object-body', {
+      method: 'POST',
+      body: { hello: 'world' } as unknown as BodyInit
+    });
+  });
+
+  it('returns text automatically for non-json content types', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('plain server text'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '17', 'content-type': 'text/plain' })
+    });
+
+    const data = await fetchApi<string>('/api/plain-content');
+    expect(data).toBe('plain server text');
+  });
+
+  it('parses json payloads even when content-type is missing', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    const data = await fetchApi<{ ok: boolean }>('/api/missing-content-type');
+    expect(data).toEqual({ ok: true });
+  });
+
+  it('respects retryMode never even for retryable GET statuses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      text: () => Promise.resolve('{"message":"try later"}'),
+      headers: new Headers({ 'content-length': '23' })
+    });
+
+    await expect(fetchApi('/api/no-retry', { retryMode: 'never' })).rejects.toBeInstanceOf(
+      ApiError
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries PUT when retryMode always is enabled', async () => {
+    vi.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        text: () => Promise.resolve('{"message":"starting"}'),
+        headers: new Headers({ 'retry-after': '0', 'content-length': '22' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+      });
+
+    const requestPromise = fetchApi<{ ok: boolean }>('/api/put-retry', {
+      method: 'PUT',
+      retryMode: 'always'
+    });
+    await vi.runAllTimersAsync();
+    await expect(requestPromise).resolves.toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('retries DELETE in auto mode for retryable status codes', async () => {
+    vi.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 504,
+        statusText: 'Gateway Timeout',
+        text: () => Promise.resolve('{"message":"timeout"}'),
+        headers: new Headers({ 'retry-after': '0', 'content-length': '21' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"deleted":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '16', 'content-type': 'application/json' })
+      });
+
+    const requestPromise = fetchApi<{ deleted: boolean }>('/api/resource/1', {
+      method: 'DELETE'
+    });
+
+    await vi.runAllTimersAsync();
+    await expect(requestPromise).resolves.toEqual({ deleted: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('uses backend request-id from response headers in errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Server Error',
+      text: () => Promise.resolve('{"message":"boom"}'),
+      headers: new Headers({ 'content-length': '18', 'x-request-id': 'server-request-id-123' })
+    });
+
+    await expect(fetchApi('/api/server-request-id')).rejects.toMatchObject({
+      name: 'ApiError',
+      requestId: 'server-request-id-123'
+    });
+  });
   it('detects backend startup messages in either error or message field', async () => {
     mockFetch
       .mockResolvedValueOnce({

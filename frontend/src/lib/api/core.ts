@@ -18,7 +18,7 @@ const STARTUP_RETRY_CONFIG = {
   backoffMultiplier: 1.5
 };
 
-const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 
 function createRequestId(): string {
@@ -29,7 +29,14 @@ function createRequestId(): string {
   return `req-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
-function isRetryableRequest(method: string, status?: number): boolean {
+function isRetryableRequest(
+  method: string,
+  status?: number,
+  retryMode: 'auto' | 'never' | 'always' = 'auto'
+): boolean {
+  if (retryMode === 'never') return false;
+  if (retryMode === 'always') return status === undefined || RETRYABLE_STATUS_CODES.has(status);
+
   const normalizedMethod = method.toUpperCase();
   if (!RETRYABLE_METHODS.has(normalizedMethod)) {
     return false;
@@ -297,6 +304,8 @@ function getRetryDelay(attempt: number, retryAfterMs?: number | null): number {
 
 export interface FetchOptions extends RequestInit {
   responseType?: 'json' | 'blob' | 'text';
+  /** Control retry behavior for this request. */
+  retryMode?: 'auto' | 'never' | 'always';
   /**
    * Optional request timeout in milliseconds.
    *
@@ -337,6 +346,32 @@ function buildRequestHeaders(options: RequestInit): Headers {
   return headers;
 }
 
+function normalizeMethod(method?: string): string {
+  return (method ?? 'GET').trim().toUpperCase();
+}
+
+function normalizeRequestBody(
+  body: BodyInit | Record<string, unknown> | null | undefined
+): BodyInit | null | undefined {
+  if (!body || typeof body === 'string') {
+    return body as BodyInit | null | undefined;
+  }
+
+  if (
+    body instanceof URLSearchParams ||
+    (typeof FormData !== 'undefined' && body instanceof FormData) ||
+    (typeof Blob !== 'undefined' && body instanceof Blob) ||
+    body instanceof ArrayBuffer ||
+    ArrayBuffer.isView(body) ||
+    (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream)
+  ) {
+    return body as BodyInit;
+  }
+
+  // Serialize plain objects automatically so callers can pass typed payloads directly.
+  return JSON.stringify(body);
+}
+
 /**
  * Perform an API request with automatic error handling, logging, and retry logic.
  * @param endpoint - The API endpoint path (e.g., "/api/tasks").
@@ -345,11 +380,15 @@ function buildRequestHeaders(options: RequestInit): Headers {
  * @throws {ApiError} If the request fails or returns an error status.
  */
 export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
-  const { timeoutMs, signal: callerSignal, ...requestOptions } = options;
+  const { timeoutMs, signal: callerSignal, retryMode = 'auto', ...requestOptions } = options;
+  const normalizedBody = normalizeRequestBody(
+    requestOptions.body as BodyInit | Record<string, unknown> | null | undefined
+  );
+  const normalizedOptions: RequestInit = { ...requestOptions, body: normalizedBody };
   const url = `${API_BASE}${endpoint}`;
-  const method = requestOptions.method || 'GET';
-  const requestBody = formatRequestBodyForLogs(requestOptions.body);
-  const requestHeaders = buildRequestHeaders(requestOptions);
+  const method = normalizeMethod(normalizedOptions.method);
+  const requestBody = formatRequestBodyForLogs(normalizedBody);
+  const requestHeaders = buildRequestHeaders(normalizedOptions);
   const requestId = createRequestId();
   if (!requestHeaders.has('X-Request-ID')) {
     requestHeaders.set('X-Request-ID', requestId);
@@ -366,7 +405,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
     try {
       const response = await fetch(url, {
-        ...requestOptions,
+        ...normalizedOptions,
         signal: signalController.signal,
         credentials: 'include',
         headers: requestHeaders
@@ -398,7 +437,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
         if (
           isBackendStartingError(errorBody, response.status) ||
-          isRetryableRequest(method, response.status)
+          isRetryableRequest(method, response.status, retryMode)
         ) {
           const delay = getRetryDelay(attempt, retryAfterMs);
           log.info(
@@ -453,7 +492,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           response.statusText,
           errorBody,
           rawText,
-          requestId
+          response.headers.get('x-request-id') ?? requestId
         );
       }
 
@@ -466,19 +505,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         return {} as T;
       }
 
-      if (options.responseType === 'blob') {
-        const data = await response.blob();
-        log.debug(`${method} ${url} success (blob)`);
-        return data as unknown as T;
-      }
-
-      if (options.responseType === 'text') {
-        const data = await response.text();
-        log.debug(`${method} ${url} success (text)`);
-        return data as unknown as T;
-      }
-
-      const data = await parseJsonResponse<T>(response, method, url);
+      const data = await parseResponsePayload<T>(response, method, url, options.responseType);
       log.debug(`${method} ${url} success`, { data });
       return data;
     } catch (error) {
@@ -508,7 +535,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       if (
         error instanceof TypeError &&
         attempt < STARTUP_RETRY_CONFIG.maxRetries &&
-        isRetryableRequest(method)
+        isRetryableRequest(method, undefined, retryMode)
       ) {
         const delay = getRetryDelay(attempt);
         log.info(
@@ -650,13 +677,39 @@ function formatRequestBodyForLogs(body: BodyInit | null | undefined): unknown {
   return `[${body.constructor.name}]`;
 }
 
-async function parseJsonResponse<T>(response: Response, method: string, url: string): Promise<T> {
+async function parseResponsePayload<T>(
+  response: Response,
+  method: string,
+  url: string,
+  responseType?: 'json' | 'blob' | 'text'
+): Promise<T> {
+  if (responseType === 'blob') {
+    return (await response.blob()) as unknown as T;
+  }
+
+  if (responseType === 'text') {
+    return (await response.text()) as unknown as T;
+  }
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
   const raw = await response.text();
+
   if (!raw.trim()) {
     log.warn(`${method} ${url} returned an empty response body for JSON payload`);
     return {} as T;
   }
 
+  const looksJson = raw.trimStart().startsWith('{') || raw.trimStart().startsWith('[');
+
+  // Auto-fallback to text for non-JSON payloads to better support existing endpoints.
+  if (!contentType.includes('application/json') && !contentType.includes('+json') && !looksJson) {
+    return raw as unknown as T;
+  }
+
+  return parseJsonPayload<T>(raw, response, method, url);
+}
+
+function parseJsonPayload<T>(raw: string, response: Response, method: string, url: string): T {
   try {
     return JSON.parse(raw) as T;
   } catch (error) {

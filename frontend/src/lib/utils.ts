@@ -11,12 +11,25 @@ export interface DateFormatOptions {
   locale?: FormatterLocale;
   mode?: 'datetime' | 'date' | 'time' | 'relative';
   fallback?: string;
+  /**
+   * Enforce UTC output to avoid timezone-dependent snapshots and inconsistent dashboards.
+   */
+  useUTC?: boolean;
+  /**
+   * Optional timezone for locale formatting, ignored when mode is relative.
+   */
+  timeZone?: string;
+  hour12?: boolean;
 }
 
 export interface DurationFormatOptions {
   fallback?: string;
   compact?: boolean;
   includeSeconds?: boolean;
+  /**
+   * When true, include zero-value units in compact mode for predictable alignment.
+   */
+  padUnits?: boolean;
 }
 
 export interface VariableDisplayOptions {
@@ -24,6 +37,18 @@ export interface VariableDisplayOptions {
   maxTextLength?: number;
   locale?: FormatterLocale;
   currency?: string;
+  /**
+   * Optional variable order for deterministic display composition.
+   */
+  preferredOrder?: string[];
+  /**
+   * Maps raw variable keys to user-facing labels.
+   */
+  labelMap?: Record<string, string>;
+  /**
+   * Include a trailing summary when values are truncated by maxItems.
+   */
+  showRemainingCount?: boolean;
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -35,7 +60,9 @@ function toFiniteNumber(value: unknown): number | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
 
-    const parsed = Number(trimmed);
+    // Handle common numeric formats from user input and CSV imports.
+    const normalized = trimmed.replace(/,/g, '');
+    const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
   }
 
@@ -48,12 +75,43 @@ function truncateText(value: unknown, maxLength: number): string {
   return `${normalized.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
+function normalizeVariableLabel(rawKey: string, labelMap?: Record<string, string>): string {
+  if (labelMap?.[rawKey]) {
+    return labelMap[rawKey];
+  }
+
+  return rawKey
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function normalizeVariableValue(value: unknown, maxTextLength: number): string {
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+
+  if (value === null || value === undefined) {
+    return 'N/A';
+  }
+
+  if (typeof value === 'object') {
+    return truncateText(JSON.stringify(value), maxTextLength);
+  }
+
+  return truncateText(value, maxTextLength);
+}
+
 export function formatCurrency(
   value: unknown,
   options: {
     locale?: FormatterLocale;
     currency?: string;
     fallback?: string;
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+    currencySign?: 'standard' | 'accounting';
   } = {}
 ): string {
   const amount = toFiniteNumber(value);
@@ -66,11 +124,13 @@ export function formatCurrency(
     return new Intl.NumberFormat(options.locale, {
       style: 'currency',
       currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      minimumFractionDigits: options.minimumFractionDigits ?? 2,
+      maximumFractionDigits: options.maximumFractionDigits ?? 2,
+      currencySign: options.currencySign ?? 'standard'
     }).format(amount);
   } catch {
-    return `$${amount.toFixed(2)}`;
+    const sign = amount < 0 ? '-' : '';
+    return `${sign}$${Math.abs(amount).toFixed(options.maximumFractionDigits ?? 2)}`;
   }
 }
 
@@ -118,7 +178,49 @@ export function getVariableDisplay(
     displays.push({ label: 'From', value: truncateText(variables.employeeName, maxTextLength) });
   }
 
-  return displays.slice(0, maxItems);
+  // Add remaining fields in a deterministic order, excluding keys handled by semantic shortcuts.
+  const handledKeys = new Set([
+    'amount',
+    'category',
+    'leaveType',
+    'days',
+    'priority',
+    'title',
+    'employeeName'
+  ]);
+  const dynamicEntries = Object.entries(variables).filter(([key]) => !handledKeys.has(key));
+  const preferredOrder = options.preferredOrder ?? [];
+
+  dynamicEntries.sort(([a], [b]) => {
+    const aIdx = preferredOrder.indexOf(a);
+    const bIdx = preferredOrder.indexOf(b);
+    if (aIdx !== -1 || bIdx !== -1) {
+      if (aIdx === -1) return 1;
+      if (bIdx === -1) return -1;
+      return aIdx - bIdx;
+    }
+    return a.localeCompare(b);
+  });
+
+  for (const [key, value] of dynamicEntries) {
+    displays.push({
+      label: normalizeVariableLabel(key, options.labelMap),
+      value: normalizeVariableValue(value, maxTextLength)
+    });
+  }
+
+  if (!options.showRemainingCount) {
+    return displays.slice(0, maxItems);
+  }
+
+  if (displays.length <= maxItems) {
+    return displays;
+  }
+
+  const result = displays.slice(0, Math.max(0, maxItems - 1));
+  const remainingCount = displays.length - result.length;
+  result.push({ label: 'More', value: `+${remainingCount} more` });
+  return result;
 }
 
 export function formatDate(dateStr: string, options: DateFormatOptions = {}): string {
@@ -132,29 +234,40 @@ export function formatDate(dateStr: string, options: DateFormatOptions = {}): st
 
   if (mode === 'relative') {
     const diffMs = date.getTime() - Date.now();
-    const diffMinutes = Math.round(diffMs / 60000);
-    const absMinutes = Math.abs(diffMinutes);
+    const absSeconds = Math.abs(Math.round(diffMs / 1000));
 
-    if (absMinutes < 1) return 'just now';
-    if (absMinutes < 60) return `${Math.abs(diffMinutes)}m ${diffMinutes < 0 ? 'ago' : 'from now'}`;
+    if (absSeconds < 30) return 'just now';
 
-    const diffHours = Math.round(diffMinutes / 60);
-    const absHours = Math.abs(diffHours);
-    if (absHours < 24) return `${absHours}h ${diffHours < 0 ? 'ago' : 'from now'}`;
+    const rtf = new Intl.RelativeTimeFormat(options.locale, { numeric: 'auto' });
+    const absMinutes = Math.round(absSeconds / 60);
+    if (absMinutes < 60) return rtf.format(Math.round(diffMs / 60000), 'minute');
 
-    const diffDays = Math.round(diffHours / 24);
-    return `${Math.abs(diffDays)}d ${diffDays < 0 ? 'ago' : 'from now'}`;
+    const absHours = Math.round(absMinutes / 60);
+    if (absHours < 24) return rtf.format(Math.round(diffMs / 3600000), 'hour');
+
+    const absDays = Math.round(absHours / 24);
+    if (absDays < 30) return rtf.format(Math.round(diffMs / 86400000), 'day');
+
+    const absMonths = Math.round(absDays / 30);
+    if (absMonths < 12) return rtf.format(Math.round(diffMs / (30 * 86400000)), 'month');
+
+    return rtf.format(Math.round(diffMs / (365 * 86400000)), 'year');
   }
 
+  const formatOptions: Intl.DateTimeFormatOptions = {
+    timeZone: options.useUTC ? 'UTC' : options.timeZone,
+    hour12: options.hour12
+  };
+
   if (mode === 'date') {
-    return date.toLocaleDateString(options.locale);
+    return date.toLocaleDateString(options.locale, formatOptions);
   }
 
   if (mode === 'time') {
-    return date.toLocaleTimeString(options.locale);
+    return date.toLocaleTimeString(options.locale, formatOptions);
   }
 
-  return date.toLocaleString(options.locale);
+  return date.toLocaleString(options.locale, formatOptions);
 }
 
 export function formatDuration(millis: number | null, options: DurationFormatOptions = {}): string {
@@ -171,8 +284,8 @@ export function formatDuration(millis: number | null, options: DurationFormatOpt
 
   if (options.compact) {
     const compactParts = [
-      days > 0 ? `${days}d` : null,
-      hours > 0 || days > 0 ? `${hours}h` : null,
+      days > 0 || options.padUnits ? `${days}d` : null,
+      hours > 0 || days > 0 || options.padUnits ? `${hours}h` : null,
       `${minutes}m`,
       options.includeSeconds ? `${seconds}s` : null
     ].filter(Boolean);
@@ -201,7 +314,40 @@ export type CSVExportOptions = {
   includeHeader?: boolean;
   delimiter?: ',' | ';' | '\t';
   lineEnding?: '\n' | '\r\n';
+  nullValue?: string;
+  quoteAllFields?: boolean;
+  sortHeaders?: boolean;
+  filenamePrefix?: string;
 };
+
+function serializeCsvValue(value: unknown, nullValue: string): string {
+  if (value === null || value === undefined) {
+    return nullValue;
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
+
+function sanitizeFilename(filename: string, prefix?: string): string {
+  const base = `${prefix ?? ''}${filename}`;
+  const sanitized = base
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '_')
+    .trim();
+  return sanitized.length > 0 ? sanitized : 'export.csv';
+}
 
 export function toCSV(data: Record<string, unknown>[], options: CSVExportOptions = {}): string {
   if (!data.length) return '';
@@ -210,19 +356,32 @@ export function toCSV(data: Record<string, unknown>[], options: CSVExportOptions
     options.headers && options.headers.length > 0
       ? options.headers
       : Array.from(new Set(data.flatMap((row) => Object.keys(row))));
+  const orderedHeaders = options.sortHeaders
+    ? [...headers].sort((a, b) => a.localeCompare(b))
+    : headers;
+
   const delimiter = options.delimiter ?? ',';
   const includeHeader = options.includeHeader ?? true;
   const lineEnding = options.lineEnding ?? '\n';
+  const nullValue = options.nullValue ?? '';
   const csvRows: string[] = [];
 
   if (includeHeader) {
-    csvRows.push(headers.join(delimiter));
+    csvRows.push(orderedHeaders.join(delimiter));
   }
 
   for (const row of data) {
-    const values = headers.map((header) => {
-      const val = row[header];
-      const escaped = String(val ?? '').replace(/"/g, '""');
+    const values = orderedHeaders.map((header) => {
+      const serialized = serializeCsvValue(row[header], nullValue);
+      const escaped = serialized.replace(/"/g, '""');
+      if (
+        options.quoteAllFields === false &&
+        !escaped.includes(delimiter) &&
+        !escaped.includes('"') &&
+        !escaped.includes('\n')
+      ) {
+        return escaped;
+      }
       return `"${escaped}"`;
     });
     csvRows.push(values.join(delimiter));
@@ -235,7 +394,7 @@ export function exportToCSV(
   data: Record<string, unknown>[],
   filename: string,
   options: CSVExportOptions = {}
-): { success: boolean; reason?: string } {
+): { success: boolean; reason?: string; filename?: string } {
   if (!data || !data.length) {
     console.warn('No data to export');
     return { success: false, reason: 'No data to export' };
@@ -251,17 +410,18 @@ export function exportToCSV(
 
   const csvString = toCSV(data, options);
   const payload = options.includeBom ? `\uFEFF${csvString}` : csvString;
+  const safeFilename = sanitizeFilename(filename, options.filenamePrefix);
 
   const blob = new Blob([payload], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.setAttribute('hidden', '');
   a.setAttribute('href', url);
-  a.setAttribute('download', filename);
+  a.setAttribute('download', safeFilename);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
 
-  return { success: true };
+  return { success: true, filename: safeFilename };
 }
