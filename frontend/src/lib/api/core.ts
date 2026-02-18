@@ -20,6 +20,7 @@ const STARTUP_RETRY_CONFIG = {
 
 const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
+const SENSITIVE_LOG_KEYS = new Set(['password', 'token', 'accessToken', 'refreshToken', 'secret']);
 
 function createRequestId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -302,8 +303,57 @@ function getRetryDelay(attempt: number, retryAfterMs?: number | null): number {
   return Math.min(delay + jitter, STARTUP_RETRY_CONFIG.maxDelayMs);
 }
 
+function normalizeEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim();
+  if (!trimmed) {
+    throw new ApiError('Invalid endpoint', 0, 'Client Error', 'Endpoint cannot be empty.');
+  }
+
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+function appendQueryParams(
+  url: string,
+  query?: Record<string, string | number | boolean | null | undefined>
+): string {
+  if (!query) return url;
+
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== null && value !== undefined) {
+      params.set(key, String(value));
+    }
+  }
+
+  const suffix = params.toString();
+  if (!suffix) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${suffix}`;
+}
+
+function redactSensitiveValues(value: unknown): unknown {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitiveValues(item));
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>(
+    (acc, [key, nestedValue]) => {
+      if (SENSITIVE_LOG_KEYS.has(key)) {
+        acc[key] = '[REDACTED]';
+      } else {
+        acc[key] = redactSensitiveValues(nestedValue);
+      }
+      return acc;
+    },
+    {}
+  );
+}
+
 export interface FetchOptions extends RequestInit {
-  responseType?: 'json' | 'blob' | 'text';
+  responseType?: 'json' | 'blob' | 'text' | 'arrayBuffer';
   /** Control retry behavior for this request. */
   retryMode?: 'auto' | 'never' | 'always';
   /**
@@ -314,6 +364,8 @@ export interface FetchOptions extends RequestInit {
    * preserving default behavior for existing callers (no timeout by default).
    */
   timeoutMs?: number;
+  query?: Record<string, string | number | boolean | null | undefined>;
+  maxRetries?: number;
 }
 
 // Preserve the existing default JSON content type while avoiding overrides
@@ -380,14 +432,22 @@ function normalizeRequestBody(
  * @throws {ApiError} If the request fails or returns an error status.
  */
 export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
-  const { timeoutMs, signal: callerSignal, retryMode = 'auto', ...requestOptions } = options;
+  const {
+    timeoutMs,
+    signal: callerSignal,
+    retryMode = 'auto',
+    query,
+    maxRetries,
+    ...requestOptions
+  } = options;
   const normalizedBody = normalizeRequestBody(
     requestOptions.body as BodyInit | Record<string, unknown> | null | undefined
   );
   const normalizedOptions: RequestInit = { ...requestOptions, body: normalizedBody };
-  const url = `${API_BASE}${endpoint}`;
+  const retryLimit = maxRetries ?? STARTUP_RETRY_CONFIG.maxRetries;
+  const url = appendQueryParams(`${API_BASE}${normalizeEndpoint(endpoint)}`, query);
   const method = normalizeMethod(normalizedOptions.method);
-  const requestBody = formatRequestBodyForLogs(normalizedBody);
+  const requestBody = redactSensitiveValues(formatRequestBodyForLogs(normalizedBody));
   const requestHeaders = buildRequestHeaders(normalizedOptions);
   const requestId = createRequestId();
   if (!requestHeaders.has('X-Request-ID')) {
@@ -400,7 +460,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   }
   log.debug(`${method} ${url}`, logContext);
 
-  for (let attempt = 0; attempt <= STARTUP_RETRY_CONFIG.maxRetries; attempt++) {
+  for (let attempt = 0; attempt <= retryLimit; attempt++) {
     const signalController = createRequestSignal(timeoutMs, callerSignal);
 
     try {
@@ -451,16 +511,16 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           );
 
           // Update backend status store
-          backendStatus.setStarting(attempt + 1, STARTUP_RETRY_CONFIG.maxRetries + 1);
+          backendStatus.setStarting(attempt + 1, retryLimit + 1);
 
-          if (attempt < STARTUP_RETRY_CONFIG.maxRetries) {
+          if (attempt < retryLimit) {
             await sleep(delay);
             continue; // Retry the request
           }
           log.warn('Backend startup retries exhausted', {
             url,
             method,
-            attempts: STARTUP_RETRY_CONFIG.maxRetries + 1,
+            attempts: retryLimit + 1,
             requestId
           });
           // Max retries reached, fall through to throw error
@@ -534,12 +594,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       // For network errors during startup, retry
       if (
         error instanceof TypeError &&
-        attempt < STARTUP_RETRY_CONFIG.maxRetries &&
+        attempt < retryLimit &&
         isRetryableRequest(method, undefined, retryMode)
       ) {
         const delay = getRetryDelay(attempt);
         log.info(
-          `Network error, backend may be starting. Retrying in ${delay}ms (attempt ${attempt + 1}/${STARTUP_RETRY_CONFIG.maxRetries + 1})`,
+          `Network error, backend may be starting. Retrying in ${delay}ms (attempt ${attempt + 1}/${retryLimit + 1})`,
           {
             url,
             method,
@@ -548,7 +608,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             requestId
           }
         );
-        backendStatus.setStarting(attempt + 1, STARTUP_RETRY_CONFIG.maxRetries + 1);
+        backendStatus.setStarting(attempt + 1, retryLimit + 1);
         await sleep(delay);
         continue;
       }
@@ -596,7 +656,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     'Backend unavailable',
     503,
     'Service Unavailable',
-    `Backend is still starting after ${STARTUP_RETRY_CONFIG.maxRetries + 1} attempts. Please try again in a moment.`,
+    `Backend is still starting after ${retryLimit + 1} attempts. Please try again in a moment.`,
     undefined,
     undefined,
     requestId
@@ -681,10 +741,14 @@ async function parseResponsePayload<T>(
   response: Response,
   method: string,
   url: string,
-  responseType?: 'json' | 'blob' | 'text'
+  responseType?: 'json' | 'blob' | 'text' | 'arrayBuffer'
 ): Promise<T> {
   if (responseType === 'blob') {
     return (await response.blob()) as unknown as T;
+  }
+
+  if (responseType === 'arrayBuffer') {
+    return (await response.arrayBuffer()) as unknown as T;
   }
 
   if (responseType === 'text') {
