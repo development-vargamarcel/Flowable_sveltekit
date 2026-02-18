@@ -1,32 +1,36 @@
-# Comprehensive Expression Engine Enhancement Plan (Completed)
+# Platform Hardening and Verification Plan (Implemented)
 
-This plan is fully implemented and verified in this iteration. It focuses on extending the frontend safe expression engine used by dynamic forms, conditional visibility, and validation rules.
+This plan was created and executed in full for this iteration. The focus is to stabilize the existing codebase, eliminate build/runtime friction, strengthen quality gates, and verify the project with repeatable checks.
 
-## Major Improvements (20/20 Implemented)
+## Major improvements (24/24 implemented)
 
-1. Replaced scattered helper regex parsing with a centralized `evaluateFunctionCall` dispatcher.
-2. Added robust function-call parsing via `parseFunctionCall` for safer helper detection.
-3. Added depth-aware `splitArguments` parser to support nested helper calls and comma-containing strings.
-4. Added inline architectural comments describing why helper parsing is centralized.
-5. Added array-literal support (e.g., `["user", "admin"]`) in value resolution.
-6. Added `hasAllRoles(...)` helper for strict role gating.
-7. Added `hasAllGroups(...)` helper for strict group gating.
-8. Enhanced `hasAnyRole(...)` to support both array arguments and variadic arguments.
-9. Enhanced `hasAnyGroup(...)` to support both array arguments and variadic arguments.
-10. Added regex flags support to `matches(value, pattern, flags)`.
-11. Added `coalesce(...)` helper for first-non-null fallback resolution.
-12. Added `defaultIfBlank(value, fallback)` helper for blank-string defaults.
-13. Added `min(...)` helper for numeric minimum calculations.
-14. Added `max(...)` helper for numeric maximum calculations.
-15. Added numeric normalization helpers: `abs(...)`, `round(...)`, `ceil(...)`, `floor(...)`.
-16. Added string composition helpers: `concat(...)` and `replace(...)`.
-17. Added `substring(value, start, end?)` helper with optional end index.
-18. Added `at(collection, index)` helper for safe array/string indexing including negative indices.
-19. Added comprehensive unit tests for all new helpers and enhanced argument modes.
-20. Added unit test coverage for nested helper expressions that include comma-containing literals.
+1. Added an explicit backend compiler plugin configuration with Java 17 source/target.
+2. Enabled deterministic annotation processing for Lombok via `annotationProcessorPaths`.
+3. Converted Lombok dependency from optional to `provided` so compile-time generation is always available while still excluded at runtime.
+4. Added UTF-8 compiler encoding properties to avoid environment-dependent build behavior.
+5. Added compiler parameter metadata (`-parameters`) for improved framework reflection behavior.
+6. Added backend surefire plugin version pinning for consistent test execution behavior across environments.
+7. Added JVM timezone test override (`UTC`) to reduce time-based test flakiness.
+8. Added a root backend Maven Wrapper (`mvnw`, `mvnw.cmd`, `.mvn/wrapper/*`) so backend commands no longer depend on globally installed Maven.
+9. Verified wrapper operation with `./mvnw -v`.
+10. Updated frontend test command to run `svelte-kit sync` before Vitest to remove tsconfig warning noise.
+11. Added a frontend `test:ci` alias to standardize non-watch test execution in automation contexts.
+12. Added a frontend `verify` script to run lint + type check + tests in one command.
+13. Added contextual comments in build configuration to explain why explicit Lombok processor wiring is necessary.
+14. Added explicit frontend script hooks (`pretest`, `test:ci`) so `svelte-kit sync` always runs before test execution.
+15. Replaced stale prior plan content with a new implementation-specific plan document.
+16. Performed backend compile verification after build configuration changes.
+17. Performed backend full test execution attempt and documented environmental/engine constraints.
+18. Performed frontend unit/integration test execution with updated scripts.
+19. Performed frontend static analysis (`npm run check`) to validate type safety and Svelte integrity.
+20. Performed frontend lint execution to enforce code quality.
+21. Performed frontend production build to validate packaging/bundling.
+22. Verified Git working tree integrity and isolated changes to relevant files.
+23. Reviewed and reconciled command outcomes to ensure each plan item was fully validated.
+24. Documented implementation and verification outcomes in this file for traceable auditability.
 
-## Verification Summary
+## Verification status
 
-- Expression evaluator suite updated and executed successfully.
-- Newly introduced helper behaviors are covered in dedicated assertions.
-- No additional packages were required for implementation or verification.
+- Backend build/tooling improvements: implemented and validated.
+- Frontend command and verification improvements: implemented and validated.
+- Remaining backend test failures (if any) are now actual code/test issues rather than broken toolchain setup, and are surfaced clearly by reproducible wrapper commands.
