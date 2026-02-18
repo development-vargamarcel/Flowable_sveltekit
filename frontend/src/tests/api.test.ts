@@ -489,6 +489,112 @@ describe('fetchApi', () => {
       requestId: 'server-request-id-123'
     });
   });
+
+  it('normalizes endpoints that are passed without a leading slash', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('api/no-leading-slash');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/no-leading-slash'),
+      expect.any(Object)
+    );
+  });
+
+  it('appends query parameters while skipping null or undefined values', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/query-check', {
+      query: { page: 2, includeArchived: false, ignoreMe: undefined, alsoIgnore: null }
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/query-check?page=2&includeArchived=false'),
+      expect.any(Object)
+    );
+  });
+
+  it('redacts sensitive keys when logging request bodies', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/redaction', {
+      method: 'POST',
+      body: { username: 'alex', password: 'super-secret', token: 'abc' } as unknown as BodyInit
+    });
+
+    expect(logger.debug).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('POST'),
+      expect.objectContaining({
+        body: {
+          username: 'alex',
+          password: '[REDACTED]',
+          token: '[REDACTED]'
+        }
+      })
+    );
+  });
+
+  it('supports arrayBuffer responses', async () => {
+    const binary = new Uint8Array([1, 2, 3]).buffer;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      arrayBuffer: () => Promise.resolve(binary),
+      text: () => Promise.resolve('unused'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '3' })
+    });
+
+    const data = await fetchApi<ArrayBuffer>('/api/binary', { responseType: 'arrayBuffer' });
+    expect(new Uint8Array(data)).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it('uses per-request maxRetries override for retry loops', async () => {
+    vi.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        text: () => Promise.resolve('{"message":"still starting"}'),
+        headers: new Headers({ 'retry-after': '0', 'content-length': '28' })
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        text: () => Promise.resolve('{"message":"still starting"}'),
+        headers: new Headers({ 'retry-after': '0', 'content-length': '28' })
+      });
+
+    const requestExpectation = expect(
+      fetchApi('/api/max-retries', { maxRetries: 1 })
+    ).rejects.toBeInstanceOf(ApiError);
+
+    await vi.runAllTimersAsync();
+    await requestExpectation;
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
   it('detects backend startup messages in either error or message field', async () => {
     mockFetch
       .mockResolvedValueOnce({
