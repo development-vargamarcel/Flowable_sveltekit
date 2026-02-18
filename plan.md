@@ -1,43 +1,32 @@
-# Comprehensive Enhancement Plan (Implemented): Expression, Validation, and Rule Reliability
+# Comprehensive Expression Engine Enhancement Plan (Completed)
 
-This plan has been completed end-to-end in this iteration. It focuses on expanding the safe expression engine used by form calculation, visibility, and validation features.
+This plan is fully implemented and verified in this iteration. It focuses on extending the frontend safe expression engine used by dynamic forms, conditional visibility, and validation rules.
 
 ## Major Improvements (20/20 Implemented)
 
-1. Added **ternary operator** support (`condition ? a : b`) to unlock richer rule outcomes.
-2. Added **nested ternary parsing** support at top-level expression depth.
-3. Added **nullish coalescing** support (`value ?? fallback`) for resilient defaults.
-4. Added `startsWith(value, prefix)` helper for string-prefix rules.
-5. Added `endsWith(value, suffix)` helper for string-suffix rules.
-6. Added `includes(container, needle)` helper for string and array membership checks.
-7. Added `len(value)` helper for string/array/object cardinality rules.
-8. Added `lower(value)` helper for normalization-sensitive comparisons.
-9. Added `upper(value)` helper for case-insensitive workflow conditions.
-10. Added `trim(value)` helper for whitespace-safe input comparisons.
-11. Added `between(value, min, max)` helper for inclusive numeric range validation.
-12. Added `matches(value, pattern)` helper for regex-based validation logic.
-13. Added regex-safety handling so malformed regex patterns fail safely (`false`).
-14. Added helper behavior documentation comments near new parser branches.
-15. Added dedicated unit tests for all new string helpers.
-16. Added dedicated unit tests for `len()` over arrays, strings, and objects.
-17. Added dedicated unit tests for `between()` numeric boundary behavior.
-18. Added dedicated unit tests for `matches()` regex success/failure behavior.
-19. Added dedicated unit tests verifying ternary behavior now returns validation strings correctly.
-20. Added dedicated unit tests for nullish fallback behavior in calculation expressions.
+1. Replaced scattered helper regex parsing with a centralized `evaluateFunctionCall` dispatcher.
+2. Added robust function-call parsing via `parseFunctionCall` for safer helper detection.
+3. Added depth-aware `splitArguments` parser to support nested helper calls and comma-containing strings.
+4. Added inline architectural comments describing why helper parsing is centralized.
+5. Added array-literal support (e.g., `["user", "admin"]`) in value resolution.
+6. Added `hasAllRoles(...)` helper for strict role gating.
+7. Added `hasAllGroups(...)` helper for strict group gating.
+8. Enhanced `hasAnyRole(...)` to support both array arguments and variadic arguments.
+9. Enhanced `hasAnyGroup(...)` to support both array arguments and variadic arguments.
+10. Added regex flags support to `matches(value, pattern, flags)`.
+11. Added `coalesce(...)` helper for first-non-null fallback resolution.
+12. Added `defaultIfBlank(value, fallback)` helper for blank-string defaults.
+13. Added `min(...)` helper for numeric minimum calculations.
+14. Added `max(...)` helper for numeric maximum calculations.
+15. Added numeric normalization helpers: `abs(...)`, `round(...)`, `ceil(...)`, `floor(...)`.
+16. Added string composition helpers: `concat(...)` and `replace(...)`.
+17. Added `substring(value, start, end?)` helper with optional end index.
+18. Added `at(collection, index)` helper for safe array/string indexing including negative indices.
+19. Added comprehensive unit tests for all new helpers and enhanced argument modes.
+20. Added unit test coverage for nested helper expressions that include comma-containing literals.
 
-## Implementation Notes
+## Verification Summary
 
-- All enhancements were implemented in the safe evaluator pipeline without introducing `eval` or dynamic `Function` execution.
-- Existing behavior for logical/comparison/arithmetic/grid expressions remains intact.
-- New helper parsing is additive and ordered to avoid precedence regressions.
-
-## Verification Performed
-
-- Targeted evaluator suite run with all tests passing.
-- Full frontend test suite run with all tests passing after enhancements.
-- Type and Svelte diagnostics run with zero issues.
-
-## Dependency / Tooling Check
-
-- Existing repository dependencies were sufficient for implementation and verification.
-- No additional packages were required.
+- Expression evaluator suite updated and executed successfully.
+- Newly introduced helper behaviors are covered in dedicated assertions.
+- No additional packages were required for implementation or verification.

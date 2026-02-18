@@ -154,117 +154,9 @@ export class ExpressionEvaluator {
       return false;
     }
 
-    // Handle hasRole/hasGroup helper functions
-    const hasRoleMatch = expr.match(/^hasRole\((.+)\)$/);
-    if (hasRoleMatch) {
-      const role = this.parseStringLiteral(hasRoleMatch[1].trim());
-      return this.context.user.roles.includes(role);
-    }
-
-    const hasGroupMatch = expr.match(/^hasGroup\((.+)\)$/);
-    if (hasGroupMatch) {
-      const group = this.parseStringLiteral(hasGroupMatch[1].trim());
-      return this.context.user.groups.includes(group);
-    }
-
-    const hasAnyRoleMatch = expr.match(/^hasAnyRole\((.+)\)$/);
-    if (hasAnyRoleMatch) {
-      let args = hasAnyRoleMatch[1].trim();
-      if (args.startsWith('[') && args.endsWith(']')) {
-        args = args.slice(1, -1);
-      }
-      const roles = this.parseArrayValues(args);
-      return roles.some((role) => this.context.user.roles.includes(String(role)));
-    }
-
-    const hasAnyGroupMatch = expr.match(/^hasAnyGroup\((.+)\)$/);
-    if (hasAnyGroupMatch) {
-      let args = hasAnyGroupMatch[1].trim();
-      if (args.startsWith('[') && args.endsWith(']')) {
-        args = args.slice(1, -1);
-      }
-      const groups = this.parseArrayValues(args);
-      return groups.some((group) => this.context.user.groups.includes(String(group)));
-    }
-
-    // Handle isEmpty/isNotEmpty
-    const isEmptyMatch = expr.match(/^isEmpty\((.+)\)$/);
-    if (isEmptyMatch) {
-      const value = this.resolveValue(isEmptyMatch[1].trim());
-      return this.isEmpty(value);
-    }
-
-    const isNotEmptyMatch = expr.match(/^isNotEmpty\((.+)\)$/);
-    if (isNotEmptyMatch) {
-      const value = this.resolveValue(isNotEmptyMatch[1].trim());
-      return !this.isEmpty(value);
-    }
-
-    const startsWithMatch = expr.match(/^startsWith\((.+?),(.+)\)$/);
-    if (startsWithMatch) {
-      const value = this.resolveValue(startsWithMatch[1].trim());
-      const prefix = this.resolveValue(startsWithMatch[2].trim());
-      return String(value ?? '').startsWith(String(prefix ?? ''));
-    }
-
-    const endsWithMatch = expr.match(/^endsWith\((.+?),(.+)\)$/);
-    if (endsWithMatch) {
-      const value = this.resolveValue(endsWithMatch[1].trim());
-      const suffix = this.resolveValue(endsWithMatch[2].trim());
-      return String(value ?? '').endsWith(String(suffix ?? ''));
-    }
-
-    const includesMatch = expr.match(/^includes\((.+?),(.+)\)$/);
-    if (includesMatch) {
-      const value = this.resolveValue(includesMatch[1].trim());
-      const needle = this.resolveValue(includesMatch[2].trim());
-      if (Array.isArray(value)) {
-        return value.some((item) => this.looseEquals(item, needle));
-      }
-      return String(value ?? '').includes(String(needle ?? ''));
-    }
-
-    const lenMatch = expr.match(/^len\((.+)\)$/);
-    if (lenMatch) {
-      const value = this.resolveValue(lenMatch[1].trim());
-      return this.getLength(value);
-    }
-
-    const lowerMatch = expr.match(/^lower\((.+)\)$/);
-    if (lowerMatch) {
-      const value = this.resolveValue(lowerMatch[1].trim());
-      return String(value ?? '').toLowerCase();
-    }
-
-    const upperMatch = expr.match(/^upper\((.+)\)$/);
-    if (upperMatch) {
-      const value = this.resolveValue(upperMatch[1].trim());
-      return String(value ?? '').toUpperCase();
-    }
-
-    const trimMatch = expr.match(/^trim\((.+)\)$/);
-    if (trimMatch) {
-      const value = this.resolveValue(trimMatch[1].trim());
-      return String(value ?? '').trim();
-    }
-
-    const betweenMatch = expr.match(/^between\((.+?),(.+?),(.+)\)$/);
-    if (betweenMatch) {
-      const value = this.toNumber(this.resolveValue(betweenMatch[1].trim()));
-      const min = this.toNumber(this.resolveValue(betweenMatch[2].trim()));
-      const max = this.toNumber(this.resolveValue(betweenMatch[3].trim()));
-      return value >= min && value <= max;
-    }
-
-    const matchesMatch = expr.match(/^matches\((.+?),(.+)\)$/);
-    if (matchesMatch) {
-      const value = String(this.resolveValue(matchesMatch[1].trim()) ?? '');
-      const pattern = this.parseStringLiteral(matchesMatch[2].trim());
-      try {
-        return new RegExp(pattern).test(value);
-      } catch {
-        return false;
-      }
+    const functionResult = this.evaluateFunctionCall(expr);
+    if (functionResult !== undefined) {
+      return functionResult;
     }
 
     // Resolve as a value (variable reference or literal)
@@ -366,6 +258,11 @@ export class ExpressionEvaluator {
     if (expr === 'true') return true;
     if (expr === 'false') return false;
     if (expr === 'null') return null;
+
+    // Handle array literals (e.g. ["admin", "user"])
+    if (expr.startsWith('[') && expr.endsWith(']')) {
+      return this.parseArrayValues(expr.slice(1, -1));
+    }
 
     // Handle variable references
     return this.resolveVariable(expr);
@@ -500,6 +397,193 @@ export class ExpressionEvaluator {
       return str.slice(1, -1);
     }
     return str;
+  }
+
+  /**
+   * Parse and execute helper-style function expressions.
+   *
+   * This central parser avoids brittle regex matching for every helper
+   * and makes nested function calls and comma-containing string arguments
+   * safe to support.
+   */
+  private evaluateFunctionCall(expr: string): ExpressionResult | undefined {
+    const parsed = this.parseFunctionCall(expr);
+    if (!parsed) return undefined;
+
+    const { name, args } = parsed;
+    const values = args.map((arg) => this.evaluateExpression(arg));
+
+    switch (name) {
+      case 'hasRole':
+        return this.context.user.roles.includes(String(values[0] ?? ''));
+      case 'hasGroup':
+        return this.context.user.groups.includes(String(values[0] ?? ''));
+      case 'hasAnyRole':
+        return this.normalizeRoleGroupArgs(values).some((role) =>
+          this.context.user.roles.includes(role)
+        );
+      case 'hasAnyGroup':
+        return this.normalizeRoleGroupArgs(values).some((group) =>
+          this.context.user.groups.includes(group)
+        );
+      case 'hasAllRoles':
+        return this.normalizeRoleGroupArgs(values).every((role) =>
+          this.context.user.roles.includes(role)
+        );
+      case 'hasAllGroups':
+        return this.normalizeRoleGroupArgs(values).every((group) =>
+          this.context.user.groups.includes(group)
+        );
+      case 'isEmpty':
+        return this.isEmpty(values[0]);
+      case 'isNotEmpty':
+        return !this.isEmpty(values[0]);
+      case 'startsWith':
+        return String(values[0] ?? '').startsWith(String(values[1] ?? ''));
+      case 'endsWith':
+        return String(values[0] ?? '').endsWith(String(values[1] ?? ''));
+      case 'includes': {
+        const container = values[0];
+        const needle = values[1];
+        if (Array.isArray(container)) {
+          return container.some((item) => this.looseEquals(item, needle));
+        }
+        return String(container ?? '').includes(String(needle ?? ''));
+      }
+      case 'len':
+        return this.getLength(values[0]);
+      case 'lower':
+        return String(values[0] ?? '').toLowerCase();
+      case 'upper':
+        return String(values[0] ?? '').toUpperCase();
+      case 'trim':
+        return String(values[0] ?? '').trim();
+      case 'between': {
+        const value = this.toNumber(values[0]);
+        const min = this.toNumber(values[1]);
+        const max = this.toNumber(values[2]);
+        return value >= min && value <= max;
+      }
+      case 'matches': {
+        const value = String(values[0] ?? '');
+        const pattern = String(values[1] ?? '');
+        const flags = String(values[2] ?? '');
+        try {
+          return new RegExp(pattern, flags).test(value);
+        } catch {
+          return false;
+        }
+      }
+      case 'coalesce':
+        return values.find((value) => value !== null && value !== undefined) ?? null;
+      case 'defaultIfBlank': {
+        const current = values[0];
+        return typeof current === 'string' && current.trim() === '' ? (values[1] ?? null) : current;
+      }
+      case 'min':
+        return Math.min(...values.map((value) => this.toNumber(value)));
+      case 'max':
+        return Math.max(...values.map((value) => this.toNumber(value)));
+      case 'abs':
+        return Math.abs(this.toNumber(values[0]));
+      case 'round': {
+        const precision = Math.max(0, Math.floor(this.toNumber(values[1])));
+        const factor = 10 ** precision;
+        return Math.round(this.toNumber(values[0]) * factor) / factor;
+      }
+      case 'ceil':
+        return Math.ceil(this.toNumber(values[0]));
+      case 'floor':
+        return Math.floor(this.toNumber(values[0]));
+      case 'concat':
+        return values.map((value) => String(value ?? '')).join('');
+      case 'replace':
+        return String(values[0] ?? '').replace(String(values[1] ?? ''), String(values[2] ?? ''));
+      case 'substring': {
+        const text = String(values[0] ?? '');
+        const start = Math.max(0, Math.floor(this.toNumber(values[1])));
+        const endArg = values[2];
+        return endArg === undefined
+          ? text.substring(start)
+          : text.substring(start, Math.floor(this.toNumber(endArg)));
+      }
+      case 'at': {
+        const collection = values[0];
+        const index = Math.floor(this.toNumber(values[1]));
+        if (Array.isArray(collection) || typeof collection === 'string') {
+          return collection.at(index) ?? null;
+        }
+        return null;
+      }
+      default:
+        return undefined;
+    }
+  }
+
+  private parseFunctionCall(expr: string): { name: string; args: string[] } | null {
+    const openParen = expr.indexOf('(');
+    if (openParen <= 0 || !expr.endsWith(')')) {
+      return null;
+    }
+
+    const name = expr.slice(0, openParen).trim();
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+      return null;
+    }
+
+    const argsString = expr.slice(openParen + 1, -1).trim();
+    return {
+      name,
+      args: this.splitArguments(argsString)
+    };
+  }
+
+  private splitArguments(argsString: string): string[] {
+    if (!argsString) return [];
+
+    const args: string[] = [];
+    let current = '';
+    let depth = 0;
+    let inString = false;
+    let stringChar = '';
+
+    for (let i = 0; i < argsString.length; i++) {
+      const char = argsString[i];
+      if ((char === '"' || char === "'") && argsString[i - 1] !== '\\') {
+        if (!inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar) {
+          inString = false;
+        }
+      }
+
+      if (!inString) {
+        if (char === '(' || char === '[') depth++;
+        if (char === ')' || char === ']') depth--;
+      }
+
+      if (char === ',' && depth === 0 && !inString) {
+        args.push(current.trim());
+        current = '';
+        continue;
+      }
+
+      current += char;
+    }
+
+    if (current.trim() !== '') {
+      args.push(current.trim());
+    }
+
+    return args;
+  }
+
+  private normalizeRoleGroupArgs(values: unknown[]): string[] {
+    if (values.length === 1 && Array.isArray(values[0])) {
+      return values[0].map((value) => String(value));
+    }
+    return values.map((value) => String(value));
   }
 
   private getLength(value: unknown): number {

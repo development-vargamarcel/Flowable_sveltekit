@@ -16,9 +16,11 @@ describe('ExpressionEvaluator', () => {
     context = createDefaultContext();
     context.form = {
       amount: 1000,
+      tax: 200,
       status: 'pending',
       category: 'travel',
       items: ['flight', 'hotel'],
+      comment: '   ',
       nullField: null,
       undefinedField: undefined,
       zero: 0,
@@ -155,6 +157,15 @@ describe('ExpressionEvaluator', () => {
     it('should evaluate hasAnyRole', () => {
       expect(evaluator.evaluate('hasAnyRole(["guest", "admin"])')).toBe(true);
       expect(evaluator.evaluate('hasAnyRole(["guest", "temp"])')).toBe(false);
+      expect(evaluator.evaluate('hasAnyRole("guest", "admin")')).toBe(true);
+    });
+
+    it('should evaluate hasAllRoles and hasAllGroups', () => {
+      expect(evaluator.evaluate('hasAllRoles(["user", "admin"])')).toBe(true);
+      expect(evaluator.evaluate('hasAllRoles("user", "admin")')).toBe(true);
+      expect(evaluator.evaluate('hasAllRoles(["user", "guest"])')).toBe(false);
+      expect(evaluator.evaluate('hasAllGroups(["engineering"])')).toBe(true);
+      expect(evaluator.evaluate('hasAllGroups(["engineering", "sales"])')).toBe(false);
     });
 
     it('should evaluate isEmpty/isNotEmpty', () => {
@@ -197,6 +208,39 @@ describe('ExpressionEvaluator', () => {
     it('should evaluate regex matching helper', () => {
       expect(evaluator.evaluate('matches(status, "^pen.*")')).toBe(true);
       expect(evaluator.evaluate('matches(status, "^app")')).toBe(false);
+      expect(evaluator.evaluate('matches(status, "PENDING", "i")')).toBe(true);
+    });
+
+    it('should evaluate coalesce and blank defaults', () => {
+      expect(evaluator.evaluate('coalesce(nullField, undefinedField, status)')).toBe('pending');
+      expect(evaluator.evaluate('defaultIfBlank(comment, "fallback")')).toBe('fallback');
+      expect(evaluator.evaluate('defaultIfBlank(status, "fallback")')).toBe('pending');
+    });
+
+    it('should evaluate numeric helpers', () => {
+      expect(evaluator.evaluate('min(amount, tax, 150)')).toBe(150);
+      expect(evaluator.evaluate('max(amount, tax, 1500)')).toBe(1500);
+      expect(evaluator.evaluate('abs(-12.5)')).toBe(12.5);
+      expect(evaluator.evaluate('round(12.345, 2)')).toBe(12.35);
+      expect(evaluator.evaluate('ceil(12.01)')).toBe(13);
+      expect(evaluator.evaluate('floor(12.99)')).toBe(12);
+    });
+
+    it('should evaluate text manipulation helpers', () => {
+      expect(evaluator.evaluate('concat("pre", "-", status)')).toBe('pre-pending');
+      expect(evaluator.evaluate('replace(status, "end", "END")')).toBe('pENDing');
+      expect(evaluator.evaluate('substring(status, 1, 4)')).toBe('end');
+      expect(evaluator.evaluate('substring(status, 2)')).toBe('nding');
+    });
+
+    it('should evaluate index access helper for arrays and strings', () => {
+      expect(evaluator.evaluate('at(items, 1)')).toBe('hotel');
+      expect(evaluator.evaluate('at(status, -1)')).toBe('g');
+      expect(evaluator.evaluate('at(items, 10)')).toBe(null);
+    });
+
+    it('should support nested helper arguments with commas', () => {
+      expect(evaluator.evaluate('concat(trim("  A, B  "), "-", upper("ok"))')).toBe('A, B-OK');
     });
   });
 
