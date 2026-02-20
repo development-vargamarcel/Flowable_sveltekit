@@ -521,7 +521,7 @@ describe('fetchApi', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/query-check?page=2&includeArchived=false'),
+      expect.stringContaining('/api/query-check?includeArchived=false&page=2'),
       expect.any(Object)
     );
   });
@@ -595,6 +595,168 @@ describe('fetchApi', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
+
+  it('serializes array and date query params deterministically', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/query-advanced', {
+      query: {
+        tags: ['alpha', 'beta'],
+        createdAfter: new Date('2024-01-01T00:00:00.000Z'),
+        a: 1
+      }
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/api/query-advanced?a=1&createdAfter=2024-01-01T00%3A00%3A00.000Z&tags=alpha&tags=beta'
+      ),
+      expect.any(Object)
+    );
+  });
+
+  it('can omit empty-string query params when configured', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/query-empty', {
+      query: { q: '', page: 2 },
+      includeEmptyStringQueryParams: false
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/query-empty?page=2'),
+      expect.any(Object)
+    );
+  });
+
+  it('supports custom expected status enforcement', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await expect(fetchApi('/api/expected-status', { expectedStatus: 201 })).rejects.toMatchObject({
+      name: 'ApiError',
+      message: 'Unexpected response status',
+      status: 200
+    });
+  });
+
+  it('allows custom response parsers for specialized payloads', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('raw payload'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    const parsed = await fetchApi('/api/custom-parser', {
+      responseParser: async (response) => ({
+        upper: (await response.text()).toUpperCase()
+      })
+    });
+
+    expect(parsed).toEqual({ upper: 'RAW PAYLOAD' });
+  });
+
+  it('invokes onRetry callback with retry details', async () => {
+    vi.useFakeTimers();
+    const onRetry = vi.fn();
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        text: () => Promise.resolve('{"message":"try again"}'),
+        headers: new Headers({ 'retry-after': '0', 'content-length': '23' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11' })
+      });
+
+    const request = fetchApi('/api/retry-callback', { onRetry, maxRetries: 1 });
+    await vi.runAllTimersAsync();
+    await request;
+
+    expect(onRetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: 'http',
+        attempt: 1,
+        maxAttempts: 2,
+        status: 503
+      })
+    );
+
+    vi.useRealTimers();
+  });
+
+  it('supports request-specific retryable status codes', async () => {
+    vi.useFakeTimers();
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 418,
+        statusText: "I'm a teapot",
+        text: () => Promise.resolve('{"message":"short outage"}'),
+        headers: new Headers({ 'retry-after': '0', 'content-length': '26' })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11' })
+      });
+
+    const request = fetchApi('/api/custom-status-retry', {
+      retryableStatusCodes: [418],
+      retryableMethods: ['GET'],
+      maxRetries: 1
+    });
+
+    await vi.runAllTimersAsync();
+    await expect(request).resolves.toEqual({ ok: true });
+    vi.useRealTimers();
+  });
+
+  it('can disable network retries per request', async () => {
+    mockFetch.mockRejectedValue(new TypeError('network error'));
+
+    await expect(
+      fetchApi('/api/no-network-retry', {
+        retryOnNetworkError: false,
+        maxRetries: 3
+      })
+    ).rejects.toMatchObject({
+      message: 'Connection failed',
+      status: 0
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('detects backend startup messages in either error or message field', async () => {
     mockFetch
       .mockResolvedValueOnce({
