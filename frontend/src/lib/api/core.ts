@@ -21,6 +21,10 @@ const STARTUP_RETRY_CONFIG = {
 const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 const SENSITIVE_LOG_KEYS = new Set(['password', 'token', 'accessToken', 'refreshToken', 'secret']);
+const DEFAULT_JSON_ACCEPT = 'application/json';
+
+type QueryValue = string | number | boolean | Date | null | undefined;
+type QueryInput = Record<string, QueryValue | QueryValue[]>;
 
 function createRequestId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -294,13 +298,17 @@ function sleep(ms: number): Promise<void> {
 /**
  * Calculate delay for next retry using exponential backoff
  */
-function getRetryDelay(attempt: number, retryAfterMs?: number | null): number {
+function getRetryDelay(
+  attempt: number,
+  retryAfterMs?: number | null,
+  initialDelayMs = STARTUP_RETRY_CONFIG.initialDelayMs,
+  backoffMultiplier = STARTUP_RETRY_CONFIG.backoffMultiplier
+): number {
   if (typeof retryAfterMs === 'number' && retryAfterMs >= 0) {
     return Math.min(retryAfterMs, STARTUP_RETRY_CONFIG.maxDelayMs);
   }
 
-  const delay =
-    STARTUP_RETRY_CONFIG.initialDelayMs * Math.pow(STARTUP_RETRY_CONFIG.backoffMultiplier, attempt);
+  const delay = initialDelayMs * Math.pow(backoffMultiplier, attempt);
   const jitter = Math.floor(Math.random() * 250);
   return Math.min(delay + jitter, STARTUP_RETRY_CONFIG.maxDelayMs);
 }
@@ -314,12 +322,12 @@ function normalizeEndpoint(endpoint: string): string {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
-type QueryValue = string | number | boolean | Date | null | undefined;
-
 function appendQueryParams(
   url: string,
-  query?: Record<string, QueryValue | QueryValue[]>,
-  includeEmptyStringQueryParams = true
+  query?: QueryInput,
+  includeEmptyStringQueryParams = true,
+  trimStringQueryParams = false,
+  dedupeArrayQueryParams = false
 ): string {
   if (!query) return url;
 
@@ -327,17 +335,24 @@ function appendQueryParams(
   const sortedEntries = Object.entries(query).sort(([a], [b]) => a.localeCompare(b));
   for (const [key, rawValue] of sortedEntries) {
     const values = Array.isArray(rawValue) ? rawValue : [rawValue];
-    for (const value of values) {
+    const normalizedValues = dedupeArrayQueryParams ? Array.from(new Set(values)) : values;
+    for (const value of normalizedValues) {
       if (value === null || value === undefined) {
         continue;
       }
 
-      if (value === '' && !includeEmptyStringQueryParams) {
+      const normalizedValue =
+        trimStringQueryParams && typeof value === 'string' ? value.trim() : value;
+
+      if (normalizedValue === '' && !includeEmptyStringQueryParams) {
         continue;
       }
 
       // Dates are normalized to ISO strings so client-side filtering remains deterministic.
-      params.append(key, value instanceof Date ? value.toISOString() : String(value));
+      params.append(
+        key,
+        normalizedValue instanceof Date ? normalizedValue.toISOString() : String(normalizedValue)
+      );
     }
   }
 
@@ -380,15 +395,35 @@ export interface FetchOptions extends RequestInit {
    * preserving default behavior for existing callers (no timeout by default).
    */
   timeoutMs?: number;
-  query?: Record<string, QueryValue | QueryValue[]>;
+  query?: QueryInput;
+  querySerializer?: (query: QueryInput) => string;
   /** Include query params with empty-string values (default true for backward compatibility). */
   includeEmptyStringQueryParams?: boolean;
+  trimStringQueryParams?: boolean;
+  dedupeArrayQueryParams?: boolean;
   maxRetries?: number;
   retryableStatusCodes?: number[];
   retryableMethods?: string[];
   retryOnNetworkError?: boolean;
+  initialRetryDelayMs?: number;
+  maxRetryDelayMs?: number;
+  retryBackoffMultiplier?: number;
+  retryJitterMs?: number;
   expectedStatus?: number | number[];
   responseParser?: (response: Response) => Promise<unknown>;
+  onRequest?: (context: {
+    url: string;
+    method: string;
+    options: RequestInit;
+  }) => RequestInit | void;
+  onResponse?: (response: Response) => void | Promise<void>;
+  suppressErrorToast?: boolean;
+  baseUrl?: string;
+  credentialsMode?: RequestCredentials;
+  timeoutMessage?: string;
+  networkErrorMessage?: string;
+  skipDefaultAcceptHeader?: boolean;
+  skipDefaultContentTypeHeader?: boolean;
   onRetry?: (details: {
     attempt: number;
     maxAttempts: number;
@@ -414,14 +449,22 @@ function shouldSetJsonContentType(body: BodyInit | null | undefined): boolean {
   return true;
 }
 
-function buildRequestHeaders(options: RequestInit): Headers {
+function buildRequestHeaders(
+  options: RequestInit,
+  skipDefaultAcceptHeader = false,
+  skipDefaultContentTypeHeader = false
+): Headers {
   const headers = new Headers(options.headers || undefined);
 
-  if (!headers.has('accept')) {
-    headers.set('Accept', 'application/json');
+  if (!skipDefaultAcceptHeader && !headers.has('accept')) {
+    headers.set('Accept', DEFAULT_JSON_ACCEPT);
   }
 
-  if (!headers.has('content-type') && shouldSetJsonContentType(options.body ?? null)) {
+  if (
+    !skipDefaultContentTypeHeader &&
+    !headers.has('content-type') &&
+    shouldSetJsonContentType(options.body ?? null)
+  ) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -430,6 +473,18 @@ function buildRequestHeaders(options: RequestInit): Headers {
 
 function normalizeMethod(method?: string): string {
   return (method ?? 'GET').trim().toUpperCase();
+}
+
+function validateNumericOption(name: string, value: number | undefined, min = 0): void {
+  if (value === undefined) return;
+  if (!Number.isFinite(value) || value < min) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      `${name} must be >= ${min}.`
+    );
+  }
 }
 
 function normalizeRequestBody(
@@ -467,33 +522,68 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     signal: callerSignal,
     retryMode = 'auto',
     query,
+    querySerializer,
     includeEmptyStringQueryParams = true,
+    trimStringQueryParams = false,
+    dedupeArrayQueryParams = false,
     maxRetries,
     retryableStatusCodes,
     retryableMethods,
     retryOnNetworkError = true,
+    initialRetryDelayMs,
+    maxRetryDelayMs,
+    retryBackoffMultiplier,
+    retryJitterMs,
     expectedStatus,
     responseParser,
+    onRequest,
+    onResponse,
+    suppressErrorToast = false,
+    baseUrl,
+    credentialsMode,
+    timeoutMessage,
+    networkErrorMessage,
+    skipDefaultAcceptHeader = false,
+    skipDefaultContentTypeHeader = false,
     onRetry,
     ...requestOptions
   } = options;
+  validateNumericOption('maxRetries', maxRetries, 0);
+  validateNumericOption('timeoutMs', timeoutMs, 1);
+  validateNumericOption('initialRetryDelayMs', initialRetryDelayMs, 0);
+  validateNumericOption('maxRetryDelayMs', maxRetryDelayMs, 0);
+  validateNumericOption('retryBackoffMultiplier', retryBackoffMultiplier, 1);
+  validateNumericOption('retryJitterMs', retryJitterMs, 0);
+
   const normalizedBody = normalizeRequestBody(
     requestOptions.body as BodyInit | Record<string, unknown> | null | undefined
   );
   const normalizedOptions: RequestInit = { ...requestOptions, body: normalizedBody };
   const retryLimit = maxRetries ?? STARTUP_RETRY_CONFIG.maxRetries;
-  const url = appendQueryParams(
-    `${API_BASE}${normalizeEndpoint(endpoint)}`,
-    query,
-    includeEmptyStringQueryParams
-  );
+  const normalizedEndpoint = normalizeEndpoint(endpoint);
+  const baseApiUrl = baseUrl ?? API_BASE;
+  const baseRequestUrl = `${baseApiUrl}${normalizedEndpoint}`;
+  const url =
+    query && querySerializer
+      ? `${baseRequestUrl}${baseRequestUrl.includes('?') ? '&' : '?'}${querySerializer(query)}`
+      : appendQueryParams(
+          baseRequestUrl,
+          query,
+          includeEmptyStringQueryParams,
+          trimStringQueryParams,
+          dedupeArrayQueryParams
+        );
   const retryableMethodSet = new Set(
     (retryableMethods ?? Array.from(RETRYABLE_METHODS)).map((value) => value.toUpperCase())
   );
   const retryableStatusSet = new Set(retryableStatusCodes ?? Array.from(RETRYABLE_STATUS_CODES));
   const method = normalizeMethod(normalizedOptions.method);
   const requestBody = redactSensitiveValues(formatRequestBodyForLogs(normalizedBody));
-  const requestHeaders = buildRequestHeaders(normalizedOptions);
+  const requestHeaders = buildRequestHeaders(
+    normalizedOptions,
+    skipDefaultAcceptHeader,
+    skipDefaultContentTypeHeader
+  );
   const requestId = createRequestId();
   if (!requestHeaders.has('X-Request-ID')) {
     requestHeaders.set('X-Request-ID', requestId);
@@ -509,12 +599,22 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     const signalController = createRequestSignal(timeoutMs, callerSignal);
 
     try {
+      const nextRequestOptions = onRequest?.({ url, method, options: normalizedOptions }) ?? {};
+      const mergedRequestOptions = { ...normalizedOptions, ...nextRequestOptions };
+      const mergedHeaders = new Headers(requestHeaders);
+      if (nextRequestOptions.headers) {
+        const hookHeaders = new Headers(nextRequestOptions.headers);
+        hookHeaders.forEach((value, key) => mergedHeaders.set(key, value));
+      }
+
       const response = await fetch(url, {
-        ...normalizedOptions,
-        signal: signalController.signal,
-        credentials: 'include',
-        headers: requestHeaders
+        ...mergedRequestOptions,
+        credentials: credentialsMode ?? 'include',
+        headers: mergedHeaders,
+        signal: signalController.signal
       });
+
+      await onResponse?.(typeof response.clone === 'function' ? response.clone() : response);
 
       if (!response.ok) {
         // Read the raw response text first
@@ -550,9 +650,17 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             retryableStatusSet
           )
         ) {
-          const delay = getRetryDelay(attempt, retryAfterMs);
+          const delay = Math.min(
+            getRetryDelay(
+              attempt,
+              retryAfterMs,
+              initialRetryDelayMs ?? STARTUP_RETRY_CONFIG.initialDelayMs,
+              retryBackoffMultiplier ?? STARTUP_RETRY_CONFIG.backoffMultiplier
+            ),
+            maxRetryDelayMs ?? STARTUP_RETRY_CONFIG.maxDelayMs
+          );
           log.info(
-            `Backend is starting, retrying in ${delay}ms (attempt ${attempt + 1}/${STARTUP_RETRY_CONFIG.maxRetries + 1})`,
+            `Backend is starting, retrying in ${delay}ms (attempt ${attempt + 1}/${retryLimit + 1})`,
             {
               url,
               method,
@@ -595,7 +703,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         // Mark backend as ready if we got a response (even an error)
         backendStatus.setReady();
 
-        if (browser && response.status >= 500) {
+        if (browser && response.status >= 500 && !suppressErrorToast) {
           const msg =
             (errorBody?.message as string) ||
             (errorBody?.error as string) ||
@@ -635,9 +743,11 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         return {} as T;
       }
 
-      const data = responseParser
-        ? await responseParser(response)
-        : await parseResponsePayload<T>(response, method, url, options.responseType);
+      const data = (
+        responseParser
+          ? await responseParser(response)
+          : await parseResponsePayload<T>(response, method, url, options.responseType)
+      ) as T;
       log.debug(`${method} ${url} success`, { data });
       return data;
     } catch (error) {
@@ -648,11 +758,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
       if (error instanceof DOMException && error.name === 'AbortError') {
         if (signalController.wasTimedOut()) {
-          const message = `The request to ${endpoint} timed out after ${timeoutMs}ms.`;
+          const message =
+            timeoutMessage ?? `The request to ${endpoint} timed out after ${timeoutMs}ms.`;
           log.warn('Request timed out', { url, method, timeoutMs, attempt, requestId });
           backendStatus.setError('Request timeout');
 
-          if (browser) {
+          if (browser && !suppressErrorToast) {
             toast.error('Request Timed Out', { description: message });
           }
 
@@ -670,7 +781,15 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         retryOnNetworkError &&
         isRetryableRequest(method, undefined, retryMode, retryableMethodSet, retryableStatusSet)
       ) {
-        const delay = getRetryDelay(attempt);
+        const delay = Math.min(
+          getRetryDelay(
+            attempt,
+            undefined,
+            initialRetryDelayMs ?? STARTUP_RETRY_CONFIG.initialDelayMs,
+            retryBackoffMultiplier ?? STARTUP_RETRY_CONFIG.backoffMultiplier
+          ) + Math.floor(Math.random() * (retryJitterMs ?? 250)),
+          maxRetryDelayMs ?? STARTUP_RETRY_CONFIG.maxDelayMs
+        );
         log.info(
           `Network error, backend may be starting. Retrying in ${delay}ms (attempt ${attempt + 1}/${retryLimit + 1})`,
           {
@@ -699,11 +818,13 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         log.error('Network error occurred', error, { url, method, requestId });
         backendStatus.setError('Connection failed');
 
-        const message = isConnectionRefused
-          ? `Unable to connect to ${url}. The server may be down or there may be a network issue.`
-          : `Network error: ${error.message}`;
+        const message =
+          networkErrorMessage ??
+          (isConnectionRefused
+            ? `Unable to connect to ${url}. The server may be down or there may be a network issue.`
+            : `Network error: ${error.message}`);
 
-        if (browser) {
+        if (browser && !suppressErrorToast) {
           toast.error('Connection Failed', { description: message });
         }
 
@@ -714,7 +835,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       log.error('Unexpected error', error, { url, method, requestId });
 
-      if (browser) {
+      if (browser && !suppressErrorToast) {
         toast.error('Unexpected Error', { description: errorMessage });
       }
 

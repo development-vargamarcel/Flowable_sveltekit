@@ -757,6 +757,169 @@ describe('fetchApi', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it('supports baseUrl overrides for edge and integration environments', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/base-url', { baseUrl: 'https://example.test' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://example.test/api/base-url'),
+      expect.any(Object)
+    );
+  });
+
+  it('allows custom query serialization for backend-specific conventions', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/custom-query', {
+      query: { tags: ['x', 'y'] },
+      querySerializer: () => 'tags=x|y'
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/custom-query?tags=x|y'),
+      expect.any(Object)
+    );
+  });
+
+  it('trims string query values when trimStringQueryParams is enabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/query-trim', {
+      query: { q: '  spaced  ' },
+      trimStringQueryParams: true
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/query-trim?q=spaced'),
+      expect.any(Object)
+    );
+  });
+
+  it('deduplicates array query values when configured', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/query-dedupe', {
+      query: { tag: ['a', 'a', 'b'] },
+      dedupeArrayQueryParams: true
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/query-dedupe?tag=a&tag=b'),
+      expect.any(Object)
+    );
+  });
+
+  it('runs onRequest hook to allow runtime request mutation', async () => {
+    mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get('X-Env')).toBe('test');
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11' })
+      });
+    });
+
+    await fetchApi('/api/request-hook', {
+      onRequest: () => ({ headers: { 'X-Env': 'test' } })
+    });
+  });
+
+  it('runs onResponse hook for side-effect integrations', async () => {
+    const onResponse = vi.fn();
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      clone: function () {
+        return this;
+      },
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/response-hook', { onResponse });
+
+    expect(onResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('can suppress browser toasts for server and network failures', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Server Error',
+      text: () => Promise.resolve('{"message":"boom"}'),
+      headers: new Headers({ 'content-length': '18' })
+    });
+
+    await expect(fetchApi('/api/no-toast', { suppressErrorToast: true })).rejects.toBeInstanceOf(
+      ApiError
+    );
+
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('allows custom timeout and network error messaging', async () => {
+    vi.useFakeTimers();
+
+    mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
+        });
+      });
+    });
+
+    const requestPromise = fetchApi('/api/custom-timeout', {
+      timeoutMs: 10,
+      timeoutMessage: 'Custom timeout message'
+    });
+    const timeoutExpectation = expect(requestPromise).rejects.toMatchObject({
+      details: 'Custom timeout message'
+    });
+
+    await vi.advanceTimersByTimeAsync(15);
+    await timeoutExpectation;
+
+    vi.useRealTimers();
+  });
+
+  it('validates retry and timeout numeric configuration', async () => {
+    await expect(fetchApi('/api/invalid-config', { maxRetries: -1 })).rejects.toMatchObject({
+      message: 'Invalid request configuration'
+    });
+    await expect(fetchApi('/api/invalid-config', { timeoutMs: 0 })).rejects.toMatchObject({
+      message: 'Invalid request configuration'
+    });
+  });
+
   it('detects backend startup messages in either error or message field', async () => {
     mockFetch
       .mockResolvedValueOnce({
