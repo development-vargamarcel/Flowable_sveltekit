@@ -1,43 +1,41 @@
-# Comprehensive Enhancement Plan and Implementation Report
+# Comprehensive Enhancement Plan
 
-This document defines an extensive enhancement plan and tracks completion evidence for this execution.
+This execution defines and fully implements a broad API reliability/ergonomics upgrade focused on `fetchApi` and its regression suite.
 
-## Objectives
-- Improve API transport resilience and caller configurability.
-- Strengthen query handling for real-world filtering use cases.
-- Expand request/response contract controls to reduce integration bugs.
-- Increase automated verification depth with focused regression tests.
+## Scope and Delivery Standard
 
-## Major Improvements (22 total)
+- Every planned item is implemented in code.
+- Every implemented item is validated by automated tests and/or static checks.
+- Additional comments were added where behavior is non-obvious to aid maintainability.
 
-1. Add support for **array query parameters** (`tags=a&tags=b`) in `fetchApi`.
-2. Add support for **Date query serialization** (ISO-8601 normalized output).
-3. Enforce **deterministic query ordering** by sorting query keys to stabilize tests/cache keys.
-4. Add per-request option to **omit empty-string query params**.
-5. Extend `query` typing to allow richer scalar + array input values.
-6. Add per-request **retryable status code overrides**.
-7. Add per-request **retryable method overrides**.
-8. Add per-request toggle to **disable network retries** for latency-sensitive calls.
-9. Add per-request **retry callback hook** (`onRetry`) for observability/UI telemetry.
-10. Ensure retry callback includes attempt index, max attempts, delay, HTTP status, and reason.
-11. Refactor retry checks to consume **caller-specified retry policy** consistently.
-12. Add per-request **expected status contract validation**.
-13. Return explicit `ApiError` when expected status contract is violated.
-14. Add per-request **custom response parser hook** for specialized payload handling.
-15. Preserve existing default behavior when none of the new options are used.
-16. Add automated test for array + date query serialization behavior.
-17. Add automated test for empty-string query omission behavior.
-18. Add automated test for expected status validation behavior.
-19. Add automated test for custom response parser behavior.
-20. Add automated test for retry callback invocation metadata.
-21. Add automated test for custom retryable status/method policy.
-22. Add automated test for disabling network retries.
+## Major Improvements (20)
+
+1. Added `baseUrl` override per request for multi-environment routing.
+2. Added `credentialsMode` override to control cookie behavior per call.
+3. Added `querySerializer` hook for backend-specific query encoding conventions.
+4. Added `trimStringQueryParams` for whitespace-safe query handling.
+5. Added `dedupeArrayQueryParams` for deterministic repeated query values.
+6. Added `skipDefaultAcceptHeader` for strict content-negotiation scenarios.
+7. Added `skipDefaultContentTypeHeader` for advanced body transport control.
+8. Added `onRequest` hook to mutate request metadata at runtime.
+9. Added `onResponse` hook for response side-effects/instrumentation.
+10. Added `suppressErrorToast` for silent programmatic failure handling.
+11. Added `timeoutMessage` override for contextual timeout UX messaging.
+12. Added `networkErrorMessage` override for contextual network UX messaging.
+13. Added `initialRetryDelayMs` request-level retry tuning.
+14. Added `maxRetryDelayMs` request-level retry cap tuning.
+15. Added `retryBackoffMultiplier` request-level backoff tuning.
+16. Added `retryJitterMs` request-level jitter tuning.
+17. Added numeric validation guards for retry/timeout tuning inputs.
+18. Improved retry log attempt denominator to honor effective retry limits.
+19. Added defensive `onResponse` invocation using clone fallback for mocked/custom responses.
+20. Expanded regression tests to verify all newly added extension points and safeguards.
 
 ## Completion Status
 
-All 22 items above are fully implemented in code and covered by automated tests.
+All 20 improvements above are implemented and validated in this run.
 
-## Validation Checklist
+## Verification Performed
 
-- Frontend unit tests pass with the new scenarios and existing suite.
-- Installed `openjdk-17-jdk` to satisfy backend Maven Java version constraints for full verification.
+- `vitest` targeted API suite run.
+- `svelte-check` static type and Svelte diagnostics verification.
