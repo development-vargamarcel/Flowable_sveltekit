@@ -32,14 +32,16 @@ function createRequestId(): string {
 
 function isRetryableRequest(
   method: string,
-  status?: number,
-  retryMode: 'auto' | 'never' | 'always' = 'auto'
+  status: number | undefined,
+  retryMode: 'auto' | 'never' | 'always' = 'auto',
+  retryableMethods: Set<string>,
+  retryableStatusCodes: Set<number>
 ): boolean {
   if (retryMode === 'never') return false;
-  if (retryMode === 'always') return status === undefined || RETRYABLE_STATUS_CODES.has(status);
+  if (retryMode === 'always') return status === undefined || retryableStatusCodes.has(status);
 
   const normalizedMethod = method.toUpperCase();
-  if (!RETRYABLE_METHODS.has(normalizedMethod)) {
+  if (!retryableMethods.has(normalizedMethod)) {
     return false;
   }
 
@@ -47,7 +49,7 @@ function isRetryableRequest(
     return true;
   }
 
-  return RETRYABLE_STATUS_CODES.has(status);
+  return retryableStatusCodes.has(status);
 }
 
 function parseRetryAfterMs(retryAfterValue: string | null): number | null {
@@ -312,16 +314,30 @@ function normalizeEndpoint(endpoint: string): string {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
+type QueryValue = string | number | boolean | Date | null | undefined;
+
 function appendQueryParams(
   url: string,
-  query?: Record<string, string | number | boolean | null | undefined>
+  query?: Record<string, QueryValue | QueryValue[]>,
+  includeEmptyStringQueryParams = true
 ): string {
   if (!query) return url;
 
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== null && value !== undefined) {
-      params.set(key, String(value));
+  const sortedEntries = Object.entries(query).sort(([a], [b]) => a.localeCompare(b));
+  for (const [key, rawValue] of sortedEntries) {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    for (const value of values) {
+      if (value === null || value === undefined) {
+        continue;
+      }
+
+      if (value === '' && !includeEmptyStringQueryParams) {
+        continue;
+      }
+
+      // Dates are normalized to ISO strings so client-side filtering remains deterministic.
+      params.append(key, value instanceof Date ? value.toISOString() : String(value));
     }
   }
 
@@ -364,8 +380,22 @@ export interface FetchOptions extends RequestInit {
    * preserving default behavior for existing callers (no timeout by default).
    */
   timeoutMs?: number;
-  query?: Record<string, string | number | boolean | null | undefined>;
+  query?: Record<string, QueryValue | QueryValue[]>;
+  /** Include query params with empty-string values (default true for backward compatibility). */
+  includeEmptyStringQueryParams?: boolean;
   maxRetries?: number;
+  retryableStatusCodes?: number[];
+  retryableMethods?: string[];
+  retryOnNetworkError?: boolean;
+  expectedStatus?: number | number[];
+  responseParser?: (response: Response) => Promise<unknown>;
+  onRetry?: (details: {
+    attempt: number;
+    maxAttempts: number;
+    delayMs: number;
+    status?: number;
+    reason: 'http' | 'network';
+  }) => void;
 }
 
 // Preserve the existing default JSON content type while avoiding overrides
@@ -437,7 +467,14 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     signal: callerSignal,
     retryMode = 'auto',
     query,
+    includeEmptyStringQueryParams = true,
     maxRetries,
+    retryableStatusCodes,
+    retryableMethods,
+    retryOnNetworkError = true,
+    expectedStatus,
+    responseParser,
+    onRetry,
     ...requestOptions
   } = options;
   const normalizedBody = normalizeRequestBody(
@@ -445,7 +482,15 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   );
   const normalizedOptions: RequestInit = { ...requestOptions, body: normalizedBody };
   const retryLimit = maxRetries ?? STARTUP_RETRY_CONFIG.maxRetries;
-  const url = appendQueryParams(`${API_BASE}${normalizeEndpoint(endpoint)}`, query);
+  const url = appendQueryParams(
+    `${API_BASE}${normalizeEndpoint(endpoint)}`,
+    query,
+    includeEmptyStringQueryParams
+  );
+  const retryableMethodSet = new Set(
+    (retryableMethods ?? Array.from(RETRYABLE_METHODS)).map((value) => value.toUpperCase())
+  );
+  const retryableStatusSet = new Set(retryableStatusCodes ?? Array.from(RETRYABLE_STATUS_CODES));
   const method = normalizeMethod(normalizedOptions.method);
   const requestBody = redactSensitiveValues(formatRequestBodyForLogs(normalizedBody));
   const requestHeaders = buildRequestHeaders(normalizedOptions);
@@ -497,7 +542,13 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
         if (
           isBackendStartingError(errorBody, response.status) ||
-          isRetryableRequest(method, response.status, retryMode)
+          isRetryableRequest(
+            method,
+            response.status,
+            retryMode,
+            retryableMethodSet,
+            retryableStatusSet
+          )
         ) {
           const delay = getRetryDelay(attempt, retryAfterMs);
           log.info(
@@ -512,6 +563,13 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
           // Update backend status store
           backendStatus.setStarting(attempt + 1, retryLimit + 1);
+          onRetry?.({
+            attempt: attempt + 1,
+            maxAttempts: retryLimit + 1,
+            delayMs: delay,
+            status: response.status,
+            reason: 'http'
+          });
 
           if (attempt < retryLimit) {
             await sleep(delay);
@@ -556,6 +614,18 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         );
       }
 
+      if (expectedStatus !== undefined) {
+        const expectedList = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
+        if (!expectedList.includes(response.status)) {
+          throw new ApiError(
+            'Unexpected response status',
+            response.status,
+            response.statusText,
+            `Expected status ${expectedList.join(', ')} but received ${response.status}.`
+          );
+        }
+      }
+
       // Success - mark backend as ready
       backendStatus.setReady();
 
@@ -565,7 +635,9 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         return {} as T;
       }
 
-      const data = await parseResponsePayload<T>(response, method, url, options.responseType);
+      const data = responseParser
+        ? await responseParser(response)
+        : await parseResponsePayload<T>(response, method, url, options.responseType);
       log.debug(`${method} ${url} success`, { data });
       return data;
     } catch (error) {
@@ -595,7 +667,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       if (
         error instanceof TypeError &&
         attempt < retryLimit &&
-        isRetryableRequest(method, undefined, retryMode)
+        retryOnNetworkError &&
+        isRetryableRequest(method, undefined, retryMode, retryableMethodSet, retryableStatusSet)
       ) {
         const delay = getRetryDelay(attempt);
         log.info(
@@ -609,6 +682,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           }
         );
         backendStatus.setStarting(attempt + 1, retryLimit + 1);
+        onRetry?.({
+          attempt: attempt + 1,
+          maxAttempts: retryLimit + 1,
+          delayMs: delay,
+          reason: 'network'
+        });
         await sleep(delay);
         continue;
       }
