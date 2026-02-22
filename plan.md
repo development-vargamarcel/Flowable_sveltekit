@@ -1,41 +1,32 @@
-# Comprehensive Enhancement Plan
+# Comprehensive Enhancement Plan and Implementation Record
 
-This execution defines and fully implements a broad API reliability/ergonomics upgrade focused on `fetchApi` and its regression suite.
-
-## Scope and Delivery Standard
-
-- Every planned item is implemented in code.
-- Every implemented item is validated by automated tests and/or static checks.
-- Additional comments were added where behavior is non-obvious to aid maintainability.
+This plan is fully implemented in this iteration and focuses on strengthening API client correctness, resilience, diagnostics, and verification depth.
 
 ## Major Improvements (20)
 
-1. Added `baseUrl` override per request for multi-environment routing.
-2. Added `credentialsMode` override to control cookie behavior per call.
-3. Added `querySerializer` hook for backend-specific query encoding conventions.
-4. Added `trimStringQueryParams` for whitespace-safe query handling.
-5. Added `dedupeArrayQueryParams` for deterministic repeated query values.
-6. Added `skipDefaultAcceptHeader` for strict content-negotiation scenarios.
-7. Added `skipDefaultContentTypeHeader` for advanced body transport control.
-8. Added `onRequest` hook to mutate request metadata at runtime.
-9. Added `onResponse` hook for response side-effects/instrumentation.
-10. Added `suppressErrorToast` for silent programmatic failure handling.
-11. Added `timeoutMessage` override for contextual timeout UX messaging.
-12. Added `networkErrorMessage` override for contextual network UX messaging.
-13. Added `initialRetryDelayMs` request-level retry tuning.
-14. Added `maxRetryDelayMs` request-level retry cap tuning.
-15. Added `retryBackoffMultiplier` request-level backoff tuning.
-16. Added `retryJitterMs` request-level jitter tuning.
-17. Added numeric validation guards for retry/timeout tuning inputs.
-18. Improved retry log attempt denominator to honor effective retry limits.
-19. Added defensive `onResponse` invocation using clone fallback for mocked/custom responses.
-20. Expanded regression tests to verify all newly added extension points and safeguards.
+1. Added case-insensitive sensitive-key redaction logic for request logging.
+2. Expanded sensitive redaction coverage to include authorization/apiKey credential fields.
+3. Added query-key trimming so accidental whitespace keys do not leak into URLs.
+4. Added blank-query-key skipping behavior for malformed caller input.
+5. Added non-finite numeric query filtering to avoid `NaN`/`Infinity` query pollution.
+6. Added base URL sanitization to remove trailing slashes and prevent double-slash endpoints.
+7. Added normalization for custom query serializers that return prefixed `?` values.
+8. Added `onError` request hook for centralized error telemetry/instrumentation.
+9. Wired `onError` callback execution for `ApiError` failures thrown from request lifecycle.
+10. Wired `onError` callback execution for timeout abort failures.
+11. Wired `onError` callback execution for caller-aborted request failures.
+12. Wired `onError` callback execution for network transport failures.
+13. Wired `onError` callback execution for unknown/unexpected runtime failures.
+14. Added `maxResponseBytes` option to cap accepted response payload sizes.
+15. Added validation guard for `maxResponseBytes` numeric configuration.
+16. Added validation guard for `expectedStatus` codes (must be valid HTTP status values).
+17. Added regression test coverage for query sanitization and non-finite filtering.
+18. Added regression test coverage for base URL slash sanitization.
+19. Added regression test coverage for serializer-prefix normalization and redaction behavior.
+20. Added regression test coverage for `onError`, invalid expected status, and oversized responses.
 
-## Completion Status
+## Implementation Verification
 
-All 20 improvements above are implemented and validated in this run.
-
-## Verification Performed
-
-- `vitest` targeted API suite run.
-- `svelte-check` static type and Svelte diagnostics verification.
+- Updated production code in the API core module.
+- Expanded API test suite with targeted regression scenarios for all newly added behavior.
+- Re-ran frontend API tests to verify implementation correctness.

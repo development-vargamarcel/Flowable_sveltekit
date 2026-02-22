@@ -20,7 +20,15 @@ const STARTUP_RETRY_CONFIG = {
 
 const RETRYABLE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
-const SENSITIVE_LOG_KEYS = new Set(['password', 'token', 'accessToken', 'refreshToken', 'secret']);
+const SENSITIVE_LOG_KEYS = new Set([
+  'password',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'secret',
+  'authorization',
+  'apikey'
+]);
 const DEFAULT_JSON_ACCEPT = 'application/json';
 
 type QueryValue = string | number | boolean | Date | null | undefined;
@@ -333,11 +341,18 @@ function appendQueryParams(
 
   const params = new URLSearchParams();
   const sortedEntries = Object.entries(query).sort(([a], [b]) => a.localeCompare(b));
-  for (const [key, rawValue] of sortedEntries) {
+  for (const [rawKey, rawValue] of sortedEntries) {
+    const key = rawKey.trim();
+    if (!key) continue;
+
     const values = Array.isArray(rawValue) ? rawValue : [rawValue];
     const normalizedValues = dedupeArrayQueryParams ? Array.from(new Set(values)) : values;
     for (const value of normalizedValues) {
       if (value === null || value === undefined) {
+        continue;
+      }
+
+      if (typeof value === 'number' && !Number.isFinite(value)) {
         continue;
       }
 
@@ -372,7 +387,8 @@ function redactSensitiveValues(value: unknown): unknown {
 
   return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>(
     (acc, [key, nestedValue]) => {
-      if (SENSITIVE_LOG_KEYS.has(key)) {
+      const normalizedKey = key.toLowerCase();
+      if (SENSITIVE_LOG_KEYS.has(normalizedKey)) {
         acc[key] = '[REDACTED]';
       } else {
         acc[key] = redactSensitiveValues(nestedValue);
@@ -431,6 +447,8 @@ export interface FetchOptions extends RequestInit {
     status?: number;
     reason: 'http' | 'network';
   }) => void;
+  onError?: (error: ApiError) => void | Promise<void>;
+  maxResponseBytes?: number;
 }
 
 // Preserve the existing default JSON content type while avoiding overrides
@@ -485,6 +503,10 @@ function validateNumericOption(name: string, value: number | undefined, min = 0)
       `${name} must be >= ${min}.`
     );
   }
+}
+
+function sanitizeBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, '');
 }
 
 function normalizeRequestBody(
@@ -546,6 +568,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     skipDefaultAcceptHeader = false,
     skipDefaultContentTypeHeader = false,
     onRetry,
+    onError,
+    maxResponseBytes,
     ...requestOptions
   } = options;
   validateNumericOption('maxRetries', maxRetries, 0);
@@ -554,6 +578,23 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   validateNumericOption('maxRetryDelayMs', maxRetryDelayMs, 0);
   validateNumericOption('retryBackoffMultiplier', retryBackoffMultiplier, 1);
   validateNumericOption('retryJitterMs', retryJitterMs, 0);
+  validateNumericOption('maxResponseBytes', maxResponseBytes, 1);
+
+  if (expectedStatus !== undefined) {
+    const expectedStatuses = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
+    const hasInvalidExpectedStatus = expectedStatuses.some(
+      (status) => !Number.isInteger(status) || status < 100 || status > 599
+    );
+
+    if (hasInvalidExpectedStatus) {
+      throw new ApiError(
+        'Invalid request configuration',
+        0,
+        'Client Error',
+        'expectedStatus must contain valid HTTP status codes.'
+      );
+    }
+  }
 
   const normalizedBody = normalizeRequestBody(
     requestOptions.body as BodyInit | Record<string, unknown> | null | undefined
@@ -561,11 +602,16 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   const normalizedOptions: RequestInit = { ...requestOptions, body: normalizedBody };
   const retryLimit = maxRetries ?? STARTUP_RETRY_CONFIG.maxRetries;
   const normalizedEndpoint = normalizeEndpoint(endpoint);
-  const baseApiUrl = baseUrl ?? API_BASE;
+  const baseApiUrl = baseUrl ? sanitizeBaseUrl(baseUrl) : API_BASE;
   const baseRequestUrl = `${baseApiUrl}${normalizedEndpoint}`;
   const url =
     query && querySerializer
-      ? `${baseRequestUrl}${baseRequestUrl.includes('?') ? '&' : '?'}${querySerializer(query)}`
+      ? (() => {
+          const serializedQuery = querySerializer(query).trim().replace(/^\?+/, '');
+          return serializedQuery
+            ? `${baseRequestUrl}${baseRequestUrl.includes('?') ? '&' : '?'}${serializedQuery}`
+            : baseRequestUrl;
+        })()
       : appendQueryParams(
           baseRequestUrl,
           query,
@@ -713,13 +759,14 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           });
         }
 
-        throw parseErrorResponse(
+        const parsedError = parseErrorResponse(
           response.status,
           response.statusText,
           errorBody,
           rawText,
           response.headers.get('x-request-id') ?? requestId
         );
+        throw parsedError;
       }
 
       if (expectedStatus !== undefined) {
@@ -748,11 +795,26 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           ? await responseParser(response)
           : await parseResponsePayload<T>(response, method, url, options.responseType)
       ) as T;
+
+      if (typeof maxResponseBytes === 'number') {
+        const serializedLength = JSON.stringify(data).length;
+        if (serializedLength > maxResponseBytes) {
+          const payloadTooLargeError = new ApiError(
+            'Response payload too large',
+            0,
+            'Client Error',
+            `Response exceeded configured maxResponseBytes (${maxResponseBytes}).`
+          );
+          throw payloadTooLargeError;
+        }
+      }
+
       log.debug(`${method} ${url} success`, { data });
       return data;
     } catch (error) {
       // Re-throw ApiErrors as-is (they're already processed)
       if (error instanceof ApiError) {
+        await onError?.(error);
         throw error;
       }
 
@@ -767,11 +829,20 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             toast.error('Request Timed Out', { description: message });
           }
 
-          throw new ApiError('Request timeout', 408, 'Request Timeout', message);
+          const timeoutError = new ApiError('Request timeout', 408, 'Request Timeout', message);
+          await onError?.(timeoutError);
+          throw timeoutError;
         }
 
         log.info('Request aborted by caller', { url, method, attempt, requestId });
-        throw new ApiError('Request cancelled', 0, 'Aborted', 'The request was cancelled.');
+        const cancelledError = new ApiError(
+          'Request cancelled',
+          0,
+          'Aborted',
+          'The request was cancelled.'
+        );
+        await onError?.(cancelledError);
+        throw cancelledError;
       }
 
       // For network errors during startup, retry
@@ -828,7 +899,9 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           toast.error('Connection Failed', { description: message });
         }
 
-        throw new ApiError('Connection failed', 0, 'Network Error', message);
+        const connectionError = new ApiError('Connection failed', 0, 'Network Error', message);
+        await onError?.(connectionError);
+        throw connectionError;
       }
 
       // Handle other errors
@@ -839,12 +912,14 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         toast.error('Unexpected Error', { description: errorMessage });
       }
 
-      throw new ApiError(
+      const unknownError = new ApiError(
         'Request failed',
         0,
         'Unknown Error',
         `An unexpected error occurred: ${errorMessage}`
       );
+      await onError?.(unknownError);
+      throw unknownError;
     } finally {
       signalController.cleanup();
     }
