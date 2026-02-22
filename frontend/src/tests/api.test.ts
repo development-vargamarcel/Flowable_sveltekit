@@ -946,4 +946,123 @@ describe('fetchApi', () => {
       expect.objectContaining({ method: 'GET' })
     );
   });
+
+  it('trims blank query keys and skips non-finite numeric query values', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/query-sanitize', {
+      query: { '  ': 'skip-me', valid: 1, bad: Number.NaN }
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/query-sanitize?valid=1'),
+      expect.any(Object)
+    );
+  });
+
+  it('handles baseUrl values with trailing slash without double-slash URLs', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/base-url-trim', { baseUrl: 'https://example.test///' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://example.test/api/base-url-trim'),
+      expect.any(Object)
+    );
+  });
+
+  it('normalizes custom query serializer output that starts with a question mark', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/custom-query-prefix', {
+      query: { page: 1 },
+      querySerializer: () => '?page=1'
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/custom-query-prefix?page=1'),
+      expect.any(Object)
+    );
+  });
+
+  it('redacts authorization-like keys regardless of case in logged request body', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/sensitive', {
+      method: 'POST',
+      body: {
+        Authorization: 'secret-token',
+        nested: { apiKey: 'abc123' }
+      } as unknown as BodyInit
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringContaining('POST'),
+      expect.objectContaining({
+        body: {
+          Authorization: '[REDACTED]',
+          nested: { apiKey: '[REDACTED]' }
+        }
+      })
+    );
+  });
+
+  it('runs onError hook when server response fails', async () => {
+    const onError = vi.fn();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Server Error',
+      text: () => Promise.resolve('{"message":"boom"}'),
+      headers: new Headers({ 'content-length': '18' })
+    });
+
+    await expect(fetchApi('/api/on-error', { onError })).rejects.toBeInstanceOf(ApiError);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0][0]).toBeInstanceOf(ApiError);
+  });
+
+  it('rejects invalid expectedStatus configuration', async () => {
+    await expect(fetchApi('/api/invalid-status', { expectedStatus: 99 })).rejects.toMatchObject({
+      message: 'Invalid request configuration'
+    });
+  });
+
+  it('rejects oversized responses using maxResponseBytes', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"value":"1234567890"}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '20', 'content-type': 'application/json' })
+    });
+
+    await expect(fetchApi('/api/oversized', { maxResponseBytes: 5 })).rejects.toMatchObject({
+      message: 'Response payload too large'
+    });
+  });
 });
