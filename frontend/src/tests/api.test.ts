@@ -1052,6 +1052,124 @@ describe('fetchApi', () => {
     });
   });
 
+  it('redacts sensitive query values from log messages while preserving actual request URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/log-query', {
+      query: { token: 'abc123', page: 1 }
+    });
+
+    const [loggedMessage] = logger.debug.mock.calls[0];
+    expect(loggedMessage).toContain('token=%5BREDACTED%5D');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/log-query?page=1&token=abc123'),
+      expect.any(Object)
+    );
+  });
+
+  it('rejects non-string values returned by querySerializer', async () => {
+    await expect(
+      fetchApi('/api/query-serializer-invalid', {
+        query: { page: 1 },
+        querySerializer: () => 123 as unknown as string
+      })
+    ).rejects.toMatchObject({
+      message: 'Invalid request configuration',
+      details: 'querySerializer must return a string.'
+    });
+  });
+
+  it('rejects invalid retryable status code configuration', async () => {
+    await expect(
+      fetchApi('/api/invalid-retry-status', {
+        retryableStatusCodes: [700],
+        maxRetries: 1
+      })
+    ).rejects.toMatchObject({
+      message: 'Invalid request configuration',
+      details: 'retryableStatusCodes must contain valid HTTP status codes.'
+    });
+  });
+
+  it('rejects invalid retryable method names', async () => {
+    await expect(
+      fetchApi('/api/invalid-retry-method', {
+        retryableMethods: ['G3T']
+      })
+    ).rejects.toMatchObject({
+      message: 'Invalid request configuration',
+      details: 'retryableMethods must only include valid HTTP method names.'
+    });
+  });
+
+  it('evaluates maxResponseBytes using byte size instead of string length', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"value":"🙂"}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '16', 'content-type': 'application/json' })
+    });
+
+    await expect(fetchApi('/api/max-bytes', { maxResponseBytes: 12 })).rejects.toMatchObject({
+      message: 'Response payload too large'
+    });
+  });
+
+  it('fails early when content-length exceeds maxResponseBytes', async () => {
+    const responseParser = vi.fn();
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '999', 'content-type': 'application/json' })
+    });
+
+    await expect(
+      fetchApi('/api/max-bytes-header', { maxResponseBytes: 10, responseParser })
+    ).rejects.toMatchObject({
+      message: 'Response payload too large'
+    });
+    expect(responseParser).not.toHaveBeenCalled();
+  });
+
+  it('redacts accessToken values in nested request bodies', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11' })
+    });
+
+    await fetchApi('/api/nested-sensitive', {
+      method: 'POST',
+      body: {
+        profile: {
+          accessToken: 'raw-token'
+        }
+      } as unknown as BodyInit
+    });
+
+    expect(logger.debug).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('POST'),
+      expect.objectContaining({
+        body: {
+          profile: {
+            accessToken: '[REDACTED]'
+          }
+        }
+      })
+    );
+  });
   it('rejects oversized responses using maxResponseBytes', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
