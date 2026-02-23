@@ -1183,4 +1183,96 @@ describe('fetchApi', () => {
       message: 'Response payload too large'
     });
   });
+
+  it('supports redacting custom sensitive keys in logs', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true,"sessionId":"hidden"}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '33', 'content-type': 'application/json' })
+    });
+
+    await fetchApi('/api/custom-redaction?sessionId=abc123', {
+      method: 'POST',
+      body: { sessionId: 'abc123' } as unknown as BodyInit,
+      additionalSensitiveLogKeys: ['sessionId']
+    });
+
+    expect(logger.debug).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('sessionId=%5BREDACTED%5D'),
+      expect.objectContaining({
+        body: { sessionId: '[REDACTED]' }
+      })
+    );
+    expect(logger.debug).toHaveBeenLastCalledWith(
+      expect.stringContaining('success'),
+      expect.objectContaining({ data: { ok: true, sessionId: '[REDACTED]' } })
+    );
+  });
+
+  it('redacts custom sensitive keys in error response logs', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Server Error',
+      text: () => Promise.resolve('{"error":"boom","secretThing":"do-not-log"}'),
+      headers: new Headers({ 'content-length': '43', 'content-type': 'application/json' })
+    });
+
+    await expect(
+      fetchApi('/api/custom-redaction-error', {
+        additionalSensitiveLogKeys: ['secretThing']
+      })
+    ).rejects.toBeInstanceOf(ApiError);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('failed'),
+      undefined,
+      expect.objectContaining({
+        errorBody: expect.objectContaining({ secretThing: '[REDACTED]' })
+      })
+    );
+  });
+
+  it('rejects invalid retryMode values at runtime', async () => {
+    await expect(
+      fetchApi('/api/invalid-retry-mode', { retryMode: 'sometimes' as never })
+    ).rejects.toMatchObject({
+      details: 'retryMode must be one of: auto, never, always.'
+    });
+  });
+
+  it('rejects invalid responseType values at runtime', async () => {
+    await expect(
+      fetchApi('/api/invalid-response-type', { responseType: 'xml' as never })
+    ).rejects.toMatchObject({
+      details: 'responseType must be one of: json, blob, text, arrayBuffer.'
+    });
+  });
+
+  it('rejects invalid credentialsMode values at runtime', async () => {
+    await expect(
+      fetchApi('/api/invalid-credentials', { credentialsMode: 'invalid' as never })
+    ).rejects.toMatchObject({
+      details: 'credentialsMode must be one of: omit, same-origin, include.'
+    });
+  });
+
+  it('rejects non-function callback options', async () => {
+    await expect(
+      fetchApi('/api/invalid-on-error', { onError: 'not-a-function' as never })
+    ).rejects.toMatchObject({
+      details: 'onError must be a function.'
+    });
+  });
+
+  it('rejects blank custom sensitive log keys', async () => {
+    await expect(
+      fetchApi('/api/invalid-redaction-keys', { additionalSensitiveLogKeys: [''] })
+    ).rejects.toMatchObject({
+      details: 'additionalSensitiveLogKeys must only include non-empty strings.'
+    });
+  });
 });
