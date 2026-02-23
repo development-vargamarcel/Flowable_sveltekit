@@ -1,32 +1,35 @@
-# Comprehensive Enhancement Plan and Implementation Record
+# API Reliability Hardening Plan (Implemented)
 
-This plan is fully implemented in this iteration and focuses on strengthening API client correctness, resilience, diagnostics, and verification depth.
+This document defines and records a full implementation pass focused on strengthening the shared frontend API client (`frontend/src/lib/api/core.ts`) and its automated verification (`frontend/src/tests/api.test.ts`).
+
+All items below were implemented and validated with tests.
 
 ## Major Improvements (20)
 
-1. Added case-insensitive sensitive-key redaction logic for request logging.
-2. Expanded sensitive redaction coverage to include authorization/apiKey credential fields.
-3. Added query-key trimming so accidental whitespace keys do not leak into URLs.
-4. Added blank-query-key skipping behavior for malformed caller input.
-5. Added non-finite numeric query filtering to avoid `NaN`/`Infinity` query pollution.
-6. Added base URL sanitization to remove trailing slashes and prevent double-slash endpoints.
-7. Added normalization for custom query serializers that return prefixed `?` values.
-8. Added `onError` request hook for centralized error telemetry/instrumentation.
-9. Wired `onError` callback execution for `ApiError` failures thrown from request lifecycle.
-10. Wired `onError` callback execution for timeout abort failures.
-11. Wired `onError` callback execution for caller-aborted request failures.
-12. Wired `onError` callback execution for network transport failures.
-13. Wired `onError` callback execution for unknown/unexpected runtime failures.
-14. Added `maxResponseBytes` option to cap accepted response payload sizes.
-15. Added validation guard for `maxResponseBytes` numeric configuration.
-16. Added validation guard for `expectedStatus` codes (must be valid HTTP status values).
-17. Added regression test coverage for query sanitization and non-finite filtering.
-18. Added regression test coverage for base URL slash sanitization.
-19. Added regression test coverage for serializer-prefix normalization and redaction behavior.
-20. Added regression test coverage for `onError`, invalid expected status, and oversized responses.
+1. Standardized sensitive-key matching to lowercase forms so redaction logic is deterministic.
+2. Expanded sensitive key coverage with additional common credential keys (`api_key`, `client_secret`, etc.).
+3. Added URL query-value redaction for logs so sensitive query parameters are never logged in plaintext.
+4. Preserved real request URLs while only sanitizing log output (no runtime behavior regressions).
+5. Added strict `retryableMethods` validation so invalid method tokens fail fast.
+6. Added strict `retryableStatusCodes` validation for valid HTTP status ranges.
+7. Refactored expected status validation to reusable HTTP status helper validation.
+8. Added `querySerializer` return-type validation to prevent runtime crashes from invalid serializer output.
+9. Normalized retryable method inputs with trim+uppercase to tolerate accidental whitespace.
+10. Introduced byte-accurate payload size measurement for `maxResponseBytes` checks.
+11. Added pre-parse `content-length` enforcement to fail early on oversized successful responses.
+12. Preserved post-parse payload size guard as a second line of defense.
+13. Sanitized failure log messages to prevent sensitive query leakage in retry and error logging paths.
+14. Sanitized success log messages to align with new secure logging behavior.
+15. Sanitized timeout/cancellation/network/unexpected error log contexts for consistency.
+16. Added regression tests proving sensitive query parameters are redacted in logs.
+17. Added regression tests for invalid `querySerializer` return values.
+18. Added regression tests for invalid retryable status/method configuration.
+19. Added regression tests validating byte-oriented `maxResponseBytes` enforcement.
+20. Added regression tests for nested `accessToken` redaction and early `content-length` rejection behavior.
 
-## Implementation Verification
+## Verification Strategy
 
-- Updated production code in the API core module.
-- Expanded API test suite with targeted regression scenarios for all newly added behavior.
-- Re-ran frontend API tests to verify implementation correctness.
+- Run targeted frontend API test suite (`src/tests/api.test.ts`) to verify new functionality.
+- Run full frontend test suite to ensure no regressions outside the API module.
+- Run frontend static checks (`check`) for type safety.
+- Re-run backend Maven tests to ensure no backend regressions in the monorepo.

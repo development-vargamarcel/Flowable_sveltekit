@@ -23,16 +23,21 @@ const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 const SENSITIVE_LOG_KEYS = new Set([
   'password',
   'token',
-  'accessToken',
-  'refreshToken',
+  'accesstoken',
+  'refreshtoken',
   'secret',
   'authorization',
-  'apikey'
+  'apikey',
+  'api_key',
+  'clientsecret',
+  'client_secret'
 ]);
 const DEFAULT_JSON_ACCEPT = 'application/json';
 
 type QueryValue = string | number | boolean | Date | null | undefined;
 type QueryInput = Record<string, QueryValue | QueryValue[]>;
+
+const HTTP_METHOD_PATTERN = /^[A-Za-z]+$/;
 
 function createRequestId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -376,6 +381,34 @@ function appendQueryParams(
   return `${url}${url.includes('?') ? '&' : '?'}${suffix}`;
 }
 
+function sanitizeUrlForLogs(url: string): string {
+  const [base, queryString] = url.split('?', 2);
+  if (!queryString) return base;
+
+  const params = new URLSearchParams(queryString);
+  const sanitized = new URLSearchParams();
+  params.forEach((value, key) => {
+    const normalizedKey = key.trim().toLowerCase();
+    sanitized.append(key, SENSITIVE_LOG_KEYS.has(normalizedKey) ? '[REDACTED]' : value);
+  });
+
+  const output = sanitized.toString();
+  return output ? `${base}?${output}` : base;
+}
+
+function getPayloadSizeBytes(payload: unknown): number {
+  if (typeof payload === 'string') {
+    return new TextEncoder().encode(payload).length;
+  }
+
+  try {
+    return new TextEncoder().encode(JSON.stringify(payload)).length;
+  } catch {
+    // Non-serializable objects should not crash response validation.
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
 function redactSensitiveValues(value: unknown): unknown {
   if (!value || typeof value !== 'object') {
     return value;
@@ -505,6 +538,32 @@ function validateNumericOption(name: string, value: number | undefined, min = 0)
   }
 }
 
+function validateHttpStatusCode(name: string, status: number): void {
+  if (!Number.isInteger(status) || status < 100 || status > 599) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      `${name} must contain valid HTTP status codes.`
+    );
+  }
+}
+
+function validateRetryableMethods(methods?: string[]): void {
+  if (!methods) return;
+
+  for (const method of methods) {
+    if (!method || !HTTP_METHOD_PATTERN.test(method.trim())) {
+      throw new ApiError(
+        'Invalid request configuration',
+        0,
+        'Client Error',
+        'retryableMethods must only include valid HTTP method names.'
+      );
+    }
+  }
+}
+
 function sanitizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '');
 }
@@ -579,20 +638,18 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   validateNumericOption('retryBackoffMultiplier', retryBackoffMultiplier, 1);
   validateNumericOption('retryJitterMs', retryJitterMs, 0);
   validateNumericOption('maxResponseBytes', maxResponseBytes, 1);
+  validateRetryableMethods(retryableMethods);
 
   if (expectedStatus !== undefined) {
     const expectedStatuses = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
-    const hasInvalidExpectedStatus = expectedStatuses.some(
-      (status) => !Number.isInteger(status) || status < 100 || status > 599
-    );
+    for (const status of expectedStatuses) {
+      validateHttpStatusCode('expectedStatus', status);
+    }
+  }
 
-    if (hasInvalidExpectedStatus) {
-      throw new ApiError(
-        'Invalid request configuration',
-        0,
-        'Client Error',
-        'expectedStatus must contain valid HTTP status codes.'
-      );
+  if (retryableStatusCodes) {
+    for (const status of retryableStatusCodes) {
+      validateHttpStatusCode('retryableStatusCodes', status);
     }
   }
 
@@ -607,7 +664,17 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   const url =
     query && querySerializer
       ? (() => {
-          const serializedQuery = querySerializer(query).trim().replace(/^\?+/, '');
+          const serializedResult = querySerializer(query);
+          if (typeof serializedResult !== 'string') {
+            throw new ApiError(
+              'Invalid request configuration',
+              0,
+              'Client Error',
+              'querySerializer must return a string.'
+            );
+          }
+
+          const serializedQuery = serializedResult.trim().replace(/^\?+/, '');
           return serializedQuery
             ? `${baseRequestUrl}${baseRequestUrl.includes('?') ? '&' : '?'}${serializedQuery}`
             : baseRequestUrl;
@@ -620,10 +687,11 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           dedupeArrayQueryParams
         );
   const retryableMethodSet = new Set(
-    (retryableMethods ?? Array.from(RETRYABLE_METHODS)).map((value) => value.toUpperCase())
+    (retryableMethods ?? Array.from(RETRYABLE_METHODS)).map((value) => value.trim().toUpperCase())
   );
   const retryableStatusSet = new Set(retryableStatusCodes ?? Array.from(RETRYABLE_STATUS_CODES));
   const method = normalizeMethod(normalizedOptions.method);
+  const sanitizedUrl = sanitizeUrlForLogs(url);
   const requestBody = redactSensitiveValues(formatRequestBodyForLogs(normalizedBody));
   const requestHeaders = buildRequestHeaders(
     normalizedOptions,
@@ -639,7 +707,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   if (timeoutMs && timeoutMs > 0) {
     logContext.timeoutMs = timeoutMs;
   }
-  log.debug(`${method} ${url}`, logContext);
+  log.debug(`${method} ${sanitizedUrl}`, logContext);
 
   for (let attempt = 0; attempt <= retryLimit; attempt++) {
     const signalController = createRequestSignal(timeoutMs, callerSignal);
@@ -708,7 +776,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           log.info(
             `Backend is starting, retrying in ${delay}ms (attempt ${attempt + 1}/${retryLimit + 1})`,
             {
-              url,
+              url: sanitizedUrl,
               method,
               attempt,
               requestId
@@ -730,7 +798,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             continue; // Retry the request
           }
           log.warn('Backend startup retries exhausted', {
-            url,
+            url: sanitizedUrl,
             method,
             attempts: retryLimit + 1,
             requestId
@@ -738,7 +806,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           // Max retries reached, fall through to throw error
         }
 
-        log.error(`${method} ${url} failed`, undefined, {
+        log.error(`${method} ${sanitizedUrl} failed`, undefined, {
           status: response.status,
           statusText: response.statusText,
           errorBody,
@@ -769,6 +837,18 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         throw parsedError;
       }
 
+      if (typeof maxResponseBytes === 'number') {
+        const contentLength = Number(response.headers.get('content-length'));
+        if (Number.isFinite(contentLength) && contentLength > maxResponseBytes) {
+          throw new ApiError(
+            'Response payload too large',
+            0,
+            'Client Error',
+            `Response exceeded configured maxResponseBytes (${maxResponseBytes}).`
+          );
+        }
+      }
+
       if (expectedStatus !== undefined) {
         const expectedList = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
         if (!expectedList.includes(response.status)) {
@@ -793,11 +873,11 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       const data = (
         responseParser
           ? await responseParser(response)
-          : await parseResponsePayload<T>(response, method, url, options.responseType)
+          : await parseResponsePayload<T>(response, method, sanitizedUrl, options.responseType)
       ) as T;
 
       if (typeof maxResponseBytes === 'number') {
-        const serializedLength = JSON.stringify(data).length;
+        const serializedLength = getPayloadSizeBytes(data);
         if (serializedLength > maxResponseBytes) {
           const payloadTooLargeError = new ApiError(
             'Response payload too large',
@@ -809,7 +889,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         }
       }
 
-      log.debug(`${method} ${url} success`, { data });
+      log.debug(`${method} ${sanitizedUrl} success`, { data });
       return data;
     } catch (error) {
       // Re-throw ApiErrors as-is (they're already processed)
@@ -822,7 +902,13 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         if (signalController.wasTimedOut()) {
           const message =
             timeoutMessage ?? `The request to ${endpoint} timed out after ${timeoutMs}ms.`;
-          log.warn('Request timed out', { url, method, timeoutMs, attempt, requestId });
+          log.warn('Request timed out', {
+            url: sanitizedUrl,
+            method,
+            timeoutMs,
+            attempt,
+            requestId
+          });
           backendStatus.setError('Request timeout');
 
           if (browser && !suppressErrorToast) {
@@ -834,7 +920,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           throw timeoutError;
         }
 
-        log.info('Request aborted by caller', { url, method, attempt, requestId });
+        log.info('Request aborted by caller', { url: sanitizedUrl, method, attempt, requestId });
         const cancelledError = new ApiError(
           'Request cancelled',
           0,
@@ -864,7 +950,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         log.info(
           `Network error, backend may be starting. Retrying in ${delay}ms (attempt ${attempt + 1}/${retryLimit + 1})`,
           {
-            url,
+            url: sanitizedUrl,
             method,
             error: error.message,
             attempt,
@@ -886,7 +972,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       if (error instanceof TypeError) {
         const isConnectionRefused =
           error.message.includes('fetch') || error.message.includes('network');
-        log.error('Network error occurred', error, { url, method, requestId });
+        log.error('Network error occurred', error, { url: sanitizedUrl, method, requestId });
         backendStatus.setError('Connection failed');
 
         const message =
@@ -906,7 +992,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
       // Handle other errors
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      log.error('Unexpected error', error, { url, method, requestId });
+      log.error('Unexpected error', error, { url: sanitizedUrl, method, requestId });
 
       if (browser && !suppressErrorToast) {
         toast.error('Unexpected Error', { description: errorMessage });
