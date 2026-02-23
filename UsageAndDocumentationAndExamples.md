@@ -1,81 +1,106 @@
 # Usage, Documentation, and Examples
 
-## Scope of this update
+## Scope of this implementation pass
 
-This update hardens the shared API client at `frontend/src/lib/api/core.ts` with safer logging, stronger runtime configuration validation, and stricter response-size handling.
+This pass strengthens the frontend API client (`frontend/src/lib/api/core.ts`) with stricter runtime option validation and more secure, customizable log redaction behavior.
 
-## What changed
+## Implemented behavior updates
 
-### 1) Safer logging
+### 1) Runtime request-option validation (fail-fast)
 
-- Query parameters are now sanitized in logs using the same sensitive-key redaction rules used for request-body logging.
-- This prevents keys like `token`, `authorization`, `api_key`, `client_secret`, and nested credentials from appearing in plaintext log output.
-- Actual request URLs sent to `fetch` are unchanged; only log output is sanitized.
+`fetchApi` now validates dynamic runtime options before making a network call:
 
-### 2) Stronger configuration validation
+- `retryMode` must be one of: `auto | never | always`.
+- `responseType` must be one of: `json | blob | text | arrayBuffer`.
+- `credentialsMode` must be one of: `omit | same-origin | include`.
+- Hook/parser options must be functions when provided:
+  - `querySerializer`
+  - `responseParser`
+  - `onRequest`
+  - `onResponse`
+  - `onRetry`
+  - `onError`
 
-- `retryableMethods` now validates each value and rejects invalid method names.
-- `retryableStatusCodes` now validates each status code and rejects anything outside `100-599`.
-- `expectedStatus` uses the same shared HTTP-status validation.
-- `querySerializer` must return a string; non-string values now throw a structured `ApiError`.
+When invalid values are passed, `fetchApi` throws a structured `ApiError` with a clear configuration message.
 
-### 3) More accurate response-size protection
+### 2) Customizable sensitive log redaction
 
-- `maxResponseBytes` now performs:
-  1. **Early rejection** via `content-length` header when available.
-  2. **Byte-accurate post-parse enforcement** using UTF-8 byte length rather than JS string length.
-- This improves protection for non-ASCII data where character count differs from byte count.
+A new option was introduced:
+
+```ts
+additionalSensitiveLogKeys?: string[]
+```
+
+Behavior:
+
+- Keys are normalized (`trim + lowercase`) to keep matching deterministic.
+- Extra keys merge with built-in sensitive keys (e.g., `token`, `authorization`, `api_key`, etc.).
+- Redaction now applies consistently to:
+  - logged request URLs (query params)
+  - logged request payloads
+  - logged success payloads
+  - logged error payloads
+
+This allows endpoint-specific secret fields (for example `sessionId` or custom API credentials) to be hidden without editing global redaction defaults.
 
 ## Usage examples
 
 ### Basic request
 
 ```ts
-import { fetchApi } from "$lib/api/core";
+import { fetchApi } from '$lib/api/core';
 
-const tasks = await fetchApi("/api/tasks");
+const tasks = await fetchApi('/api/tasks');
 ```
 
-### Custom retry configuration (validated)
+### Custom per-request redaction keys
 
 ```ts
-await fetchApi("/api/jobs", {
-  retryableMethods: ["GET", "HEAD"],
-  retryableStatusCodes: [429, 503],
-  maxRetries: 2,
+await fetchApi('/api/workflow/run?sessionId=abc123', {
+  method: 'POST',
+  body: { sessionId: 'abc123', action: 'start' },
+  additionalSensitiveLogKeys: ['sessionId']
 });
 ```
 
-### Query serializer (must return string)
+### Validated runtime options
 
 ```ts
-await fetchApi("/api/search", {
-  query: { q: "invoice", page: 1 },
-  querySerializer: (query) => `q=${query.q}&page=${query.page}`,
+await fetchApi('/api/reports', {
+  retryMode: 'always',
+  responseType: 'json',
+  credentialsMode: 'include'
 });
 ```
 
-### Response-size protection
+### Hook option usage
 
 ```ts
-await fetchApi("/api/analytics/export", {
-  maxResponseBytes: 100_000,
+await fetchApi('/api/export', {
+  onRetry: ({ attempt, delayMs }) => {
+    console.info(`Retry #${attempt} in ${delayMs}ms`);
+  },
+  onError: (error) => {
+    console.error(error.getFullMessage());
+  }
 });
 ```
 
-## Testing steps
+## Testing steps used for this implementation
 
 From `frontend/`:
 
-1. `npm run test -- src/tests/api.test.ts`
-2. `npm run test`
-3. `npm run check`
+1. `npm install`
+2. `npm run test -- src/tests/api.test.ts`
+3. `npm run test`
+4. `npm run check`
+5. `npm run lint`
 
-From `backend/`:
+From `backend/` (using Java 17 for Maven enforcer compatibility):
 
-4. `./mvnw test`
+6. `JAVA_HOME=$(mise where java@17.0.2) PATH="$JAVA_HOME/bin:$PATH" ./mvnw test`
 
-## Notes for maintainers
+## Maintenance notes
 
-- If you add new sensitive auth keys used in query strings or JSON payloads, update the shared redaction key set in `core.ts`.
-- Keep validation fail-fast and descriptive so consuming UI code receives predictable `ApiError` messages.
+- Prefer `additionalSensitiveLogKeys` for endpoint-specific fields instead of expanding global defaults prematurely.
+- Keep `ApiError` configuration messages explicit; these messages are relied on by tests and make integration debugging faster.

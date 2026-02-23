@@ -1,35 +1,34 @@
-# API Reliability Hardening Plan (Implemented)
+# Comprehensive One-Day Improvement Plan (Implemented)
 
-This document defines and records a full implementation pass focused on strengthening the shared frontend API client (`frontend/src/lib/api/core.ts`) and its automated verification (`frontend/src/tests/api.test.ts`).
-
-All items below were implemented and validated with tests.
+This plan captures a focused, full-day engineering pass on the frontend API core to improve runtime safety, observability hygiene, and failure-mode resilience. Every item below was implemented and verified with automated tests.
 
 ## Major Improvements (20)
 
-1. Standardized sensitive-key matching to lowercase forms so redaction logic is deterministic.
-2. Expanded sensitive key coverage with additional common credential keys (`api_key`, `client_secret`, etc.).
-3. Added URL query-value redaction for logs so sensitive query parameters are never logged in plaintext.
-4. Preserved real request URLs while only sanitizing log output (no runtime behavior regressions).
-5. Added strict `retryableMethods` validation so invalid method tokens fail fast.
-6. Added strict `retryableStatusCodes` validation for valid HTTP status ranges.
-7. Refactored expected status validation to reusable HTTP status helper validation.
-8. Added `querySerializer` return-type validation to prevent runtime crashes from invalid serializer output.
-9. Normalized retryable method inputs with trim+uppercase to tolerate accidental whitespace.
-10. Introduced byte-accurate payload size measurement for `maxResponseBytes` checks.
-11. Added pre-parse `content-length` enforcement to fail early on oversized successful responses.
-12. Preserved post-parse payload size guard as a second line of defense.
-13. Sanitized failure log messages to prevent sensitive query leakage in retry and error logging paths.
-14. Sanitized success log messages to align with new secure logging behavior.
-15. Sanitized timeout/cancellation/network/unexpected error log contexts for consistency.
-16. Added regression tests proving sensitive query parameters are redacted in logs.
-17. Added regression tests for invalid `querySerializer` return values.
-18. Added regression tests for invalid retryable status/method configuration.
-19. Added regression tests validating byte-oriented `maxResponseBytes` enforcement.
-20. Added regression tests for nested `accessToken` redaction and early `content-length` rejection behavior.
+1. Added runtime validation for `retryMode` to guard against invalid dynamic inputs.
+2. Added runtime validation for `responseType` to reject unsupported parser modes.
+3. Added runtime validation for `credentialsMode` to enforce valid fetch credential semantics.
+4. Added runtime validation for callback hooks (`onRequest`, `onResponse`, `onRetry`, `onError`) to prevent misconfiguration crashes.
+5. Added runtime validation for parser hooks (`querySerializer`, `responseParser`) to fail fast on invalid option wiring.
+6. Added runtime validation for custom redaction key lists to require non-empty string entries.
+7. Introduced `additionalSensitiveLogKeys` request option for per-request secure logging customization.
+8. Implemented deterministic normalization of custom redaction keys (`trim + lowercase`) for predictable matching.
+9. Implemented URL log sanitization that supports custom sensitive key sets.
+10. Implemented request body log redaction that supports custom sensitive key sets.
+11. Implemented success payload log redaction that supports custom sensitive key sets.
+12. Implemented error payload log redaction that supports custom sensitive key sets.
+13. Added explicit in-code comments documenting custom redaction behavior and configuration intent.
+14. Expanded request configuration safety checks before network dispatch to avoid avoidable backend calls.
+15. Strengthened defensive programming around invalid runtime option values in mixed TS/JS consumer contexts.
+16. Added regression test coverage for custom sensitive key redaction in request URL + request body logs.
+17. Added regression test coverage for custom sensitive key redaction in success payload logs.
+18. Added regression test coverage for custom sensitive key redaction in error payload logs.
+19. Added regression tests covering invalid `retryMode`, `responseType`, and `credentialsMode` values.
+20. Added regression tests covering invalid callback and custom redaction-key option values.
 
-## Verification Strategy
+## Verification Checklist
 
-- Run targeted frontend API test suite (`src/tests/api.test.ts`) to verify new functionality.
-- Run full frontend test suite to ensure no regressions outside the API module.
-- Run frontend static checks (`check`) for type safety.
-- Re-run backend Maven tests to ensure no backend regressions in the monorepo.
+- Run frontend unit tests (`vitest`) including the expanded API suite.
+- Run frontend static validation (`svelte-check`).
+- Run frontend lint checks (`eslint`).
+- Run backend compile/test checks using JDK 17 compatibility path.
+- Review modified files to confirm all 20 items were implemented and no plan item was left partial.

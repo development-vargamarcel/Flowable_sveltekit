@@ -33,6 +33,9 @@ const SENSITIVE_LOG_KEYS = new Set([
   'client_secret'
 ]);
 const DEFAULT_JSON_ACCEPT = 'application/json';
+const VALID_RESPONSE_TYPES = new Set(['json', 'blob', 'text', 'arrayBuffer']);
+const VALID_RETRY_MODES = new Set(['auto', 'never', 'always']);
+const VALID_CREDENTIAL_MODES = new Set(['omit', 'same-origin', 'include']);
 
 type QueryValue = string | number | boolean | Date | null | undefined;
 type QueryInput = Record<string, QueryValue | QueryValue[]>;
@@ -381,21 +384,6 @@ function appendQueryParams(
   return `${url}${url.includes('?') ? '&' : '?'}${suffix}`;
 }
 
-function sanitizeUrlForLogs(url: string): string {
-  const [base, queryString] = url.split('?', 2);
-  if (!queryString) return base;
-
-  const params = new URLSearchParams(queryString);
-  const sanitized = new URLSearchParams();
-  params.forEach((value, key) => {
-    const normalizedKey = key.trim().toLowerCase();
-    sanitized.append(key, SENSITIVE_LOG_KEYS.has(normalizedKey) ? '[REDACTED]' : value);
-  });
-
-  const output = sanitized.toString();
-  return output ? `${base}?${output}` : base;
-}
-
 function getPayloadSizeBytes(payload: unknown): number {
   if (typeof payload === 'string') {
     return new TextEncoder().encode(payload).length;
@@ -407,29 +395,6 @@ function getPayloadSizeBytes(payload: unknown): number {
     // Non-serializable objects should not crash response validation.
     return Number.POSITIVE_INFINITY;
   }
-}
-
-function redactSensitiveValues(value: unknown): unknown {
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => redactSensitiveValues(item));
-  }
-
-  return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>(
-    (acc, [key, nestedValue]) => {
-      const normalizedKey = key.toLowerCase();
-      if (SENSITIVE_LOG_KEYS.has(normalizedKey)) {
-        acc[key] = '[REDACTED]';
-      } else {
-        acc[key] = redactSensitiveValues(nestedValue);
-      }
-      return acc;
-    },
-    {}
-  );
 }
 
 export interface FetchOptions extends RequestInit {
@@ -482,6 +447,11 @@ export interface FetchOptions extends RequestInit {
   }) => void;
   onError?: (error: ApiError) => void | Promise<void>;
   maxResponseBytes?: number;
+  /**
+   * Additional object keys that should be redacted in request/response logs.
+   * Keys are normalized with trim + lowercase to make matching deterministic.
+   */
+  additionalSensitiveLogKeys?: string[];
 }
 
 // Preserve the existing default JSON content type while avoiding overrides
@@ -564,6 +534,41 @@ function validateRetryableMethods(methods?: string[]): void {
   }
 }
 
+function validateStringArrayOption(name: string, values?: string[]): void {
+  if (!values) return;
+
+  for (const value of values) {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new ApiError(
+        'Invalid request configuration',
+        0,
+        'Client Error',
+        `${name} must only include non-empty strings.`
+      );
+    }
+  }
+}
+
+function validateFunctionOption(name: string, value: unknown): void {
+  if (value === undefined || typeof value === 'function') return;
+
+  throw new ApiError(
+    'Invalid request configuration',
+    0,
+    'Client Error',
+    `${name} must be a function.`
+  );
+}
+
+function createSensitiveLogKeySet(extraKeys?: string[]): Set<string> {
+  const merged = new Set(SENSITIVE_LOG_KEYS);
+  for (const extraKey of extraKeys ?? []) {
+    merged.add(extraKey.trim().toLowerCase());
+  }
+
+  return merged;
+}
+
 function sanitizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '');
 }
@@ -588,6 +593,44 @@ function normalizeRequestBody(
 
   // Serialize plain objects automatically so callers can pass typed payloads directly.
   return JSON.stringify(body);
+}
+
+function sanitizeUrlForLogsWithKeys(url: string, sensitiveLogKeys: Set<string>): string {
+  const [base, queryString] = url.split('?', 2);
+  if (!queryString) return base;
+
+  const params = new URLSearchParams(queryString);
+  const sanitized = new URLSearchParams();
+  params.forEach((value, key) => {
+    const normalizedKey = key.trim().toLowerCase();
+    sanitized.append(key, sensitiveLogKeys.has(normalizedKey) ? '[REDACTED]' : value);
+  });
+
+  const output = sanitized.toString();
+  return output ? `${base}?${output}` : base;
+}
+
+function redactSensitiveValuesWithKeys(value: unknown, sensitiveLogKeys: Set<string>): unknown {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitiveValuesWithKeys(item, sensitiveLogKeys));
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>(
+    (acc, [key, nestedValue]) => {
+      const normalizedKey = key.toLowerCase();
+      if (sensitiveLogKeys.has(normalizedKey)) {
+        acc[key] = '[REDACTED]';
+      } else {
+        acc[key] = redactSensitiveValuesWithKeys(nestedValue, sensitiveLogKeys);
+      }
+      return acc;
+    },
+    {}
+  );
 }
 
 /**
@@ -629,6 +672,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     onRetry,
     onError,
     maxResponseBytes,
+    additionalSensitiveLogKeys,
     ...requestOptions
   } = options;
   validateNumericOption('maxRetries', maxRetries, 0);
@@ -639,6 +683,40 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   validateNumericOption('retryJitterMs', retryJitterMs, 0);
   validateNumericOption('maxResponseBytes', maxResponseBytes, 1);
   validateRetryableMethods(retryableMethods);
+  validateStringArrayOption('additionalSensitiveLogKeys', additionalSensitiveLogKeys);
+  validateFunctionOption('querySerializer', querySerializer);
+  validateFunctionOption('responseParser', responseParser);
+  validateFunctionOption('onRequest', onRequest);
+  validateFunctionOption('onResponse', onResponse);
+  validateFunctionOption('onRetry', onRetry);
+  validateFunctionOption('onError', onError);
+
+  if (!VALID_RETRY_MODES.has(retryMode)) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      'retryMode must be one of: auto, never, always.'
+    );
+  }
+
+  if (options.responseType && !VALID_RESPONSE_TYPES.has(options.responseType)) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      'responseType must be one of: json, blob, text, arrayBuffer.'
+    );
+  }
+
+  if (credentialsMode && !VALID_CREDENTIAL_MODES.has(credentialsMode)) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      'credentialsMode must be one of: omit, same-origin, include.'
+    );
+  }
 
   if (expectedStatus !== undefined) {
     const expectedStatuses = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
@@ -691,8 +769,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   );
   const retryableStatusSet = new Set(retryableStatusCodes ?? Array.from(RETRYABLE_STATUS_CODES));
   const method = normalizeMethod(normalizedOptions.method);
-  const sanitizedUrl = sanitizeUrlForLogs(url);
-  const requestBody = redactSensitiveValues(formatRequestBodyForLogs(normalizedBody));
+  const sensitiveLogKeys = createSensitiveLogKeySet(additionalSensitiveLogKeys);
+  const sanitizedUrl = sanitizeUrlForLogsWithKeys(url, sensitiveLogKeys);
+  const requestBody = redactSensitiveValuesWithKeys(
+    formatRequestBodyForLogs(normalizedBody),
+    sensitiveLogKeys
+  );
   const requestHeaders = buildRequestHeaders(
     normalizedOptions,
     skipDefaultAcceptHeader,
@@ -809,7 +891,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         log.error(`${method} ${sanitizedUrl} failed`, undefined, {
           status: response.status,
           statusText: response.statusText,
-          errorBody,
+          errorBody: redactSensitiveValuesWithKeys(errorBody, sensitiveLogKeys),
           rawText: rawText.substring(0, 500),
           requestId
         });
@@ -889,7 +971,9 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         }
       }
 
-      log.debug(`${method} ${sanitizedUrl} success`, { data });
+      log.debug(`${method} ${sanitizedUrl} success`, {
+        data: redactSensitiveValuesWithKeys(data, sensitiveLogKeys)
+      });
       return data;
     } catch (error) {
       // Re-throw ApiErrors as-is (they're already processed)
