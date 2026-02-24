@@ -343,20 +343,31 @@ function appendQueryParams(
   query?: QueryInput,
   includeEmptyStringQueryParams = true,
   trimStringQueryParams = false,
-  dedupeArrayQueryParams = false
+  dedupeArrayQueryParams = false,
+  includeNullQueryParams = false,
+  includeUndefinedQueryParams = false,
+  sortQueryParams = true,
+  trimQueryKeys = true
 ): string {
   if (!query) return url;
 
   const params = new URLSearchParams();
-  const sortedEntries = Object.entries(query).sort(([a], [b]) => a.localeCompare(b));
+  const rawEntries = Object.entries(query);
+  const sortedEntries = sortQueryParams
+    ? rawEntries.sort(([a], [b]) => a.localeCompare(b))
+    : rawEntries;
   for (const [rawKey, rawValue] of sortedEntries) {
-    const key = rawKey.trim();
+    const key = trimQueryKeys ? rawKey.trim() : rawKey;
     if (!key) continue;
 
     const values = Array.isArray(rawValue) ? rawValue : [rawValue];
     const normalizedValues = dedupeArrayQueryParams ? Array.from(new Set(values)) : values;
     for (const value of normalizedValues) {
-      if (value === null || value === undefined) {
+      if (value === null && !includeNullQueryParams) {
+        continue;
+      }
+
+      if (value === undefined && !includeUndefinedQueryParams) {
         continue;
       }
 
@@ -452,6 +463,16 @@ export interface FetchOptions extends RequestInit {
    * Keys are normalized with trim + lowercase to make matching deterministic.
    */
   additionalSensitiveLogKeys?: string[];
+  includeNullQueryParams?: boolean;
+  includeUndefinedQueryParams?: boolean;
+  sortQueryParams?: boolean;
+  trimQueryKeys?: boolean;
+  stripHashFromQuerySerializer?: boolean;
+  acceptedContentTypes?: string[];
+  requiredResponseHeaders?: string[];
+  requestIdHeaderName?: string;
+  maxLoggedResponsePreviewChars?: number;
+  maxLoggedErrorPreviewChars?: number;
 }
 
 // Preserve the existing default JSON content type while avoiding overrides
@@ -560,6 +581,41 @@ function validateFunctionOption(name: string, value: unknown): void {
   );
 }
 
+function validateBooleanOption(name: string, value: unknown): void {
+  if (value === undefined || typeof value === 'boolean') return;
+
+  throw new ApiError(
+    'Invalid request configuration',
+    0,
+    'Client Error',
+    `${name} must be a boolean.`
+  );
+}
+
+function validateResponseHeaderNameOption(name: string, value: string | undefined): void {
+  if (value === undefined) return;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      `${name} must be a non-empty string.`
+    );
+  }
+}
+
+function validateQueryInput(query: QueryInput | undefined): void {
+  if (query === undefined) return;
+  if (query === null || typeof query !== 'object' || Array.isArray(query)) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      'query must be an object map of key/value pairs.'
+    );
+  }
+}
+
 function createSensitiveLogKeySet(extraKeys?: string[]): Set<string> {
   const merged = new Set(SENSITIVE_LOG_KEYS);
   for (const extraKey of extraKeys ?? []) {
@@ -570,7 +626,31 @@ function createSensitiveLogKeySet(extraKeys?: string[]): Set<string> {
 }
 
 function sanitizeBaseUrl(baseUrl: string): string {
-  return baseUrl.trim().replace(/\/+$/, '');
+  const sanitized = baseUrl.trim().replace(/\/+$/, '');
+  if (!sanitized) {
+    throw new ApiError(
+      'Invalid request configuration',
+      0,
+      'Client Error',
+      'baseUrl cannot be empty.'
+    );
+  }
+
+  if (/^https?:\/\//i.test(sanitized)) {
+    try {
+      // Validate absolute URLs early so consumers fail fast before dispatch.
+      new URL(sanitized);
+    } catch {
+      throw new ApiError(
+        'Invalid request configuration',
+        0,
+        'Client Error',
+        'baseUrl must be a valid absolute URL.'
+      );
+    }
+  }
+
+  return sanitized;
 }
 
 function normalizeRequestBody(
@@ -673,6 +753,16 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     onError,
     maxResponseBytes,
     additionalSensitiveLogKeys,
+    includeNullQueryParams = false,
+    includeUndefinedQueryParams = false,
+    sortQueryParams = true,
+    trimQueryKeys = true,
+    stripHashFromQuerySerializer = true,
+    acceptedContentTypes,
+    requiredResponseHeaders,
+    requestIdHeaderName = 'X-Request-ID',
+    maxLoggedResponsePreviewChars = 200,
+    maxLoggedErrorPreviewChars = 500,
     ...requestOptions
   } = options;
   validateNumericOption('maxRetries', maxRetries, 0);
@@ -684,12 +774,23 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   validateNumericOption('maxResponseBytes', maxResponseBytes, 1);
   validateRetryableMethods(retryableMethods);
   validateStringArrayOption('additionalSensitiveLogKeys', additionalSensitiveLogKeys);
+  validateStringArrayOption('acceptedContentTypes', acceptedContentTypes);
+  validateStringArrayOption('requiredResponseHeaders', requiredResponseHeaders);
   validateFunctionOption('querySerializer', querySerializer);
   validateFunctionOption('responseParser', responseParser);
   validateFunctionOption('onRequest', onRequest);
   validateFunctionOption('onResponse', onResponse);
   validateFunctionOption('onRetry', onRetry);
   validateFunctionOption('onError', onError);
+  validateBooleanOption('includeNullQueryParams', includeNullQueryParams);
+  validateBooleanOption('includeUndefinedQueryParams', includeUndefinedQueryParams);
+  validateBooleanOption('sortQueryParams', sortQueryParams);
+  validateBooleanOption('trimQueryKeys', trimQueryKeys);
+  validateBooleanOption('stripHashFromQuerySerializer', stripHashFromQuerySerializer);
+  validateResponseHeaderNameOption('requestIdHeaderName', requestIdHeaderName);
+  validateNumericOption('maxLoggedResponsePreviewChars', maxLoggedResponsePreviewChars, 1);
+  validateNumericOption('maxLoggedErrorPreviewChars', maxLoggedErrorPreviewChars, 1);
+  validateQueryInput(query);
 
   if (!VALID_RETRY_MODES.has(retryMode)) {
     throw new ApiError(
@@ -753,8 +854,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           }
 
           const serializedQuery = serializedResult.trim().replace(/^\?+/, '');
-          return serializedQuery
-            ? `${baseRequestUrl}${baseRequestUrl.includes('?') ? '&' : '?'}${serializedQuery}`
+          const withoutHash = stripHashFromQuerySerializer
+            ? serializedQuery.replace(/#.*/, '')
+            : serializedQuery;
+
+          return withoutHash
+            ? `${baseRequestUrl}${baseRequestUrl.includes('?') ? '&' : '?'}${withoutHash}`
             : baseRequestUrl;
         })()
       : appendQueryParams(
@@ -762,7 +867,11 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           query,
           includeEmptyStringQueryParams,
           trimStringQueryParams,
-          dedupeArrayQueryParams
+          dedupeArrayQueryParams,
+          includeNullQueryParams,
+          includeUndefinedQueryParams,
+          sortQueryParams,
+          trimQueryKeys
         );
   const retryableMethodSet = new Set(
     (retryableMethods ?? Array.from(RETRYABLE_METHODS)).map((value) => value.trim().toUpperCase())
@@ -781,8 +890,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     skipDefaultContentTypeHeader
   );
   const requestId = createRequestId();
-  if (!requestHeaders.has('X-Request-ID')) {
-    requestHeaders.set('X-Request-ID', requestId);
+  if (!requestHeaders.has(requestIdHeaderName)) {
+    requestHeaders.set(requestIdHeaderName, requestId);
   }
 
   const logContext: Record<string, unknown> = { body: requestBody, requestId };
@@ -829,7 +938,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
         } catch {
           // Response body is not valid JSON
           log.warn('Failed to parse error response as JSON', {
-            rawText: rawText.substring(0, 200)
+            rawText: rawText.substring(0, maxLoggedResponsePreviewChars)
           });
         }
 
@@ -892,7 +1001,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
           status: response.status,
           statusText: response.statusText,
           errorBody: redactSensitiveValuesWithKeys(errorBody, sensitiveLogKeys),
-          rawText: rawText.substring(0, 500),
+          rawText: rawText.substring(0, maxLoggedErrorPreviewChars),
           requestId
         });
 
@@ -939,6 +1048,37 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             response.status,
             response.statusText,
             `Expected status ${expectedList.join(', ')} but received ${response.status}.`
+          );
+        }
+      }
+
+      if (acceptedContentTypes && acceptedContentTypes.length > 0) {
+        const responseContentType = (response.headers.get('content-type') || '').toLowerCase();
+        const isAccepted = acceptedContentTypes.some((contentType) =>
+          responseContentType.includes(contentType.toLowerCase())
+        );
+
+        if (!isAccepted) {
+          throw new ApiError(
+            'Unexpected response content type',
+            response.status,
+            response.statusText,
+            `Expected one of ${acceptedContentTypes.join(', ')} but received ${responseContentType || 'none'}.`
+          );
+        }
+      }
+
+      if (requiredResponseHeaders && requiredResponseHeaders.length > 0) {
+        const missingHeaders = requiredResponseHeaders.filter(
+          (headerName) => !response.headers.get(headerName)
+        );
+
+        if (missingHeaders.length > 0) {
+          throw new ApiError(
+            'Missing required response headers',
+            response.status,
+            response.statusText,
+            `Missing headers: ${missingHeaders.join(', ')}.`
           );
         }
       }

@@ -1275,4 +1275,146 @@ describe('fetchApi', () => {
       details: 'additionalSensitiveLogKeys must only include non-empty strings.'
     });
   });
+
+  it('supports including null and undefined query values when configured', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+    });
+
+    await fetchApi('/api/query-values', {
+      query: { includeNull: null, includeUndefined: undefined },
+      includeNullQueryParams: true,
+      includeUndefinedQueryParams: true
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('includeNull=null&includeUndefined=undefined'),
+      expect.any(Object)
+    );
+  });
+
+  it('does not trim query keys when trimQueryKeys is disabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+    });
+
+    await fetchApi('/api/raw-query-key', {
+      query: { '  custom key  ': 'value' },
+      trimQueryKeys: false
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('++custom+key++=value'),
+      expect.any(Object)
+    );
+  });
+
+  it('preserves query order when sortQueryParams is disabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+    });
+
+    await fetchApi('/api/no-sort-query', {
+      query: { b: '2', a: '1' },
+      sortQueryParams: false
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('b=2&a=1'), expect.any(Object));
+  });
+
+  it('uses requestIdHeaderName when provided', async () => {
+    mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get('X-Correlation-ID')).toBeTruthy();
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+      });
+    });
+
+    await fetchApi('/api/custom-request-id', { requestIdHeaderName: 'X-Correlation-ID' });
+  });
+
+  it('fails when response content type is outside acceptedContentTypes', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11', 'content-type': 'text/plain' })
+    });
+
+    await expect(
+      fetchApi('/api/content-type-check', { acceptedContentTypes: ['application/json'] })
+    ).rejects.toMatchObject({ message: 'Unexpected response content type' });
+  });
+
+  it('fails when required response headers are missing', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+    });
+
+    await expect(
+      fetchApi('/api/required-headers', { requiredResponseHeaders: ['x-trace-id'] })
+    ).rejects.toMatchObject({ message: 'Missing required response headers' });
+  });
+
+  it('rejects invalid query object values', async () => {
+    await expect(fetchApi('/api/invalid-query', { query: 'abc' as never })).rejects.toMatchObject({
+      details: 'query must be an object map of key/value pairs.'
+    });
+  });
+
+  it('rejects invalid requestIdHeaderName values', async () => {
+    await expect(
+      fetchApi('/api/invalid-header-name', { requestIdHeaderName: '' })
+    ).rejects.toMatchObject({
+      details: 'requestIdHeaderName must be a non-empty string.'
+    });
+  });
+
+  it('strips hash fragments emitted by querySerializer by default', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+      statusText: 'OK',
+      headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+    });
+
+    await fetchApi('/api/query-serializer', {
+      query: { term: 'x' },
+      querySerializer: () => 'term=x#debug'
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.not.stringContaining('#debug'),
+      expect.any(Object)
+    );
+  });
+
+  it('rejects non-boolean query toggle options', async () => {
+    await expect(
+      fetchApi('/api/invalid-bool-option', { includeNullQueryParams: 'true' as never })
+    ).rejects.toMatchObject({ details: 'includeNullQueryParams must be a boolean.' });
+  });
 });

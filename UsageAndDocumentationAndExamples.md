@@ -2,91 +2,112 @@
 
 ## Scope of this implementation pass
 
-This pass strengthens the frontend API client (`frontend/src/lib/api/core.ts`) with stricter runtime option validation and more secure, customizable log redaction behavior.
+This implementation pass extends `fetchApi` in `frontend/src/lib/api/core.ts` to harden request configuration, query composition behavior, and response contract validation.
 
 ## Implemented behavior updates
 
-### 1) Runtime request-option validation (fail-fast)
+### 1) Query configuration hardening
 
-`fetchApi` now validates dynamic runtime options before making a network call:
+New query controls were added:
 
-- `retryMode` must be one of: `auto | never | always`.
-- `responseType` must be one of: `json | blob | text | arrayBuffer`.
-- `credentialsMode` must be one of: `omit | same-origin | include`.
-- Hook/parser options must be functions when provided:
-  - `querySerializer`
-  - `responseParser`
-  - `onRequest`
-  - `onResponse`
-  - `onRetry`
-  - `onError`
+- `includeNullQueryParams?: boolean` (default `false`)
+- `includeUndefinedQueryParams?: boolean` (default `false`)
+- `sortQueryParams?: boolean` (default `true`)
+- `trimQueryKeys?: boolean` (default `true`)
+- `stripHashFromQuerySerializer?: boolean` (default `true`)
 
-When invalid values are passed, `fetchApi` throws a structured `ApiError` with a clear configuration message.
+Runtime validation now rejects invalid non-object `query` values and non-boolean values for these toggles.
 
-### 2) Customizable sensitive log redaction
+### 2) Response contract enforcement
 
-A new option was introduced:
+New response guard options were added:
 
-```ts
-additionalSensitiveLogKeys?: string[]
-```
+- `acceptedContentTypes?: string[]` to enforce an allow-list for response `content-type`.
+- `requiredResponseHeaders?: string[]` to enforce mandatory response headers.
+
+If either contract is violated, `fetchApi` throws a structured `ApiError` with explicit details.
+
+### 3) Correlation header customization
+
+New option:
+
+- `requestIdHeaderName?: string` (default: `X-Request-ID`)
 
 Behavior:
 
-- Keys are normalized (`trim + lowercase`) to keep matching deterministic.
-- Extra keys merge with built-in sensitive keys (e.g., `token`, `authorization`, `api_key`, etc.).
-- Redaction now applies consistently to:
-  - logged request URLs (query params)
-  - logged request payloads
-  - logged success payloads
-  - logged error payloads
+- The request ID header name is now configurable per request.
+- If the configured header already exists in request headers, `fetchApi` preserves it.
 
-This allows endpoint-specific secret fields (for example `sessionId` or custom API credentials) to be hidden without editing global redaction defaults.
+### 4) Log preview safety controls
+
+New options:
+
+- `maxLoggedResponsePreviewChars?: number` (default `200`)
+- `maxLoggedErrorPreviewChars?: number` (default `500`)
+
+These configure truncation for response/error previews in logs to prevent oversized log payloads.
+
+### 5) Base URL validation improvements
+
+`baseUrl` now fails fast when:
+
+- Empty or whitespace-only
+- Absolute URL format is malformed
+
+This avoids hidden runtime fetch failures and surfaces clear configuration errors earlier.
 
 ## Usage examples
 
-### Basic request
+### Include nullable query values for a backend filter API
 
 ```ts
-import { fetchApi } from '$lib/api/core';
-
-const tasks = await fetchApi('/api/tasks');
-```
-
-### Custom per-request redaction keys
-
-```ts
-await fetchApi('/api/workflow/run?sessionId=abc123', {
-  method: 'POST',
-  body: { sessionId: 'abc123', action: 'start' },
-  additionalSensitiveLogKeys: ['sessionId']
+await fetchApi('/api/search', {
+  query: {
+    status: null,
+    includeArchived: undefined
+  },
+  includeNullQueryParams: true,
+  includeUndefinedQueryParams: true
 });
 ```
 
-### Validated runtime options
+### Preserve insertion order of query parameters
 
 ```ts
 await fetchApi('/api/reports', {
-  retryMode: 'always',
-  responseType: 'json',
-  credentialsMode: 'include'
+  query: { page: 2, pageSize: 20, sort: 'createdAt' },
+  sortQueryParams: false
 });
 ```
 
-### Hook option usage
+### Enforce JSON response contract with required tracing header
 
 ```ts
-await fetchApi('/api/export', {
-  onRetry: ({ attempt, delayMs }) => {
-    console.info(`Retry #${attempt} in ${delayMs}ms`);
-  },
-  onError: (error) => {
-    console.error(error.getFullMessage());
-  }
+await fetchApi('/api/tasks', {
+  acceptedContentTypes: ['application/json'],
+  requiredResponseHeaders: ['x-trace-id']
 });
 ```
 
-## Testing steps used for this implementation
+### Customize request correlation header
+
+```ts
+await fetchApi('/api/workflow', {
+  requestIdHeaderName: 'X-Correlation-ID'
+});
+```
+
+### Use a serializer while stripping accidental hash fragments
+
+```ts
+await fetchApi('/api/advanced', {
+  query: { term: 'invoice' },
+  querySerializer: (query) => `term=${query.term}#debug`,
+  // final URL omits #debug by default
+});
+```
+
+## Testing and verification steps
 
 From `frontend/`:
 
@@ -94,13 +115,15 @@ From `frontend/`:
 2. `npm run test -- src/tests/api.test.ts`
 3. `npm run test`
 4. `npm run check`
-5. `npm run lint`
+5. `npx eslint src/lib/api/core.ts src/tests/api.test.ts`
 
-From `backend/` (using Java 17 for Maven enforcer compatibility):
+From `backend/`:
 
-6. `JAVA_HOME=$(mise where java@17.0.2) PATH="$JAVA_HOME/bin:$PATH" ./mvnw test`
+6. `./mvnw test` *(expected to fail with default Java 25 because backend enforces Java 17)*
+7. `JAVA_HOME=$(mise where java@17.0.2) PATH="$JAVA_HOME/bin:$PATH" ./mvnw test`
 
-## Maintenance notes
+## Notes for maintainers
 
-- Prefer `additionalSensitiveLogKeys` for endpoint-specific fields instead of expanding global defaults prematurely.
-- Keep `ApiError` configuration messages explicit; these messages are relied on by tests and make integration debugging faster.
+- Prefer `acceptedContentTypes` and `requiredResponseHeaders` for endpoints with strict downstream contract requirements.
+- Keep query toggle defaults conservative to preserve existing behavior unless consumers opt in explicitly.
+- Use `requestIdHeaderName` only when integrating with systems that require a specific correlation header key.
