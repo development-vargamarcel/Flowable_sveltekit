@@ -22,7 +22,7 @@
 	let clearingCookies = $state(false);
 	let cookieDiagnostics = $state('');
 	let backendReady = $state(false);
-	let checkingBackend = $state(false);
+	const checkingBackend = $state(false);
 
 	function toggleMode() {
 		isRegistering = !isRegistering;

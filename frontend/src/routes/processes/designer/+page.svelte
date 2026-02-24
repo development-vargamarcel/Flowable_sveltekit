@@ -1422,7 +1422,7 @@
     const modeling = modeler.get('modeling') as any;
     const moddle = modeler.get('moddle') as any;
     const businessObject = selectedElement.businessObject;
-    let loopCharacteristics = businessObject.loopCharacteristics;
+    const loopCharacteristics = businessObject.loopCharacteristics;
 
     if (!loopCharacteristics) return;
 

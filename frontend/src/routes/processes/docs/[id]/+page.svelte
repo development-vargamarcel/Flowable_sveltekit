@@ -19,7 +19,7 @@
   let userTasks: any[] = $state([]);
   let serviceTasks: any[] = $state([]);
   let scriptTasks: any[] = $state([]);
-  let docTypes: string[] = $state([]);
+  const docTypes: string[] = $state([]);
 
   onMount(async () => {
     processId = $page.params.id ?? '';
