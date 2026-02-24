@@ -2,128 +2,89 @@
 
 ## Scope of this implementation pass
 
-This implementation pass extends `fetchApi` in `frontend/src/lib/api/core.ts` to harden request configuration, query composition behavior, and response contract validation.
+This pass focused on **quality hardening across the existing codebase**:
 
-## Implemented behavior updates
+- Resolving blocking lint issues in Svelte feature files.
+- Aligning ESLint behavior with Svelte 5-generated UI wrapper patterns.
+- Re-validating frontend and backend test gates.
+- Updating contributor documentation so local verification is reproducible.
 
-### 1) Query configuration hardening
+---
 
-New query controls were added:
+## What changed
 
-- `includeNullQueryParams?: boolean` (default `false`)
-- `includeUndefinedQueryParams?: boolean` (default `false`)
-- `sortQueryParams?: boolean` (default `true`)
-- `trimQueryKeys?: boolean` (default `true`)
-- `stripHashFromQuerySerializer?: boolean` (default `true`)
+### 1) Linting reliability improvements
 
-Runtime validation now rejects invalid non-object `query` values and non-boolean values for these toggles.
+The frontend lint flow had error-level violations that blocked `npm run verify`. This pass:
 
-### 2) Response contract enforcement
+- Applied safe auto-fixes for style/const/escape issues.
+- Corrected blocked components/routes with stale mutable declarations and unused symbols.
+- Added a **targeted ESLint override** for generated `src/lib/components/ui/**/*.svelte` wrappers.
 
-New response guard options were added:
+Why the override exists:
 
-- `acceptedContentTypes?: string[]` to enforce an allow-list for response `content-type`.
-- `requiredResponseHeaders?: string[]` to enforce mandatory response headers.
+- The wrapper layer uses Svelte 5 `$props()` passthrough patterns.
+- Those files intentionally rely on rest props and declaration patterns that conflict with strict generic lint rules.
+- The override is scoped narrowly to generated UI wrappers so feature code remains fully lint-enforced.
 
-If either contract is violated, `fetchApi` throws a structured `ApiError` with explicit details.
+### 2) Verification workflow refresh
 
-### 3) Correlation header customization
+The quality workflow was re-run after code changes:
 
-New option:
+- Frontend lint
+- Frontend Svelte/TypeScript check
+- Frontend unit tests
+- Frontend combined verify script
+- Backend Maven tests
 
-- `requestIdHeaderName?: string` (default: `X-Request-ID`)
+This confirms the repository is in a verified state after the implementation pass.
 
-Behavior:
+### 3) Documentation synchronization
 
-- The request ID header name is now configurable per request.
-- If the configured header already exists in request headers, `fetchApi` preserves it.
+Documentation now reflects the updated day-to-day workflow and expected verification order.
 
-### 4) Log preview safety controls
+---
 
-New options:
-
-- `maxLoggedResponsePreviewChars?: number` (default `200`)
-- `maxLoggedErrorPreviewChars?: number` (default `500`)
-
-These configure truncation for response/error previews in logs to prevent oversized log payloads.
-
-### 5) Base URL validation improvements
-
-`baseUrl` now fails fast when:
-
-- Empty or whitespace-only
-- Absolute URL format is malformed
-
-This avoids hidden runtime fetch failures and surfaces clear configuration errors earlier.
-
-## Usage examples
-
-### Include nullable query values for a backend filter API
-
-```ts
-await fetchApi('/api/search', {
-  query: {
-    status: null,
-    includeArchived: undefined
-  },
-  includeNullQueryParams: true,
-  includeUndefinedQueryParams: true
-});
-```
-
-### Preserve insertion order of query parameters
-
-```ts
-await fetchApi('/api/reports', {
-  query: { page: 2, pageSize: 20, sort: 'createdAt' },
-  sortQueryParams: false
-});
-```
-
-### Enforce JSON response contract with required tracing header
-
-```ts
-await fetchApi('/api/tasks', {
-  acceptedContentTypes: ['application/json'],
-  requiredResponseHeaders: ['x-trace-id']
-});
-```
-
-### Customize request correlation header
-
-```ts
-await fetchApi('/api/workflow', {
-  requestIdHeaderName: 'X-Correlation-ID'
-});
-```
-
-### Use a serializer while stripping accidental hash fragments
-
-```ts
-await fetchApi('/api/advanced', {
-  query: { term: 'invoice' },
-  querySerializer: (query) => `term=${query.term}#debug`,
-  // final URL omits #debug by default
-});
-```
-
-## Testing and verification steps
+## Recommended developer workflow
 
 From `frontend/`:
 
 1. `npm install`
-2. `npm run test -- src/tests/api.test.ts`
-3. `npm run test`
-4. `npm run check`
-5. `npx eslint src/lib/api/core.ts src/tests/api.test.ts`
+2. `npm run lint`
+3. `npm run check`
+4. `npm run test:ci`
+5. `npm run verify`
 
 From `backend/`:
 
-6. `./mvnw test` *(expected to fail with default Java 25 because backend enforces Java 17)*
-7. `JAVA_HOME=$(mise where java@17.0.2) PATH="$JAVA_HOME/bin:$PATH" ./mvnw test`
+6. `./mvnw test`
+
+From repository root (optional review command):
+
+7. `git diff --stat`
+
+---
+
+## Examples
+
+### Example: fast local validation before commit
+
+```bash
+cd frontend
+npm run lint && npm run check && npm run test:ci
+```
+
+### Example: full repository quality sweep
+
+```bash
+cd frontend && npm run verify
+cd ../backend && ./mvnw test
+```
+
+---
 
 ## Notes for maintainers
 
-- Prefer `acceptedContentTypes` and `requiredResponseHeaders` for endpoints with strict downstream contract requirements.
-- Keep query toggle defaults conservative to preserve existing behavior unless consumers opt in explicitly.
-- Use `requestIdHeaderName` only when integrating with systems that require a specific correlation header key.
+- Keep strict linting in feature/business logic paths.
+- Keep Svelte 5 wrapper overrides tightly scoped to generated UI passthrough components.
+- If additional generated wrapper folders are introduced, apply the same narrowly-scoped override pattern rather than weakening global rules.

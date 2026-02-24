@@ -4,7 +4,7 @@
 		showLabel?: boolean;
 	}
 
-	let { count, showLabel = false }: Props = $props();
+	const { count, showLabel = false }: Props = $props();
 </script>
 
 <span

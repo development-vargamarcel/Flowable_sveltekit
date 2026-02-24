@@ -120,7 +120,7 @@
 		return range;
 	}
 
-	let paginationRange = $derived(getPaginationRange());
+	const paginationRange = $derived(getPaginationRange());
 </script>
 
 <svelte:head>

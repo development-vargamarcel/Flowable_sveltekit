@@ -17,7 +17,7 @@
 
 	let users = $state<User[]>([]);
 	let selectedUserId = $state('');
-	let loading = $state(false);
+	const loading = $state(false);
 	let submitting = $state(false);
 
 	onMount(async () => {

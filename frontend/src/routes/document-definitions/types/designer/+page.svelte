@@ -28,7 +28,7 @@
   // Preview state
   let showPreview = $state(true);
   let previewValues = $state({});
-  let previewErrors = $state({});
+  const previewErrors = $state({});
 
   onMount(async () => {
     const keyParam = $page.url.searchParams.get('key');
