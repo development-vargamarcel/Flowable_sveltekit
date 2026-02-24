@@ -21,7 +21,7 @@
     height?: string;
   }
 
-  let { bpmnXml, activeActivityIds = [], height = '500px' }: Props = $props();
+  const { bpmnXml, activeActivityIds = [], height = '500px' }: Props = $props();
 
   let container: HTMLElement;
   let viewer: any;

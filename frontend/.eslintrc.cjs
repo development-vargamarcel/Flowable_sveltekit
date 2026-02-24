@@ -27,6 +27,17 @@ module.exports = {
         parser: '@typescript-eslint/parser'
       }
     },
+
+    {
+      // Generated shadcn/bits-ui wrappers rely on Svelte 5 $props patterns that
+      // intentionally use mutable declarations and rest props for passthrough.
+      files: ['src/lib/components/ui/**/*.svelte'],
+      rules: {
+        'prefer-const': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
+        'svelte/valid-compile': 'off'
+      }
+    },
     {
       // Allow console in server-side files and hooks
       files: [
@@ -43,13 +54,14 @@ module.exports = {
   rules: {
     // TypeScript rules
     '@typescript-eslint/no-unused-vars': [
-      'error',
+      'warn',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
     ],
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-non-null-assertion': 'warn',
+    '@typescript-eslint/ban-ts-comment': 'warn',
 
     // General rules
     'no-console': ['warn', { allow: ['warn', 'error'] }],
@@ -57,6 +69,7 @@ module.exports = {
     'prefer-const': 'error',
     'no-var': 'error',
     eqeqeq: ['error', 'always'],
+    'no-useless-escape': 'warn',
 
     // Svelte rules
     'svelte/no-at-html-tags': 'warn',

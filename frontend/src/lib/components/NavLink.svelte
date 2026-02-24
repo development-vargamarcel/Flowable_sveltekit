@@ -6,7 +6,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { cn } from '$lib/utils';
 
-	let { item }: { item: NavigationItem } = $props();
+	const { item }: { item: NavigationItem } = $props();
 
 	function isActive(href: string, currentPath: string): boolean {
 		if (href === '/') {

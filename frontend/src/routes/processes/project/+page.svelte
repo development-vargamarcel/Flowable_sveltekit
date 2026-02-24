@@ -150,7 +150,7 @@
 		}
 	}
 
-	let approvalInfo = $derived(budget && budget > 0 ? getApprovalInfo(budget, projectType) : null);
+	const approvalInfo = $derived(budget && budget > 0 ? getApprovalInfo(budget, projectType) : null);
 </script>
 
 <svelte:head>

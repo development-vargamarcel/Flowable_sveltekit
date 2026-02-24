@@ -7,7 +7,7 @@
 		approvals: Approval[];
 	}
 
-	let { taskHistory, escalationHistory, approvals }: Props = $props();
+	const { taskHistory, escalationHistory, approvals }: Props = $props();
 
 	interface TimelineEvent {
 		id: string;
@@ -115,7 +115,7 @@
 		return new Date(dateStr).toLocaleString();
 	}
 
-	let timeline = $derived(buildTimeline());
+	const timeline = $derived(buildTimeline());
 </script>
 
 <div class="relative">
