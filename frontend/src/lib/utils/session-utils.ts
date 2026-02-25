@@ -1,196 +1,298 @@
 import { api } from '$lib/api/client';
+import { logger } from '$lib/utils/logger';
+
+const SESSION_LOGGER = logger.child({ module: 'session-utils' });
+const DEFAULT_HEALTH_TIMEOUT_MS = 4000;
+const DEFAULT_HEALTH_DELAYS_MS = [1000, 2000, 3000];
+const HEADER_TOO_LARGE_PATTERNS = [
+  /header.*too large/i,
+  /cookie.*too large/i,
+  /request header or cookie too large/i,
+  /request entity too large/i,
+  /request-uri too long/i,
+  /413 request entity/i,
+  /431 request header/i,
+  /header fields too large/i,
+  /bad request.*header/i,
+  /header.*overflow/i,
+  /status\s*:?\s*431/i,
+  /status\s*:?\s*413/i
+];
+
+interface FetchLike {
+  (input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+}
+
+interface HealthCheckOptions {
+  fetchFn?: FetchLike;
+  timeoutMs?: number;
+  delaysMs?: number[];
+  healthEndpoint?: string;
+  readyEndpoint?: string;
+}
+
+interface ClearCookiesOptions {
+  fetchFn?: FetchLike;
+  skipRedirect?: boolean;
+}
+
+interface ClearSessionAttempt {
+  strategy: 'fallback-endpoint' | 'backend-endpoint' | 'redirect';
+  success: boolean;
+  details: string;
+}
 
 /**
- * Get diagnostic information about current cookies
+ * Get diagnostic information about current cookies.
  */
-export function getCookieDiagnostics(): string {
-    if (typeof document === 'undefined') return 'Cookie diagnostics not available during SSR';
-    const cookies = document.cookie.split(';').filter(c => c.trim());
-    const totalSize = document.cookie.length;
-    const cookieNames = cookies.map(c => c.split('=')[0].trim()).join(', ');
-    return `Found ${cookies.length} accessible cookies (${totalSize} bytes): ${cookieNames || 'none'}. Note: HttpOnly cookies (like JSESSIONID) are not visible to JavaScript.`;
+export function getCookieDiagnostics(maxNames = 10): string {
+  if (typeof document === 'undefined') return 'Cookie diagnostics not available during SSR';
+
+  const cookies = document.cookie
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .filter(Boolean);
+
+  const totalSize = document.cookie.length;
+  const names = cookies.map((cookie) => cookie.split('=')[0]?.trim()).filter(Boolean) as string[];
+  const limitedNames = names.slice(0, Math.max(maxNames, 0));
+  const suffix =
+    names.length > limitedNames.length ? ` (+${names.length - limitedNames.length} more)` : '';
+
+  return `Found ${cookies.length} accessible cookies (${totalSize} bytes): ${limitedNames.join(', ') || 'none'}${suffix}. Note: HttpOnly cookies (like JSESSIONID) are not visible to JavaScript.`;
+}
+
+async function fetchWithTimeout(
+  fetchFn: FetchLike,
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetchFn(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function safeReadJson(response: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await response.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function resolveDelays(retries: number, providedDelays?: number[]): number[] {
+  if (providedDelays && providedDelays.length > 0) {
+    return providedDelays.slice(0, retries);
+  }
+
+  if (retries <= DEFAULT_HEALTH_DELAYS_MS.length) {
+    return DEFAULT_HEALTH_DELAYS_MS.slice(0, retries);
+  }
+
+  const lastDefaultDelay = DEFAULT_HEALTH_DELAYS_MS[DEFAULT_HEALTH_DELAYS_MS.length - 1];
+  return Array.from(
+    { length: retries },
+    (_, idx) => DEFAULT_HEALTH_DELAYS_MS[idx] ?? lastDefaultDelay
+  );
 }
 
 /**
  * Check if the backend is healthy and ready to accept requests.
- * Retries up to 3 times with increasing delays.
+ * Retries with exponential-style delay defaults.
  */
-export async function checkBackendHealth(retries = 3): Promise<boolean> {
-    for (let i = 0; i < retries; i++) {
-        try {
-            // Try the health endpoint first
-            const response = await fetch('/health', {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' }
-            });
+export async function checkBackendHealth(
+  retries = 3,
+  options: HealthCheckOptions = {}
+): Promise<boolean> {
+  const fetchFn = options.fetchFn ?? fetch;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_HEALTH_TIMEOUT_MS;
+  const healthEndpoint = options.healthEndpoint ?? '/health';
+  const readyEndpoint = options.readyEndpoint ?? '/ready';
+  const retryCount = Math.max(1, retries);
+  const delays = resolveDelays(retryCount, options.delaysMs);
 
-            if (response.ok) {
-                // Also try the ready endpoint to check backend specifically
-                const readyResponse = await fetch('/ready', {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
+  for (let i = 0; i < retryCount; i++) {
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        healthEndpoint,
+        { method: 'GET', headers: { Accept: 'application/json' } },
+        timeoutMs
+      );
 
-                if (readyResponse.ok) {
-                    return true;
-                }
+      if (response.ok) {
+        const readyResponse = await fetchWithTimeout(
+          fetchFn,
+          readyEndpoint,
+          { method: 'GET', headers: { Accept: 'application/json' } },
+          timeoutMs
+        );
 
-                // If ready returns 503 (backend starting), wait and retry
-                if (readyResponse.status === 503) {
-                    // eslint-disable-next-line no-console
-                    console.log(`Backend not ready yet, attempt ${i + 1}/${retries}...`);
-                    await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-                    continue;
-                }
-            }
-        } catch (e) {
-            // eslint-disable-next-line no-console
-            console.log(`Health check failed, attempt ${i + 1}/${retries}:`, e);
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        if (readyResponse.ok) {
+          return true;
         }
+
+        if (readyResponse.status === 503) {
+          SESSION_LOGGER.info('Backend not ready yet, retrying health check', {
+            attempt: i + 1,
+            retryCount,
+            readyStatus: readyResponse.status
+          });
+        }
+      }
+    } catch (error) {
+      SESSION_LOGGER.warn('Backend health check failed', { attempt: i + 1, retryCount, error });
     }
-    return false;
+
+    if (i < retryCount - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delays[i] ?? 1000));
+    }
+  }
+
+  return false;
+}
+
+function clearCookieByName(name: string, hostname: string): void {
+  const paths = ['/', '/api', '/api/'];
+  const domains = ['', hostname, `.${hostname}`];
+
+  for (const path of paths) {
+    for (const domain of domains) {
+      const domainPart = domain ? `;domain=${domain}` : '';
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}${domainPart}`;
+      document.cookie = `${name}=;max-age=0;path=${path}${domainPart}`;
+    }
+  }
+}
+
+function performRedirect(skipRedirect: boolean): void {
+  if (skipRedirect) return;
+
+  // Guard against accidental redirect loops while still allowing manual recovery.
+  if (sessionStorage.getItem('cookie-clear-redirected') === 'true') {
+    SESSION_LOGGER.warn('Skipping duplicate clear-cookie redirect to avoid loop');
+    return;
+  }
+
+  sessionStorage.setItem('cookie-clear-redirected', 'true');
+  window.location.href = '/clear-cookies';
+}
+
+async function tryClearServerSession(fetchFn: FetchLike): Promise<ClearSessionAttempt> {
+  try {
+    const fallbackResponse = await fetchFn('/api/auth/clear-session-fallback', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' }
+    });
+
+    if (fallbackResponse.ok) {
+      const payload = await safeReadJson(fallbackResponse);
+      return {
+        strategy: 'fallback-endpoint',
+        success: true,
+        details: (payload.details as string) || 'Session cleared via nginx fallback'
+      };
+    }
+
+    SESSION_LOGGER.warn('Fallback endpoint returned non-success status', {
+      status: fallbackResponse.status
+    });
+  } catch (fallbackError) {
+    SESSION_LOGGER.warn('Fallback clear-session endpoint failed', { error: fallbackError });
+  }
+
+  try {
+    const result = await api.clearSession();
+    return {
+      strategy: 'backend-endpoint',
+      success: true,
+      details: result.details || 'Session cleared via backend endpoint'
+    };
+  } catch (backendError) {
+    SESSION_LOGGER.warn('Backend clear-session endpoint failed', { error: backendError });
+    return {
+      strategy: 'redirect',
+      success: false,
+      details: 'Unable to clear server session through available endpoints'
+    };
+  }
 }
 
 /**
- * Result of a clear cookies operation
+ * Result of a clear cookies operation.
  */
 export interface ClearCookiesResult {
-    cookiesCleared: boolean;
-    diagnostics: string;
-    backendReady: boolean;
+  cookiesCleared: boolean;
+  diagnostics: string;
+  backendReady: boolean;
 }
 
 /**
- * Clears all cookies for the current domain to resolve "Request Header Or Cookie Too Large" errors.
- * This clears both JavaScript-accessible cookies and calls the backend to clear HttpOnly cookies.
- * Uses multiple fallback strategies when headers are too large.
+ * Clears all cookies for the current domain to resolve large-header/cookie failures.
+ * This clears JavaScript-accessible cookies and attempts to clear HttpOnly server session cookies.
  */
-export async function clearAllCookies(): Promise<ClearCookiesResult> {
-    if (typeof document === 'undefined' || typeof window === 'undefined') {
-        return { cookiesCleared: false, diagnostics: '', backendReady: false };
+export async function clearAllCookies(
+  options: ClearCookiesOptions = {}
+): Promise<ClearCookiesResult> {
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
+    return { cookiesCleared: false, diagnostics: '', backendReady: false };
+  }
+
+  const fetchFn = options.fetchFn ?? fetch;
+
+  try {
+    const cookies = document.cookie
+      .split(';')
+      .map((cookie) => cookie.trim())
+      .filter(Boolean);
+    let clearedCount = 0;
+
+    for (const cookie of cookies) {
+      const eqPos = cookie.indexOf('=');
+      const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie;
+      if (!name) continue;
+      clearCookieByName(name, window.location.hostname);
+      clearedCount++;
     }
 
-    let cookieDiagnostics = '';
-    let backendReady = false;
-
-    try {
-        // First, clear JavaScript-accessible cookies locally
-        const cookies = document.cookie.split(';');
-        let clearedCount = 0;
-        for (const cookie of cookies) {
-            const eqPos = cookie.indexOf('=');
-            const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
-            if (name) {
-                // Clear the cookie with various path and domain combinations
-                const paths = ['/', '/api', '/api/'];
-                const domains = ['', window.location.hostname];
-                for (const path of paths) {
-                    for (const domain of domains) {
-                        const domainPart = domain ? `;domain=${domain}` : '';
-                        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}${domainPart}`;
-                        document.cookie = `${name}=;max-age=0;path=${path}${domainPart}`;
-                    }
-                }
-                clearedCount++;
-            }
-        }
-        // eslint-disable-next-line no-console
-        console.log(`Cleared ${clearedCount} JavaScript-accessible cookies`);
-
-        // Try to clear HttpOnly cookies (like JSESSIONID) using multiple strategies
-        let serverCleared = false;
-        let clearDetails = '';
-
-        // Strategy 1: Try the nginx fallback endpoint FIRST (more reliable when headers are large)
-        // This endpoint uses credentials: 'include' but nginx will set Set-Cookie headers to clear
-        try {
-            const fallbackResponse = await fetch('/api/auth/clear-session-fallback', {
-                method: 'POST',
-                credentials: 'include', // Send cookies so browser associates the Set-Cookie response
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (fallbackResponse.ok) {
-                const result = await fallbackResponse.json();
-                // eslint-disable-next-line no-console
-                console.log('Fallback session clear succeeded:', result);
-                serverCleared = true;
-                clearDetails = result.details || 'Session cleared via nginx fallback';
-            } else {
-                console.warn('Fallback endpoint returned error:', fallbackResponse.status);
-            }
-        } catch (fallbackError) {
-            console.warn('Fallback clear failed, trying backend:', fallbackError);
-
-            // Strategy 2: Try the normal backend endpoint
-            try {
-                const result = await api.clearSession();
-                // eslint-disable-next-line no-console
-                console.log('Backend session cleared:', result);
-                serverCleared = true;
-                clearDetails = result.details;
-            } catch (backendError) {
-                console.warn('Backend clear-session also failed:', backendError);
-
-                // Strategy 3: Redirect to the static clear-cookies page
-                // eslint-disable-next-line no-console
-                console.log('Redirecting to /clear-cookies page as last resort');
-                window.location.href = '/clear-cookies';
-                return { cookiesCleared: false, diagnostics: 'Redirecting...', backendReady: false };
-            }
-        }
-
-        if (serverCleared) {
-            cookieDiagnostics = `Cleared ${clearedCount} browser cookies and server session. ${clearDetails}`;
-        } else {
-            cookieDiagnostics = `Cleared ${clearedCount} browser cookies. Server session cookies will expire automatically. Please refresh the page and try again.`;
-        }
-
-        // Check if backend is healthy before telling user to proceed
-        try {
-            backendReady = await checkBackendHealth(3);
-            if (!backendReady) {
-                cookieDiagnostics += ' Warning: Backend may still be starting up. Please wait a moment before trying again.';
-            }
-        } catch (e) {
-            // ignore
-        }
-
-        return { cookiesCleared: true, diagnostics: cookieDiagnostics, backendReady };
-
-    } catch (e) {
-        console.error('Error clearing cookies:', e);
-        // As a last resort, redirect to clear-cookies page
-        // eslint-disable-next-line no-console
-        console.log('Redirecting to /clear-cookies page after error');
-        window.location.href = '/clear-cookies';
-        return { cookiesCleared: false, diagnostics: 'Redirecting...', backendReady: false };
+    const sessionResult = await tryClearServerSession(fetchFn);
+    if (!sessionResult.success && sessionResult.strategy === 'redirect') {
+      performRedirect(options.skipRedirect === true);
+      return { cookiesCleared: false, diagnostics: 'Redirecting...', backendReady: false };
     }
+
+    const backendReady = await checkBackendHealth(3, { fetchFn });
+    const readinessMessage = backendReady
+      ? 'Backend health check succeeded.'
+      : 'Warning: Backend may still be starting up. Please wait before retrying.';
+
+    return {
+      cookiesCleared: true,
+      diagnostics: `Cleared ${clearedCount} browser cookies. ${sessionResult.details} ${readinessMessage}`,
+      backendReady
+    };
+  } catch (error) {
+    SESSION_LOGGER.error('Unexpected error while clearing cookies', error);
+    performRedirect(options.skipRedirect === true);
+    return { cookiesCleared: false, diagnostics: 'Redirecting...', backendReady: false };
+  }
 }
 
 /**
  * Checks if the error is related to request headers or cookies being too large.
- * Detects various error message formats from nginx, proxies, and browsers.
  */
-export function isHeaderTooLargeError(errorMessage: string, details: string, rawText?: string): boolean {
-    const combined = `${errorMessage} ${details} ${rawText || ''}`.toLowerCase();
-
-    // Check for common nginx/proxy error patterns
-    const patterns = [
-        'header.*too large',
-        'cookie.*too large',
-        'request header or cookie too large',
-        'request entity too large',
-        'request-uri too long',
-        '413 request entity',
-        '431 request header',
-        'header fields too large',
-        'bad request.*header',
-        'header.*overflow'
-    ];
-
-    return patterns.some(pattern => new RegExp(pattern).test(combined));
+export function isHeaderTooLargeError(
+  errorMessage: string,
+  details: string,
+  rawText?: string
+): boolean {
+  const combined = `${errorMessage} ${details} ${rawText || ''}`;
+  return HEADER_TOO_LARGE_PATTERNS.some((pattern) => pattern.test(combined));
 }

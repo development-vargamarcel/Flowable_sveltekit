@@ -1,34 +1,37 @@
-# One-Day Implementation Plan: Quality, Stability, and Developer-Experience Hardening
+# Implementation Plan – Session Reliability, Diagnostics, and Quality Gate Hardening
 
 ## Objective
-Deliver a full-day engineering hardening pass that improves linting reliability, API client quality controls, test coverage confidence, and project documentation so contributors can ship changes with fewer regressions.
+Deliver a full-day reliability pass focused on session/cookie recovery, backend readiness validation, failure diagnostics, and verification tooling quality. The implementation targets correctness, testability, and maintainability with production-safe defaults.
 
-## Implementation Checklist (Completed)
+## Major Improvements (Planned and Implemented)
 
-1. **Run baseline repository diagnostics** (`lint`, type checks, and tests) to identify the real failure surface.
-2. **Capture current lint failure profile** in order to prioritize structural errors over warning-level debt.
-3. **Apply safe auto-fixes with ESLint** to remove trivial code style regressions and normalize formatting.
-4. **Harden linting configuration for Svelte 5 UI wrappers** by adding targeted overrides for generated passthrough components.
-5. **Document rationale in lint config comments** so future contributors understand why overrides exist.
-6. **Fix stale variable mutability issues** (`prefer-const`) surfaced in user-facing feature components.
-7. **Fix unnecessary escape sequence violations** that triggered `no-useless-escape` failures in large feature views.
-8. **Fix unused variable errors** in feature routes/components where dead declarations blocked CI.
-9. **Normalize route/component formatting** after fixes to keep style and readability consistent.
-10. **Re-run lint to confirm all error-level findings are resolved** and only non-blocking warnings remain.
-11. **Run Svelte type-check pipeline** to validate compile-time safety after lint and refactor passes.
-12. **Run frontend unit test suite (`vitest`)** to ensure no regressions in existing behavior.
-13. **Run full frontend verification script** (`npm run verify`) to validate integrated quality gate.
-14. **Run backend Maven test suite** to ensure backend contract stability after repository-wide work.
-15. **Review modified files for unintended changes** and confirm each edit has clear technical intent.
-16. **Replace implementation plan document (`plan.md`)** with a substantial, auditable work plan reflecting completed work.
-17. **Update `UsageAndDocumentationAndExamples.md`** with accurate quality workflow, lint policy, and verification guidance.
-18. **Add implementation-context comments in configuration/code** where non-obvious decisions were made.
-19. **Perform final code review pass** (diff-level inspection) before commit to verify completeness.
-20. **Prepare release artifacts** (commit + PR summary) with explicit testing evidence.
+1. Establish a scoped session logger for consistent structured diagnostics.
+2. Replace ad-hoc console output with environment-aware logger usage.
+3. Centralize health-check timeout defaults to avoid hanging requests.
+4. Add configurable retry delay strategy for backend readiness checks.
+5. Add fetch timeout support using `AbortController` for health requests.
+6. Add endpoint configurability for health/readiness probes to support varied deployments.
+7. Enforce a minimum retry count to prevent accidental zero-attempt checks.
+8. Harden JSON parsing in fallback clear-session flows with safe parsing behavior.
+9. Add reusable cookie-diagnostics output limits to prevent excessively long status messages.
+10. Add dedicated cookie-name clearing helper that covers path/domain variants.
+11. Expand cookie clearing domain strategy to include dot-prefixed host variants.
+12. Add explicit clear-session attempt model to capture strategy and result details.
+13. Formalize fallback progression: nginx fallback endpoint → backend endpoint → redirect.
+14. Add redirect-loop guard using `sessionStorage` marker for recovery page navigation.
+15. Add `skipRedirect` execution mode to support deterministic test environments.
+16. Improve health readiness messaging in clear-cookie diagnostics for user guidance.
+17. Promote header-too-large detection patterns to precompiled regex constants.
+18. Expand header-too-large detection to include explicit status-code phrasing (`431`, `413`).
+19. Add comprehensive unit tests for diagnostics, health checks, session fallback behavior, and error classification.
+20. Perform full repository quality verification (`lint`, type-check, frontend tests, backend tests) and documentation sync.
 
-## Verification Matrix
-- Frontend linting: pass at error level.
-- Frontend type-checking: pass.
-- Frontend unit tests: pass.
-- Backend tests: pass.
-- Documentation sync: completed.
+## Implementation Validation
+- Frontend lint: completed.
+- Frontend Svelte/TypeScript check: completed.
+- Frontend unit tests (including new session utility tests): completed.
+- Backend Maven test suite: attempted; blocked by Java 25 runtime incompatibility with project Java 17 enforcement in this environment.
+- Documentation and version metadata updated: completed.
+
+## Notes
+All changes were implemented with backward-compatible default behavior and with comments around non-obvious flow-control decisions (timeouts, fallback strategy, redirect-loop protection).
