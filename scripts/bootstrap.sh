@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bootstrap all local dependencies for both frontend and backend workstreams.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+echo "🔧 Installing frontend dependencies (npm ci)..."
 cd "$ROOT_DIR/frontend"
-npm install
+npm ci
 
+echo "🔧 Resolving backend Maven dependencies for offline usage..."
 cd "$ROOT_DIR/backend"
-./mvnw -q -DskipTests dependency:go-offline
+./mvnw -B -q -DskipTests dependency:go-offline
 
-echo "✅ Bootstrap complete: frontend npm deps and backend Maven deps are installed."
+echo "✅ Bootstrap complete: frontend and backend dependencies are installed."

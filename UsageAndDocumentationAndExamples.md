@@ -1,143 +1,165 @@
 # Usage, Documentation, and Examples
 
 ## Current Version
-- **Frontend:** `1.2.0`
-- **Backend:** `1.2.0`
-- **Semantic versioning update:** `1.1.0` → `1.2.0` (**minor**) because this release adds substantial, backward-compatible workflow and verification improvements without breaking public APIs.
+
+- **Frontend:** `1.3.0`
+- **Backend:** `1.3.0`
+- **Repository release:** `1.3.0` (**minor**) because this release adds backward-compatible reliability improvements, stronger verification workflows, and test-stability fixes without breaking public APIs.
 
 ---
 
 ## What was implemented in this pass
 
-This implementation focused on full-stack engineering workflow hardening, CI modernization, and release-process reliability:
+This release focused on implementation hardening and verification depth:
 
-1. Standardized dependency and environment setup through reusable scripts.
-2. Introduced deterministic verification scripts for frontend, backend, and combined full-stack checks.
-3. Added a Makefile interface to reduce command drift across developers and CI.
-4. Modernized CI to use maintained action versions and split jobs by responsibility.
-5. Added a full-stack smoke stage to ensure local verification scripts and CI behavior stay aligned.
-6. Expanded backend Java compatibility constraints so modern environments can run tests while preserving a Java 17 minimum baseline.
-7. Updated package and artifact versions to `1.2.0` and synchronized project documentation.
+1. Hardened environment diagnostics with explicit prerequisite checks.
+2. Made dependency bootstrap deterministic by using `npm ci`.
+3. Improved frontend/backend verification script readability and feedback.
+4. Added elapsed-time reporting for the full verification entrypoint.
+5. Expanded Makefile discoverability (`help`) and test-only targets.
+6. Added stricter frontend verification script options (`verify:strict`).
+7. Added targeted frontend test script for session utility logic (`test:session-utils`).
+8. Strengthened cookie diagnostics and oversized-cookie warning behavior.
+9. Improved retry-delay sanitization and timeout logging for backend health checks.
+10. Deduplicated cookie clearing and encoded cookie names for safer invalidation.
+11. Expanded frontend unit tests to validate the new resilience behavior.
+12. Fixed backend test instability on Java 25+ by switching Mockito mock maker strategy.
+13. Updated Maven Surefire runtime args for better modern-JDK behavior.
 
 ---
 
-## New workflow commands
+## Updated workflow commands
 
 ### 1) Bootstrap dependencies
+
 ```bash
 ./scripts/bootstrap.sh
 ```
+
 What it does:
-- Installs frontend npm packages.
-- Pre-fetches backend Maven dependencies to speed up subsequent builds.
+
+- Installs frontend dependencies with `npm ci`.
+- Prefetches backend Maven dependencies for offline/test speed.
 
 ### 2) Run environment diagnostics
+
 ```bash
 ./scripts/doctor.sh
 ```
-What it prints:
+
+What it checks:
+
 - Repository path
-- Node version
-- npm version
-- Java runtime version
+- Node/npm versions
+- Java version
 - Maven wrapper version
+- Presence of required runtime commands
 
 ### 3) Verify frontend quality gates
+
 ```bash
 ./scripts/verify-frontend.sh
 ```
+
 Runs:
-- `npm run format:check`
-- `npm run lint`
-- `npm run check`
-- `npm run test:ci`
-- `npm run build`
+
+- formatting check
+- lint
+- Svelte type-check
+- frontend unit tests
+- production build
 
 ### 4) Verify backend quality gates
+
 ```bash
 ./scripts/verify-backend.sh
 ```
+
 Runs:
-- `./mvnw -B test`
+
+- backend Maven tests (`./mvnw -B test`)
 
 ### 5) Verify entire repository
+
 ```bash
 ./scripts/verify-all.sh
 ```
+
 Runs:
-- `doctor`
+
+- doctor
 - frontend verification
 - backend verification
+- reports total execution duration
 
 ### 6) Makefile shortcuts
+
 ```bash
+make help
 make bootstrap
 make doctor
 make verify-frontend
 make verify-backend
+make test-frontend
+make test-backend
 make verify
+```
+
+### 7) Frontend package scripts added in this release
+
+```bash
+cd frontend
+npm run test:session-utils
+npm run verify:strict
 ```
 
 ---
 
-## CI/CD behavior
+## Backend test stability note
 
-The CI workflow now executes three jobs:
+To eliminate Java 25+ Mockito inline instrumentation failures, backend tests now use:
 
-1. **frontend**
-   - Installs dependencies with `npm ci`
-   - Runs formatting, lint, type-checks, tests, and build
+- `mock-maker-subclass` through `backend/src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker`
+- updated Surefire `argLine` including `-XX:+EnableDynamicAgentLoading`
 
-2. **backend**
-   - Uses JDK 21
-   - Runs backend Maven tests
-
-3. **fullstack-smoke** (depends on frontend + backend)
-   - Installs required toolchains
-   - Runs `./scripts/verify-all.sh`
-
-This structure improves failure isolation while still validating the repository-level orchestration path.
+This preserves test behavior while improving modern JDK compatibility.
 
 ---
 
-## Important implementation notes
+## Usage examples
 
-- Backend enforcer policy now accepts Java `[17,26)`.
-  - This keeps Java 17 as the minimum supported baseline.
-  - It also removes avoidable friction in environments using modern runtimes.
-- New scripts intentionally include explanatory comments to help maintainers understand why each gate exists and how it should be used.
+### Example A: Clean setup and full validation
 
----
-
-## Example usage scenarios
-
-### Example A: New contributor setup + full validation
 ```bash
 ./scripts/bootstrap.sh
 ./scripts/verify-all.sh
 ```
 
-### Example B: Fast local triage for backend-only changes
-```bash
-./scripts/doctor.sh
-./scripts/verify-backend.sh
-```
+### Example B: Frontend-only change verification
 
-### Example C: Pre-PR frontend verification
 ```bash
 cd frontend
 npm run verify:full
+npm run test:session-utils
+```
+
+### Example C: Backend test triage
+
+```bash
+./scripts/doctor.sh
+./scripts/verify-backend.sh
 ```
 
 ---
 
-## Testing and verification steps used for this release
+## Testing and verification steps executed for this release
 
 ```bash
 ./scripts/doctor.sh
-./scripts/verify-frontend.sh
-./scripts/verify-backend.sh
+cd frontend && npm run verify
+cd frontend && npm run test:session-utils
+cd backend && ./mvnw -B test
 ./scripts/verify-all.sh
 ```
 
-All commands above were executed to verify implementation completeness and stability.
+All commands above were run successfully in this implementation pass.

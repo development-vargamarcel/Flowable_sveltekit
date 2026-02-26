@@ -13,7 +13,7 @@
 
     <groupId>com.demo</groupId>
     <artifactId>bpm-backend</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <name>BPM Backend</name>
     <description>Flowable BPM Backend with Spring Boot</description>
 
@@ -154,7 +154,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <argLine>-Duser.timezone=UTC</argLine>
+                    <argLine>-Duser.timezone=UTC -XX:+EnableDynamicAgentLoading</argLine>
                 </configuration>
             </plugin>
             <plugin>

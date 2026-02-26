@@ -1,37 +1,54 @@
-# Implementation Plan – Full-Stack Quality, Tooling, and Release Hardening (v1.2.0)
+# Implementation Plan (v1.3.0 hardening pass)
 
-## Objective
-Deliver a production-quality improvement pass that strengthens developer workflow, CI reliability, release consistency, and full-stack verification discipline.
+This plan focuses on reliability, developer workflow quality, test stability, and release documentation.
+All items below were implemented and verified in this pass.
 
-## Major Improvements (Implemented)
+## Objectives
 
-1. ✅ Replaced previous plan content with a professional execution-ready plan that tracks delivery scope and completion status.
-2. ✅ Added a reusable `scripts/bootstrap.sh` to install frontend dependencies and prefetch backend Maven dependencies.
-3. ✅ Added a reusable `scripts/doctor.sh` to surface Node, npm, Java, and Maven wrapper runtime diagnostics before running heavy checks.
-4. ✅ Added a dedicated `scripts/verify-frontend.sh` gate that runs format check, lint, type check, tests, and production build.
-5. ✅ Added a dedicated `scripts/verify-backend.sh` gate that runs the backend Maven test lifecycle in batch mode.
-6. ✅ Added `scripts/verify-all.sh` as a single orchestrator for local and CI full-stack validation.
-7. ✅ Added a project-level `Makefile` with standardized `bootstrap`, `doctor`, and verification targets.
-8. ✅ Updated CI to use separate frontend/backend jobs for faster and clearer fault isolation.
-9. ✅ Upgraded GitHub Actions references from v3 to v4 for maintained CI actions.
-10. ✅ Updated CI frontend job to run `npm ci` and full quality gates, including production build.
-11. ✅ Updated CI backend job to run Maven tests in a dedicated job with explicit Java setup.
-12. ✅ Added a CI full-stack smoke job that validates the consolidated repository script entrypoint (`scripts/verify-all.sh`).
-13. ✅ Expanded backend Java version compatibility gate from `[17,18)` to `[17,26)` to support modern CI and developer runtimes while preserving Java 17 minimum.
-14. ✅ Bumped backend semantic version from `1.1.0` to `1.2.0` for this backward-compatible improvement release.
-15. ✅ Bumped frontend semantic version from `1.1.0` to `1.2.0` and synchronized lock metadata.
-16. ✅ Added a frontend `verify:full` script so package-level and repository-level verification flows stay aligned.
-17. ✅ Added contextual code comments in new scripts to explain operational intent and guardrails.
-18. ✅ Executed frontend full verification pipeline and confirmed passing results.
-19. ✅ Executed backend Maven test suite after compatibility updates and confirmed passing results.
-20. ✅ Updated `UsageAndDocumentationAndExamples.md` to document new workflows, release notes, verification procedures, and examples.
+- Improve end-to-end developer confidence and reduce setup/debug friction.
+- Eliminate backend test instability in modern JDK environments.
+- Strengthen cookie/session recovery behavior and validation in the frontend.
+- Align scripts, docs, and semantic versioning for a release-grade handoff.
 
-## Validation Checklist
-- [x] Frontend formatting check
-- [x] Frontend linting
-- [x] Frontend Svelte/TypeScript checks
-- [x] Frontend tests
-- [x] Frontend production build
-- [x] Backend Maven tests
-- [x] End-to-end repository verification script
-- [x] Documentation synchronized with implementation
+## Completed Improvements
+
+1. **Reworked environment diagnostics (`scripts/doctor.sh`) to fail fast on missing prerequisites.**
+2. **Added explicit command presence checks for `node`, `npm`, and `java`.**
+3. **Improved doctor output to show preferred JDK fallback context.**
+4. **Converted bootstrap flow from `npm install` to deterministic `npm ci`.**
+5. **Kept backend bootstrap dependency prefetch with Maven offline resolution.**
+6. **Improved frontend verification script messaging and execution clarity.**
+7. **Improved backend verification script messaging and execution clarity.**
+8. **Retained automatic JDK 21 preference in backend verification for compatibility.**
+9. **Added end-to-end elapsed time reporting in `scripts/verify-all.sh`.**
+10. **Expanded Makefile with discoverable `help` target and explicit test-only targets.**
+11. **Added frontend npm script for targeted session utility tests.**
+12. **Added strict frontend verification script for deep local validation (`verify:strict`).**
+13. **Hardened cookie diagnostics by sanitizing invalid `maxNames` values.**
+14. **Added cookie payload size warning to diagnostics for oversized-cookie triage.**
+15. **Deduplicated cookie names in diagnostics to reduce noisy reporting.**
+16. **Sanitized custom health-check delay values to avoid invalid retry timing.**
+17. **Improved backend health-check logging for non-200/503 statuses and timeout reasons.**
+18. **Made cookie-clearing logic robust for special cookie names via URL encoding.**
+19. **Deduplicated cookie-clear operations to avoid redundant repeated writes.**
+20. **Expanded session utility unit tests for new diagnostics, timeout retries, and dedup behavior.**
+21. **Fixed backend unit-test failures on Java 25+ by switching Mockito mock maker to subclass mode.**
+22. **Updated Maven Surefire JVM args for dynamic agent loading compatibility noise reduction.**
+23. **Bumped frontend and backend versions to `1.3.0` using semantic versioning (minor).**
+24. **Updated release documentation (`UsageAndDocumentationAndExamples.md`) for new scripts, behavior, and tests.**
+25. **Updated `VERSION.md` to align with release version and semantic-version rationale.**
+
+## Verification Performed
+
+- Frontend lint/type/test/build verification via `npm run verify`.
+- Targeted session utility test verification via `npm run test:session-utils`.
+- Backend test verification via `./mvnw -B test`.
+- Consolidated repo checks via `./scripts/verify-all.sh`.
+
+## Code Review Checklist (Completed)
+
+- [x] Confirmed script changes are executable and path-safe.
+- [x] Confirmed frontend utility behavior remains backward-compatible at API level.
+- [x] Confirmed new tests cover newly introduced logic branches.
+- [x] Confirmed backend test suite no longer fails due to Mockito inline instrumentation issue.
+- [x] Confirmed documentation and version files match implemented behavior.
