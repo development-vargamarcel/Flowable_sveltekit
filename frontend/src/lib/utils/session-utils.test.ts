@@ -34,6 +34,23 @@ describe('session-utils', () => {
         Object.defineProperty(document, 'cookie', cookieDescriptor);
       }
     });
+
+    it('guards against invalid maxNames and includes payload warning when cookies are large', () => {
+      const cookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+      Object.defineProperty(document, 'cookie', {
+        configurable: true,
+        get: () => `token=${'x'.repeat(4200)}; a=1`,
+        set: () => undefined
+      });
+
+      const diagnostics = getCookieDiagnostics(Number.NaN);
+      expect(diagnostics).toContain('Potential risk');
+      expect(diagnostics).toContain('token, a');
+
+      if (cookieDescriptor) {
+        Object.defineProperty(document, 'cookie', cookieDescriptor);
+      }
+    });
   });
 
   describe('checkBackendHealth', () => {
@@ -61,6 +78,19 @@ describe('session-utils', () => {
         checkBackendHealth(2, { fetchFn: fetchFn as any, delaysMs: [0, 0] })
       ).resolves.toBe(true);
       expect(fetchFn).toHaveBeenCalledTimes(4);
+    });
+
+    it('handles timeout-style failures and keeps retrying', async () => {
+      const fetchFn = vi
+        .fn()
+        .mockRejectedValueOnce(new DOMException('timeout', 'AbortError'))
+        .mockResolvedValueOnce({ ok: true, status: 200 })
+        .mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await expect(
+        checkBackendHealth(2, { fetchFn: fetchFn as typeof fetch, delaysMs: [0, 0] })
+      ).resolves.toBe(true);
+      expect(fetchFn).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -104,6 +134,33 @@ describe('session-utils', () => {
       expect(result.cookiesCleared).toBe(true);
       expect(result.diagnostics).toContain('backend cleared');
       expect(api.clearSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not duplicate clear operations for repeated cookie names', async () => {
+      const writes: string[] = [];
+      const cookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+      Object.defineProperty(document, 'cookie', {
+        configurable: true,
+        get: () => 'session=1; session=2; preference=3',
+        set: (value: string) => {
+          writes.push(value);
+        }
+      });
+
+      const fetchFn = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ details: 'ok from fallback' }) })
+        .mockResolvedValueOnce({ ok: true, status: 200 })
+        .mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await clearAllCookies({ fetchFn: fetchFn as typeof fetch, skipRedirect: true });
+
+      // There are 18 cookie invalidation writes per cookie name (3 paths × 3 domains × 2 directives).
+      expect(writes.length).toBe(36);
+
+      if (cookieDescriptor) {
+        Object.defineProperty(document, 'cookie', cookieDescriptor);
+      }
     });
   });
 

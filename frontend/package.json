@@ -1,6 +1,6 @@
 {
   "name": "bpm-frontend",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "scripts": {
     "dev": "vite dev",
@@ -20,7 +20,9 @@
     "pretest": "svelte-kit sync",
     "test:ci": "npm run pretest && vitest run",
     "verify": "npm run lint && npm run check && npm run test:ci",
-    "verify:full": "npm run format:check && npm run lint && npm run check && npm run test:ci && npm run build"
+    "verify:full": "npm run format:check && npm run lint && npm run check && npm run test:ci && npm run build",
+    "test:session-utils": "vitest run src/lib/utils/session-utils.test.ts",
+    "verify:strict": "npm run verify:full && npm run test:coverage"
   },
   "devDependencies": {
     "@lucide/svelte": "^0.575.0",

@@ -4,6 +4,7 @@ import { logger } from '$lib/utils/logger';
 const SESSION_LOGGER = logger.child({ module: 'session-utils' });
 const DEFAULT_HEALTH_TIMEOUT_MS = 4000;
 const DEFAULT_HEALTH_DELAYS_MS = [1000, 2000, 3000];
+const LARGE_COOKIE_WARNING_BYTES = 4096;
 const HEADER_TOO_LARGE_PATTERNS = [
   /header.*too large/i,
   /cookie.*too large/i,
@@ -48,18 +49,26 @@ interface ClearSessionAttempt {
 export function getCookieDiagnostics(maxNames = 10): string {
   if (typeof document === 'undefined') return 'Cookie diagnostics not available during SSR';
 
+  const safeMaxNames = Number.isFinite(maxNames) ? Math.max(0, Math.floor(maxNames)) : 10;
+
   const cookies = document.cookie
     .split(';')
     .map((cookie) => cookie.trim())
     .filter(Boolean);
 
   const totalSize = document.cookie.length;
-  const names = cookies.map((cookie) => cookie.split('=')[0]?.trim()).filter(Boolean) as string[];
-  const limitedNames = names.slice(0, Math.max(maxNames, 0));
+  const names = Array.from(
+    new Set(cookies.map((cookie) => cookie.split('=')[0]?.trim()).filter(Boolean) as string[])
+  );
+  const limitedNames = names.slice(0, safeMaxNames);
   const suffix =
     names.length > limitedNames.length ? ` (+${names.length - limitedNames.length} more)` : '';
+  const possibleHeaderWarning =
+    totalSize > LARGE_COOKIE_WARNING_BYTES
+      ? ` Potential risk: browser cookie payload is above ${LARGE_COOKIE_WARNING_BYTES} bytes.`
+      : '';
 
-  return `Found ${cookies.length} accessible cookies (${totalSize} bytes): ${limitedNames.join(', ') || 'none'}${suffix}. Note: HttpOnly cookies (like JSESSIONID) are not visible to JavaScript.`;
+  return `Found ${cookies.length} accessible cookies (${totalSize} bytes): ${limitedNames.join(', ') || 'none'}${suffix}. Note: HttpOnly cookies (like JSESSIONID) are not visible to JavaScript.${possibleHeaderWarning}`;
 }
 
 async function fetchWithTimeout(
@@ -88,7 +97,13 @@ async function safeReadJson(response: Response): Promise<Record<string, unknown>
 
 function resolveDelays(retries: number, providedDelays?: number[]): number[] {
   if (providedDelays && providedDelays.length > 0) {
-    return providedDelays.slice(0, retries);
+    const sanitizedDelays = providedDelays
+      .map((delay) => (Number.isFinite(delay) ? Math.max(0, Math.floor(delay)) : 0))
+      .slice(0, retries);
+
+    if (sanitizedDelays.length > 0) {
+      return sanitizedDelays;
+    }
   }
 
   if (retries <= DEFAULT_HEALTH_DELAYS_MS.length) {
@@ -145,9 +160,22 @@ export async function checkBackendHealth(
             readyStatus: readyResponse.status
           });
         }
+      } else {
+        SESSION_LOGGER.warn('Backend health endpoint returned non-success status', {
+          attempt: i + 1,
+          retryCount,
+          healthStatus: response.status
+        });
       }
     } catch (error) {
-      SESSION_LOGGER.warn('Backend health check failed', { attempt: i + 1, retryCount, error });
+      const isAbort = error instanceof DOMException && error.name === 'AbortError';
+      SESSION_LOGGER.warn('Backend health check failed', {
+        attempt: i + 1,
+        retryCount,
+        timeoutMs,
+        reason: isAbort ? 'timeout' : 'request-failure',
+        error
+      });
     }
 
     if (i < retryCount - 1) {
@@ -161,12 +189,13 @@ export async function checkBackendHealth(
 function clearCookieByName(name: string, hostname: string): void {
   const paths = ['/', '/api', '/api/'];
   const domains = ['', hostname, `.${hostname}`];
+  const encodedName = encodeURIComponent(name);
 
   for (const path of paths) {
     for (const domain of domains) {
       const domainPart = domain ? `;domain=${domain}` : '';
-      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}${domainPart}`;
-      document.cookie = `${name}=;max-age=0;path=${path}${domainPart}`;
+      document.cookie = `${encodedName}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}${domainPart}`;
+      document.cookie = `${encodedName}=;max-age=0;path=${path}${domainPart}`;
     }
   }
 }
@@ -220,7 +249,8 @@ async function tryClearServerSession(fetchFn: FetchLike): Promise<ClearSessionAt
     return {
       strategy: 'redirect',
       success: false,
-      details: 'Unable to clear server session through available endpoints'
+      details:
+        'Unable to clear server session through available endpoints; falling back to redirect'
     };
   }
 }
@@ -252,11 +282,19 @@ export async function clearAllCookies(
       .split(';')
       .map((cookie) => cookie.trim())
       .filter(Boolean);
+    const uniqueCookieNames = Array.from(
+      new Set(
+        cookies
+          .map((cookie) => {
+            const eqPos = cookie.indexOf('=');
+            return eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie;
+          })
+          .filter(Boolean)
+      )
+    );
     let clearedCount = 0;
 
-    for (const cookie of cookies) {
-      const eqPos = cookie.indexOf('=');
-      const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie;
+    for (const name of uniqueCookieNames) {
       if (!name) continue;
       clearCookieByName(name, window.location.hostname);
       clearedCount++;
