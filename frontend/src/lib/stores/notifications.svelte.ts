@@ -24,12 +24,12 @@ function createNotificationStore() {
   }
 
   function updateUnreadCount() {
-    unreadCount = notifications.filter(n => !n.read).length;
+    unreadCount = notifications.filter((n) => !n.read).length;
   }
 
   async function markAsRead(id: string) {
     // Optimistic update
-    const notification = notifications.find(n => n.id === id);
+    const notification = notifications.find((n) => n.id === id);
     if (notification && !notification.read) {
       notification.read = true;
       updateUnreadCount();
@@ -47,8 +47,8 @@ function createNotificationStore() {
 
   async function markAllAsRead() {
     // Optimistic update
-    const unread = notifications.filter(n => !n.read);
-    unread.forEach(n => n.read = true);
+    const unread = notifications.filter((n) => !n.read);
+    unread.forEach((n) => (n.read = true));
     updateUnreadCount();
 
     try {
@@ -56,7 +56,7 @@ function createNotificationStore() {
     } catch (err) {
       console.error('Failed to mark all as read', err);
       // Revert
-      unread.forEach(n => n.read = false);
+      unread.forEach((n) => (n.read = false));
       updateUnreadCount();
     }
   }
@@ -76,9 +76,15 @@ function createNotificationStore() {
   }
 
   return {
-    get notifications() { return notifications; },
-    get unreadCount() { return unreadCount; },
-    get loading() { return loading; },
+    get notifications() {
+      return notifications;
+    },
+    get unreadCount() {
+      return unreadCount;
+    },
+    get loading() {
+      return loading;
+    },
     loadNotifications,
     markAsRead,
     markAllAsRead,

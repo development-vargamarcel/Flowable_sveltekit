@@ -1,4 +1,3 @@
-
 import { test, expect } from '@playwright/test';
 
 test('Verify Process Designer UI Changes', async ({ page }) => {
@@ -39,5 +38,8 @@ test('Verify Process Designer UI Changes', async ({ page }) => {
   await page.getByTitle('Expression Tester').getByRole('button').first().click(); // Close button usually in header
 
   // 7. Screenshot
-  await page.screenshot({ path: 'frontend/src/tests/verification/process_designer_verification.png', fullPage: true });
+  await page.screenshot({
+    path: 'frontend/src/tests/verification/process_designer_verification.png',
+    fullPage: true
+  });
 });

@@ -52,9 +52,7 @@ export const analyticsApi = {
    * @param days - Number of days to look back (default 7).
    * @returns A promise that resolves to an array of trend metrics.
    */
-  async getProcessCompletionTrend(
-    days: number = 7
-  ): Promise<{ date: string; count: number }[]> {
+  async getProcessCompletionTrend(days: number = 7): Promise<{ date: string; count: number }[]> {
     log.debug('getProcessCompletionTrend called', { days });
     return fetchApi(`/api/analytics/completion-trend?days=${days}`);
   },

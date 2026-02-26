@@ -11,75 +11,75 @@
 
 // Export all schemas and types
 export {
-	// Field validation
-	fieldStateSchema,
-	fieldConstraintsSchema,
-	fieldValidationSchema,
-	fieldOptionSchema,
-	fieldTypeEnum,
-	fieldDefinitionSchema,
+  // Field validation
+  fieldStateSchema,
+  fieldConstraintsSchema,
+  fieldValidationSchema,
+  fieldOptionSchema,
+  fieldTypeEnum,
+  fieldDefinitionSchema,
 
-	// Grid validation
-	gridStateSchema,
-	gridColumnSchema,
-	gridDefinitionSchema,
+  // Grid validation
+  gridStateSchema,
+  gridColumnSchema,
+  gridDefinitionSchema,
 
-	// Document type
-	documentTypeSchema,
+  // Document type
+  documentTypeSchema,
 
-	// Condition rules
-	conditionTargetSchema,
-	conditionEffectEnum,
-	conditionRuleSchema,
+  // Condition rules
+  conditionTargetSchema,
+  conditionEffectEnum,
+  conditionRuleSchema,
 
-	// Process form configuration
-	processFormConfigSchema,
+  // Process form configuration
+  processFormConfigSchema,
 
-	// Validation results
-	validationErrorSchema,
-	validationResultSchema,
+  // Validation results
+  validationErrorSchema,
+  validationResultSchema,
 
-	// Computed states
-	computedFieldStateSchema,
-	computedGridStateSchema,
+  // Computed states
+  computedFieldStateSchema,
+  computedGridStateSchema,
 
-	// Defaults
-	defaultFieldValidation,
-	defaultGridValidation,
+  // Defaults
+  defaultFieldValidation,
+  defaultGridValidation,
 
-	// Types
-	type FieldState,
-	type FieldConstraints,
-	type FieldValidation,
-	type FieldOption,
-	type FieldType,
-	type FieldDefinition,
-	type GridState,
-	type GridColumn,
-	type GridDefinition,
-	type DocumentType,
-	type ConditionTarget,
-	type ConditionEffect,
-	type ConditionRule,
-	type ProcessFormConfig,
-	type ValidationError,
-	type ValidationResult,
-	type ComputedFieldState,
-	type ComputedGridState
+  // Types
+  type FieldState,
+  type FieldConstraints,
+  type FieldValidation,
+  type FieldOption,
+  type FieldType,
+  type FieldDefinition,
+  type GridState,
+  type GridColumn,
+  type GridDefinition,
+  type DocumentType,
+  type ConditionTarget,
+  type ConditionEffect,
+  type ConditionRule,
+  type ProcessFormConfig,
+  type ValidationError,
+  type ValidationResult,
+  type ComputedFieldState,
+  type ComputedGridState
 } from './schemas';
 
 // Export dynamic validator functions
 export {
-	createFieldValueSchema,
-	createGridRowSchema,
-	createGridSchema,
-	createDocumentFormSchema,
-	validateFormData,
-	validateFieldValue,
-	validateGridData,
-	sanitizeInput,
-	createServerSchema,
-	type FormValidationResult
+  createFieldValueSchema,
+  createGridRowSchema,
+  createGridSchema,
+  createDocumentFormSchema,
+  validateFormData,
+  validateFieldValue,
+  validateGridData,
+  sanitizeInput,
+  createServerSchema,
+  type FormValidationResult
 } from './dynamic-validator';
 
 // Export the Svelte 5 validation hook

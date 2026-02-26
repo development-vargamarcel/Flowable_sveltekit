@@ -5,22 +5,22 @@ import * as Sentry from '@sentry/sveltekit';
 const sentryDsn = import.meta.env.PUBLIC_SENTRY_DSN;
 
 if (sentryDsn) {
-	Sentry.init({
-		dsn: sentryDsn,
+  Sentry.init({
+    dsn: sentryDsn,
 
-		// Performance Monitoring
-		tracesSampleRate: 1.0, // Capture 100% of transactions for performance monitoring
+    // Performance Monitoring
+    tracesSampleRate: 1.0, // Capture 100% of transactions for performance monitoring
 
-		// Session Replay
-		replaysSessionSampleRate: 0.1, // 10% of sessions for general sampling
-		replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
+    // Session Replay
+    replaysSessionSampleRate: 0.1, // 10% of sessions for general sampling
+    replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
 
-		// Environment configuration
-		environment: import.meta.env.MODE,
+    // Environment configuration
+    environment: import.meta.env.MODE,
 
-		// Integrations
-		integrations: [Sentry.replayIntegration()]
-	});
+    // Integrations
+    integrations: [Sentry.replayIntegration()]
+  });
 }
 
 // Export Sentry's handleError hook

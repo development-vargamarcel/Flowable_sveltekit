@@ -1,6 +1,6 @@
 /**
  * Breadcrumb Context Store
- * 
+ *
  * Provides dynamic context labels for breadcrumbs.
  * Pages can set custom labels for route segments (like task names, process names)
  * instead of showing raw IDs.
@@ -15,41 +15,41 @@ let contextLabels = $state<Record<string, string>>({});
  * @param label - The human-readable label to display
  */
 export function setBreadcrumbLabel(segment: string, label: string): void {
-	contextLabels = { ...contextLabels, [segment]: label };
+  contextLabels = { ...contextLabels, [segment]: label };
 }
 
 /**
  * Set multiple context labels at once
  */
 export function setBreadcrumbLabels(labels: Record<string, string>): void {
-	contextLabels = { ...contextLabels, ...labels };
+  contextLabels = { ...contextLabels, ...labels };
 }
 
 /**
  * Get a context label for a segment, or return undefined
  */
 export function getBreadcrumbLabel(segment: string): string | undefined {
-	return contextLabels[segment];
+  return contextLabels[segment];
 }
 
 /**
  * Clear a specific context label
  */
 export function clearBreadcrumbLabel(segment: string): void {
-	const { [segment]: _, ...rest } = contextLabels;
-	contextLabels = rest;
+  const { [segment]: _, ...rest } = contextLabels;
+  contextLabels = rest;
 }
 
 /**
  * Clear all context labels
  */
 export function clearAllBreadcrumbLabels(): void {
-	contextLabels = {};
+  contextLabels = {};
 }
 
 /**
  * Get all current context labels (for debugging)
  */
 export function getAllBreadcrumbLabels(): Record<string, string> {
-	return { ...contextLabels };
+  return { ...contextLabels };
 }

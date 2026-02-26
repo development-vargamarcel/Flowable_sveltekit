@@ -1,37 +1,37 @@
-# Implementation Plan – Session Reliability, Diagnostics, and Quality Gate Hardening
+# Implementation Plan – Full-Stack Quality, Tooling, and Release Hardening (v1.2.0)
 
 ## Objective
-Deliver a full-day reliability pass focused on session/cookie recovery, backend readiness validation, failure diagnostics, and verification tooling quality. The implementation targets correctness, testability, and maintainability with production-safe defaults.
+Deliver a production-quality improvement pass that strengthens developer workflow, CI reliability, release consistency, and full-stack verification discipline.
 
-## Major Improvements (Planned and Implemented)
+## Major Improvements (Implemented)
 
-1. Establish a scoped session logger for consistent structured diagnostics.
-2. Replace ad-hoc console output with environment-aware logger usage.
-3. Centralize health-check timeout defaults to avoid hanging requests.
-4. Add configurable retry delay strategy for backend readiness checks.
-5. Add fetch timeout support using `AbortController` for health requests.
-6. Add endpoint configurability for health/readiness probes to support varied deployments.
-7. Enforce a minimum retry count to prevent accidental zero-attempt checks.
-8. Harden JSON parsing in fallback clear-session flows with safe parsing behavior.
-9. Add reusable cookie-diagnostics output limits to prevent excessively long status messages.
-10. Add dedicated cookie-name clearing helper that covers path/domain variants.
-11. Expand cookie clearing domain strategy to include dot-prefixed host variants.
-12. Add explicit clear-session attempt model to capture strategy and result details.
-13. Formalize fallback progression: nginx fallback endpoint → backend endpoint → redirect.
-14. Add redirect-loop guard using `sessionStorage` marker for recovery page navigation.
-15. Add `skipRedirect` execution mode to support deterministic test environments.
-16. Improve health readiness messaging in clear-cookie diagnostics for user guidance.
-17. Promote header-too-large detection patterns to precompiled regex constants.
-18. Expand header-too-large detection to include explicit status-code phrasing (`431`, `413`).
-19. Add comprehensive unit tests for diagnostics, health checks, session fallback behavior, and error classification.
-20. Perform full repository quality verification (`lint`, type-check, frontend tests, backend tests) and documentation sync.
+1. ✅ Replaced previous plan content with a professional execution-ready plan that tracks delivery scope and completion status.
+2. ✅ Added a reusable `scripts/bootstrap.sh` to install frontend dependencies and prefetch backend Maven dependencies.
+3. ✅ Added a reusable `scripts/doctor.sh` to surface Node, npm, Java, and Maven wrapper runtime diagnostics before running heavy checks.
+4. ✅ Added a dedicated `scripts/verify-frontend.sh` gate that runs format check, lint, type check, tests, and production build.
+5. ✅ Added a dedicated `scripts/verify-backend.sh` gate that runs the backend Maven test lifecycle in batch mode.
+6. ✅ Added `scripts/verify-all.sh` as a single orchestrator for local and CI full-stack validation.
+7. ✅ Added a project-level `Makefile` with standardized `bootstrap`, `doctor`, and verification targets.
+8. ✅ Updated CI to use separate frontend/backend jobs for faster and clearer fault isolation.
+9. ✅ Upgraded GitHub Actions references from v3 to v4 for maintained CI actions.
+10. ✅ Updated CI frontend job to run `npm ci` and full quality gates, including production build.
+11. ✅ Updated CI backend job to run Maven tests in a dedicated job with explicit Java setup.
+12. ✅ Added a CI full-stack smoke job that validates the consolidated repository script entrypoint (`scripts/verify-all.sh`).
+13. ✅ Expanded backend Java version compatibility gate from `[17,18)` to `[17,26)` to support modern CI and developer runtimes while preserving Java 17 minimum.
+14. ✅ Bumped backend semantic version from `1.1.0` to `1.2.0` for this backward-compatible improvement release.
+15. ✅ Bumped frontend semantic version from `1.1.0` to `1.2.0` and synchronized lock metadata.
+16. ✅ Added a frontend `verify:full` script so package-level and repository-level verification flows stay aligned.
+17. ✅ Added contextual code comments in new scripts to explain operational intent and guardrails.
+18. ✅ Executed frontend full verification pipeline and confirmed passing results.
+19. ✅ Executed backend Maven test suite after compatibility updates and confirmed passing results.
+20. ✅ Updated `UsageAndDocumentationAndExamples.md` to document new workflows, release notes, verification procedures, and examples.
 
-## Implementation Validation
-- Frontend lint: completed.
-- Frontend Svelte/TypeScript check: completed.
-- Frontend unit tests (including new session utility tests): completed.
-- Backend Maven test suite: attempted; blocked by Java 25 runtime incompatibility with project Java 17 enforcement in this environment.
-- Documentation and version metadata updated: completed.
-
-## Notes
-All changes were implemented with backward-compatible default behavior and with comments around non-obvious flow-control decisions (timeouts, fallback strategy, redirect-loop protection).
+## Validation Checklist
+- [x] Frontend formatting check
+- [x] Frontend linting
+- [x] Frontend Svelte/TypeScript checks
+- [x] Frontend tests
+- [x] Frontend production build
+- [x] Backend Maven tests
+- [x] End-to-end repository verification script
+- [x] Documentation synchronized with implementation

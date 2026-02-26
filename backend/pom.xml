@@ -13,7 +13,7 @@
 
     <groupId>com.demo</groupId>
     <artifactId>bpm-backend</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <name>BPM Backend</name>
     <description>Flowable BPM Backend with Spring Boot</description>
 
@@ -22,7 +22,7 @@
         <flowable.version>7.0.1</flowable.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>17</maven.compiler.release>
-        <lombok.version>1.18.30</lombok.version>
+        <lombok.version>1.18.38</lombok.version>
     </properties>
 
     <dependencies>
@@ -123,10 +123,10 @@
                             <goal>enforce</goal>
                         </goals>
                         <configuration>
-                            <!-- The backend relies on Java 17 compatibility with Flowable and Lombok. -->
+                            <!-- Enforce Java 17+ minimum while allowing modern CI/dev runtimes (for example Java 21/25). -->
                             <rules>
                                 <requireJavaVersion>
-                                    <version>[17,18)</version>
+                                    <version>[17,26)</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>

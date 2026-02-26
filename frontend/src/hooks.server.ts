@@ -22,7 +22,11 @@ if (sentryDsn) {
 // For Netlify deployment: Set BACKEND_URL in Netlify dashboard (e.g., https://your-app.railway.app)
 // For local development: http://localhost:8080
 // Remove trailing slashes to prevent double-slash issues (e.g., //api/auth/login)
-const BACKEND_URL = (process.env.BACKEND_URL || process.env.VITE_API_URL || 'http://localhost:8080').replace(/\/+$/, '');
+const BACKEND_URL = (
+  process.env.BACKEND_URL ||
+  process.env.VITE_API_URL ||
+  'http://localhost:8080'
+).replace(/\/+$/, '');
 const isDev = process.env.NODE_ENV === 'development';
 
 // Check if we're running on Netlify (serverless functions)

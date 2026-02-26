@@ -1,9 +1,9 @@
-
 export const demoDocumentTypes = [
   {
     key: 'customer-logic-demo',
     name: 'Customer Logic Demo',
-    description: 'Showcases SQL and JS logic features. Auto-fetches customer data from DEMO tables and calculates discounts.',
+    description:
+      'Showcases SQL and JS logic features. Auto-fetches customer data from DEMO tables and calculates discounts.',
     schema: {
       fields: [
         {
@@ -25,7 +25,7 @@ export const demoDocumentTypes = [
           validation: null,
           logic: {
             type: 'SQL',
-            content: "SELECT name FROM DEMO_CUSTOMERS WHERE id = ${form.customerId}",
+            content: 'SELECT name FROM DEMO_CUSTOMERS WHERE id = ${form.customerId}',
             dependencies: ['customerId'],
             autoCalculate: true
           }
@@ -39,7 +39,7 @@ export const demoDocumentTypes = [
           validation: null,
           logic: {
             type: 'SQL',
-            content: "SELECT email FROM DEMO_CUSTOMERS WHERE id = ${form.customerId}",
+            content: 'SELECT email FROM DEMO_CUSTOMERS WHERE id = ${form.customerId}',
             dependencies: ['customerId'],
             autoCalculate: true
           }
@@ -53,7 +53,7 @@ export const demoDocumentTypes = [
           validation: null,
           logic: {
             type: 'SQL',
-            content: "SELECT segment FROM DEMO_CUSTOMERS WHERE id = ${form.customerId}",
+            content: 'SELECT segment FROM DEMO_CUSTOMERS WHERE id = ${form.customerId}',
             dependencies: ['customerId'],
             autoCalculate: true
           }
