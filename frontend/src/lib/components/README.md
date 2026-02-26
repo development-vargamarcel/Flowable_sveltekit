@@ -130,6 +130,7 @@ Modal dialog for confirming destructive or important actions.
 | `onCancel` | `() => void` | required | Cancel callback |
 
 **Accessibility:**
+
 - Focus is automatically moved to the cancel button when opened (safer default)
 - Use `focusConfirm={true}` to focus the confirm button instead
 - Tab key cycles through buttons (tab trapping)
@@ -146,7 +147,7 @@ Wrapper component for form inputs with consistent styling and validation feedbac
 ```svelte
 <script>
   import FormField from '$lib/components/FormField.svelte';
-  
+
   let email = '';
   let error = '';
   let touched = false;
@@ -185,6 +186,7 @@ Wrapper component for form inputs with consistent styling and validation feedbac
 | `children` | `Snippet` | required | Input element(s) |
 
 **Accessibility:**
+
 - Tooltip is keyboard-accessible (focus/blur on help icon)
 - Error messages use `aria-live="assertive"` for immediate announcement
 - Required fields have screen reader text "(required)"
@@ -224,6 +226,7 @@ Displays a summary of all form validation errors with links to fields.
 | `autoFocus` | `boolean` | `false` | Auto-focus first error link |
 
 **Accessibility:**
+
 - Arrow keys (up/down/left/right) navigate between error links
 - Home/End keys jump to first/last error
 - Enter key on an error link scrolls to and focuses the field
@@ -255,6 +258,7 @@ Navigation breadcrumbs with context-aware labels.
 | `overrides` | `Record<string, string>` | `{}` | Label overrides for segments |
 
 **Context Functions:**
+
 - `setBreadcrumbLabel(segment, label)` - Set label for a URL segment
 - `clearBreadcrumbLabel(segment)` - Remove a label
 - `clearAllBreadcrumbLabels()` - Clear all labels
@@ -364,6 +368,7 @@ Renders forms dynamically based on form definitions.
 | `task` | `Task` | optional | Task context |
 
 **Methods:**
+
 - `validate(): boolean` - Validates all fields
 - `getValues(): Record<string, unknown>` - Gets current values
 - `reset()` - Resets form to initial values

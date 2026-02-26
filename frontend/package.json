@@ -1,6 +1,6 @@
 {
   "name": "bpm-frontend",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "dev": "vite dev",
@@ -19,10 +19,11 @@
     "prepare": "cd .. && husky frontend/.husky",
     "pretest": "svelte-kit sync",
     "test:ci": "npm run pretest && vitest run",
-    "verify": "npm run lint && npm run check && npm run test:ci"
+    "verify": "npm run lint && npm run check && npm run test:ci",
+    "verify:full": "npm run format:check && npm run lint && npm run check && npm run test:ci && npm run build"
   },
   "devDependencies": {
-    "@lucide/svelte": "^0.482.0",
+    "@lucide/svelte": "^0.575.0",
     "@playwright/test": "^1.57.0",
     "@sveltejs/adapter-netlify": "^5.2.4",
     "@sveltejs/adapter-node": "^5.2.0",

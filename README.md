@@ -132,6 +132,18 @@ npm run check
 npm run test:unit
 ```
 
+### Repository Verification Helpers
+
+Run consistent local checks with the repository scripts:
+
+```bash
+./scripts/bootstrap.sh
+./scripts/doctor.sh
+./scripts/verify-all.sh
+```
+
+These scripts mirror CI behavior and reduce local/CI drift.
+
 ## Project Structure
 
 ```
