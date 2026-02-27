@@ -27,7 +27,13 @@
 			document.documentElement.classList.remove('dark');
 		}
 
-		// Try to get current user on mount
+		// Avoid calling /api/auth/me on public routes (for example /login)
+		// to prevent unnecessary backend calls and noisy browser console errors.
+		if (publicRoutes.includes(window.location.pathname)) {
+			authStore.setUser(null);
+			return;
+		}
+
 		try {
 			const user = await api.getCurrentUser();
 			authStore.setUser(user);

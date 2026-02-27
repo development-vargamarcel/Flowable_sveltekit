@@ -2,29 +2,31 @@
 
 ## Current Version
 
-- **Frontend:** `1.3.0`
-- **Backend:** `1.3.0`
-- **Repository release:** `1.3.0` (**minor**) because this release adds backward-compatible reliability improvements, stronger verification workflows, and test-stability fixes without breaking public APIs.
+- **Frontend:** `1.4.0`
+- **Backend:** `1.4.0`
+- **Repository release:** `1.4.0` (**minor**) because this release adds backward-compatible reliability and developer-workflow improvements across automation scripts and validation flows.
 
 ---
 
 ## What was implemented in this pass
 
-This release focused on implementation hardening and verification depth:
+This release focused on making development and verification workflows safer, cleaner, and easier to diagnose:
 
-1. Hardened environment diagnostics with explicit prerequisite checks.
-2. Made dependency bootstrap deterministic by using `npm ci`.
-3. Improved frontend/backend verification script readability and feedback.
-4. Added elapsed-time reporting for the full verification entrypoint.
-5. Expanded Makefile discoverability (`help`) and test-only targets.
-6. Added stricter frontend verification script options (`verify:strict`).
-7. Added targeted frontend test script for session utility logic (`test:session-utils`).
-8. Strengthened cookie diagnostics and oversized-cookie warning behavior.
-9. Improved retry-delay sanitization and timeout logging for backend health checks.
-10. Deduplicated cookie clearing and encoded cookie names for safer invalidation.
-11. Expanded frontend unit tests to validate the new resilience behavior.
-12. Fixed backend test instability on Java 25+ by switching Mockito mock maker strategy.
-13. Updated Maven Surefire runtime args for better modern-JDK behavior.
+1. Introduced a shared shell utility module (`scripts/common.sh`) for reusable logging, command checks, timers, and npm-safe execution.
+2. Added timestamped, sectioned script output for easier CI and local debugging.
+3. Added reusable repository-root validation to avoid accidental execution from incorrect paths.
+4. Added centralized required-command checks and clear failure messaging.
+5. Added npm safe wrapper that strips legacy proxy environment keys producing noisy npm warnings.
+6. Enhanced `doctor.sh` with git branch/commit diagnostics.
+7. Enhanced `doctor.sh` to validate lockfile and backend descriptor presence.
+8. Standardized Node/npm/Java/Maven reporting in diagnostics output.
+9. Improved `bootstrap.sh` with explicit frontend/backend phases and duration reporting.
+10. Improved `verify-frontend.sh` with quality-gate sequencing and stage-level messages.
+11. Improved `verify-backend.sh` with a consistent timing and diagnostics structure.
+12. Improved `verify-all.sh` orchestration and total duration reporting.
+13. Extended Makefile ergonomics with `verify-strict`, `check-lockfiles`, and `clean` targets.
+14. Added script comments where behavior requires non-obvious context (notably npm env sanitization).
+15. Completed full-stack verification after implementing all updates.
 
 ---
 
@@ -38,8 +40,9 @@ This release focused on implementation hardening and verification depth:
 
 What it does:
 
-- Installs frontend dependencies with `npm ci`.
-- Prefetches backend Maven dependencies for offline/test speed.
+- Installs frontend dependencies with `npm ci` (through the safe npm wrapper).
+- Prefetches backend Maven dependencies for faster offline and CI test runs.
+- Prints elapsed duration.
 
 ### 2) Run environment diagnostics
 
@@ -49,11 +52,10 @@ What it does:
 
 What it checks:
 
-- Repository path
-- Node/npm versions
-- Java version
-- Maven wrapper version
-- Presence of required runtime commands
+- Required commands (`git`, `node`, `npm`, `java`, backend Maven wrapper)
+- Current branch and short commit hash
+- Node/npm/Java/Maven versions
+- Frontend lockfile and backend `pom.xml` presence
 
 ### 3) Verify frontend quality gates
 
@@ -61,9 +63,9 @@ What it checks:
 ./scripts/verify-frontend.sh
 ```
 
-Runs:
+Runs in order:
 
-- formatting check
+- format check
 - lint
 - Svelte type-check
 - frontend unit tests
@@ -77,9 +79,9 @@ Runs:
 
 Runs:
 
-- backend Maven tests (`./mvnw -B test`)
+- backend Maven test suite (`./mvnw -B test`)
 
-### 5) Verify entire repository
+### 5) Verify everything end-to-end
 
 ```bash
 ./scripts/verify-all.sh
@@ -90,7 +92,7 @@ Runs:
 - doctor
 - frontend verification
 - backend verification
-- reports total execution duration
+- total duration summary
 
 ### 6) Makefile shortcuts
 
@@ -98,68 +100,46 @@ Runs:
 make help
 make bootstrap
 make doctor
+make check-lockfiles
 make verify-frontend
 make verify-backend
 make test-frontend
 make test-backend
+make verify-strict
 make verify
+make clean
 ```
 
-### 7) Frontend package scripts added in this release
+---
+
+## Testing and validation examples
+
+### Quick local confidence pass
 
 ```bash
-cd frontend
-npm run test:session-utils
-npm run verify:strict
+./scripts/doctor.sh
+./scripts/verify-frontend.sh
+./scripts/verify-backend.sh
 ```
 
----
-
-## Backend test stability note
-
-To eliminate Java 25+ Mockito inline instrumentation failures, backend tests now use:
-
-- `mock-maker-subclass` through `backend/src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker`
-- updated Surefire `argLine` including `-XX:+EnableDynamicAgentLoading`
-
-This preserves test behavior while improving modern JDK compatibility.
-
----
-
-## Usage examples
-
-### Example A: Clean setup and full validation
+### Full CI-like pass
 
 ```bash
 ./scripts/bootstrap.sh
 ./scripts/verify-all.sh
 ```
 
-### Example B: Frontend-only change verification
+### Strict frontend test pass with coverage
 
 ```bash
-cd frontend
-npm run verify:full
-npm run test:session-utils
-```
-
-### Example C: Backend test triage
-
-```bash
-./scripts/doctor.sh
-./scripts/verify-backend.sh
+make verify-strict
 ```
 
 ---
 
-## Testing and verification steps executed for this release
+## Semantic versioning update
 
-```bash
-./scripts/doctor.sh
-cd frontend && npm run verify
-cd frontend && npm run test:session-utils
-cd backend && ./mvnw -B test
-./scripts/verify-all.sh
-```
-
-All commands above were run successfully in this implementation pass.
+- Previous version: `1.3.0`
+- Current version: `1.4.0`
+- Type: **minor**
+- Rationale: significant non-breaking workflow and reliability enhancements were added without changing public API contracts.

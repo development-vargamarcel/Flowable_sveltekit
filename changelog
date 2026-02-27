@@ -1,0 +1,5 @@
+## 1.4.0
+- Added shared script utilities and standardized timestamped diagnostics/logging.
+- Hardened doctor/bootstrap/verify automation with better checks and duration reporting.
+- Added Makefile quality-of-life targets (`verify-strict`, `check-lockfiles`, `clean`).
+- Updated usage documentation and examples to match the current workflow.

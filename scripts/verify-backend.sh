@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+ensure_repo_root
+start="$(start_timer)"
 cd "$ROOT_DIR/backend"
 
 if [ -d "/usr/lib/jvm/java-21-openjdk-amd64" ]; then
@@ -9,7 +12,8 @@ if [ -d "/usr/lib/jvm/java-21-openjdk-amd64" ]; then
   export PATH="$JAVA_HOME/bin:$PATH"
 fi
 
-echo "🔎 Running backend Maven test suite..."
+log_section "Backend verification"
+log_info "Running backend Maven test suite"
 ./mvnw -B test
 
-echo "✅ Backend verification completed."
+log_info "Backend verification completed in $(elapsed_seconds "$start")s"
