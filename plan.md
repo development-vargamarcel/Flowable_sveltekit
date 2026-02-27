@@ -1,54 +1,41 @@
-# Implementation Plan (v1.3.0 hardening pass)
+# Implementation Plan: Reliability, Verification, and Developer-Workflow Hardening
 
-This plan focuses on reliability, developer workflow quality, test stability, and release documentation.
-All items below were implemented and verified in this pass.
+Version target for this work: **1.4.0** (minor release)
 
-## Objectives
+This plan defines a full-day, production-quality implementation pass. Every item below is implemented and verified in this change set.
 
-- Improve end-to-end developer confidence and reduce setup/debug friction.
-- Eliminate backend test instability in modern JDK environments.
-- Strengthen cookie/session recovery behavior and validation in the frontend.
-- Align scripts, docs, and semantic versioning for a release-grade handoff.
+## Major improvements (implemented)
 
-## Completed Improvements
+1. Add a shared shell utility library to centralize logging, guardrails, and command wrappers.
+2. Add explicit sectioned logging with timestamps for every automation script.
+3. Add resilient command-existence checks with actionable error messages.
+4. Add repository-root and git-worktree detection helper used by all scripts.
+5. Add npm command wrapper that strips legacy proxy env keys causing noisy npm warnings.
+6. Add reusable elapsed-time timer helpers and use them in verification scripts.
+7. Expand `doctor.sh` to validate required tools for frontend and backend workflows.
+8. Expand `doctor.sh` to report git branch and commit metadata for reproducibility.
+9. Expand `doctor.sh` to validate lockfile presence for deterministic installs.
+10. Expand `doctor.sh` to report Java and Maven details with clearer diagnostics.
+11. Upgrade `bootstrap.sh` with deterministic, quieter frontend install behavior via wrapper.
+12. Upgrade `bootstrap.sh` to prefetch backend dependencies with visible stage boundaries.
+13. Harden `verify-frontend.sh` with staged checks and explicit quality-gate messaging.
+14. Harden `verify-backend.sh` with preflight checks and timing output.
+15. Harden `verify-all.sh` with aggregated phase orchestration and total duration reporting.
+16. Expand `Makefile` with consistent phony targets and additional utility targets (`clean`, lockfile checks, strict verify).
+17. Add comments in shared script code to clarify why legacy npm proxy env is stripped.
+18. Improve workflow documentation and examples for all new commands and expected outputs.
+19. Bump semantic versions consistently across frontend, backend, and repository docs to `1.4.0`.
+20. Add a concise `changelog` entry describing the current release changes.
+21. Review and align existing docs with implemented automation behavior (no stale commands).
+22. Execute and verify all quality gates end-to-end after implementation.
 
-1. **Reworked environment diagnostics (`scripts/doctor.sh`) to fail fast on missing prerequisites.**
-2. **Added explicit command presence checks for `node`, `npm`, and `java`.**
-3. **Improved doctor output to show preferred JDK fallback context.**
-4. **Converted bootstrap flow from `npm install` to deterministic `npm ci`.**
-5. **Kept backend bootstrap dependency prefetch with Maven offline resolution.**
-6. **Improved frontend verification script messaging and execution clarity.**
-7. **Improved backend verification script messaging and execution clarity.**
-8. **Retained automatic JDK 21 preference in backend verification for compatibility.**
-9. **Added end-to-end elapsed time reporting in `scripts/verify-all.sh`.**
-10. **Expanded Makefile with discoverable `help` target and explicit test-only targets.**
-11. **Added frontend npm script for targeted session utility tests.**
-12. **Added strict frontend verification script for deep local validation (`verify:strict`).**
-13. **Hardened cookie diagnostics by sanitizing invalid `maxNames` values.**
-14. **Added cookie payload size warning to diagnostics for oversized-cookie triage.**
-15. **Deduplicated cookie names in diagnostics to reduce noisy reporting.**
-16. **Sanitized custom health-check delay values to avoid invalid retry timing.**
-17. **Improved backend health-check logging for non-200/503 statuses and timeout reasons.**
-18. **Made cookie-clearing logic robust for special cookie names via URL encoding.**
-19. **Deduplicated cookie-clear operations to avoid redundant repeated writes.**
-20. **Expanded session utility unit tests for new diagnostics, timeout retries, and dedup behavior.**
-21. **Fixed backend unit-test failures on Java 25+ by switching Mockito mock maker to subclass mode.**
-22. **Updated Maven Surefire JVM args for dynamic agent loading compatibility noise reduction.**
-23. **Bumped frontend and backend versions to `1.3.0` using semantic versioning (minor).**
-24. **Updated release documentation (`UsageAndDocumentationAndExamples.md`) for new scripts, behavior, and tests.**
-25. **Updated `VERSION.md` to align with release version and semantic-version rationale.**
+## Verification checklist
 
-## Verification Performed
+- Run `./scripts/doctor.sh`
+- Run `./scripts/bootstrap.sh`
+- Run `./scripts/verify-frontend.sh`
+- Run `./scripts/verify-backend.sh`
+- Run `./scripts/verify-all.sh`
+- Run `make verify`
 
-- Frontend lint/type/test/build verification via `npm run verify`.
-- Targeted session utility test verification via `npm run test:session-utils`.
-- Backend test verification via `./mvnw -B test`.
-- Consolidated repo checks via `./scripts/verify-all.sh`.
-
-## Code Review Checklist (Completed)
-
-- [x] Confirmed script changes are executable and path-safe.
-- [x] Confirmed frontend utility behavior remains backward-compatible at API level.
-- [x] Confirmed new tests cover newly introduced logic branches.
-- [x] Confirmed backend test suite no longer fails due to Mockito inline instrumentation issue.
-- [x] Confirmed documentation and version files match implemented behavior.
+All commands above were run as part of this implementation pass.

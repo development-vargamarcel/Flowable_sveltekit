@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-echo "🔧 Installing frontend dependencies (npm ci)..."
+ensure_repo_root
+start="$(start_timer)"
+
+log_section "Frontend dependency bootstrap"
 cd "$ROOT_DIR/frontend"
-npm ci
+log_info "Installing frontend dependencies with npm ci"
+npm_safe ci
 
-echo "🔧 Resolving backend Maven dependencies for offline usage..."
+log_section "Backend dependency bootstrap"
 cd "$ROOT_DIR/backend"
+log_info "Resolving backend Maven dependencies for offline use"
 ./mvnw -B -q -DskipTests dependency:go-offline
 
-echo "✅ Bootstrap complete: frontend and backend dependencies are installed."
+log_info "Bootstrap complete in $(elapsed_seconds "$start")s"

@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+ensure_repo_root
+start="$(start_timer)"
 cd "$ROOT_DIR/frontend"
 
-echo "🔎 Running frontend format, lint, type-check, unit tests, and production build..."
-npm run format:check
-npm run lint
-npm run check
-npm run test:ci
-npm run build
+log_section "Frontend verification"
+log_info "Running formatting check"
+npm_safe run format:check
 
-echo "✅ Frontend verification completed."
+log_info "Running lint checks"
+npm_safe run lint
+
+log_info "Running Svelte type checks"
+npm_safe run check
+
+log_info "Running unit tests"
+npm_safe run test:ci
+
+log_info "Running production build"
+npm_safe run build
+
+log_info "Frontend verification completed in $(elapsed_seconds "$start")s"
