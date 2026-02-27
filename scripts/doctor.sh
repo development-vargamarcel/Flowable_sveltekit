@@ -4,40 +4,50 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 ensure_repo_root
+ensure_standard_dirs
+install_error_trap
+
 log_section "Environment diagnostics"
 
-for cmd in git node npm java; do
-  require_cmd "$cmd"
-done
+validate_required_commands() {
+  require_cmd git
+  require_cmd node
+  require_cmd npm
+  require_cmd java
+  require_cmd "$BPM_BACKEND_DIR/mvnw"
+}
 
-require_cmd "$ROOT_DIR/backend/mvnw"
+validate_metadata_files() {
+  require_file "$BPM_BACKEND_DIR/pom.xml"
+  check_lockfiles
+}
 
-log_info "Repository: $ROOT_DIR"
-log_info "Branch: $(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
-log_info "Commit: $(git -C "$ROOT_DIR" rev-parse --short HEAD)"
-log_info "Node: $(node --version)"
-log_info "npm: $(npm_safe --version)"
-log_info "Java: $(java --version 2>&1 | head -n 1)"
+print_repo_metadata() {
+  log_info "Repository: $ROOT_DIR"
+  log_info "Branch: $(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
+  log_info "Commit: $(git -C "$ROOT_DIR" rev-parse --short HEAD)"
+}
 
-if [ -f "$ROOT_DIR/frontend/package-lock.json" ]; then
-  log_info "Frontend lockfile: present"
-else
-  log_error "Frontend lockfile missing at frontend/package-lock.json"
-  exit 1
-fi
+print_toolchain_versions() {
+  log_info "Node: $(node --version)"
+  log_info "npm: $(npm_safe --version)"
+  log_info "Java: $(java --version 2>&1 | head -n 1)"
+  log_info "Maven Wrapper: $($BPM_BACKEND_DIR/mvnw --version 2>/dev/null | head -n 1)"
+}
 
-if [ -f "$ROOT_DIR/backend/pom.xml" ]; then
-  log_info "Backend Maven descriptor: present"
-else
-  log_error "Backend pom.xml missing"
-  exit 1
-fi
+print_runtime_guidance() {
+  if [ -d "/usr/lib/jvm/java-21-openjdk-amd64" ]; then
+    log_info "Preferred backend JDK: /usr/lib/jvm/java-21-openjdk-amd64"
+  else
+    log_warn "Preferred backend JDK not detected; continuing with active JAVA_HOME/runtime"
+  fi
+  log_info "Environment diagnostics completed successfully."
+}
 
-if [ -d "/usr/lib/jvm/java-21-openjdk-amd64" ]; then
-  log_info "Preferred backend JDK: /usr/lib/jvm/java-21-openjdk-amd64"
-else
-  log_info "Preferred backend JDK: not detected (using active JAVA_HOME/runtime)"
-fi
+run_step "Validate required commands" validate_required_commands
+run_step "Validate project metadata files" validate_metadata_files
+run_step "Print repository metadata" print_repo_metadata
+run_step "Print toolchain versions" print_toolchain_versions
+run_step "Print runtime guidance" print_runtime_guidance
 
-log_info "Maven Wrapper: $($ROOT_DIR/backend/mvnw --version 2>/dev/null | head -n 1)"
-log_info "Environment diagnostics completed successfully."
+print_summary

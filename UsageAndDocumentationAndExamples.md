@@ -2,31 +2,36 @@
 
 ## Current Version
 
-- **Frontend:** `1.4.0`
-- **Backend:** `1.4.0`
-- **Repository release:** `1.4.0` (**minor**) because this release adds backward-compatible reliability and developer-workflow improvements across automation scripts and validation flows.
+- **Frontend:** `1.5.0`
+- **Backend:** `1.5.0`
+- **Repository release:** `1.5.0` (**minor**) because this release introduces backward-compatible automation runner improvements, deeper staged verification, and enhanced operational documentation.
 
 ---
 
 ## What was implemented in this pass
 
-This release focused on making development and verification workflows safer, cleaner, and easier to diagnose:
+This release focused on reliability hardening, diagnosability, and workflow ergonomics for local development and CI:
 
-1. Introduced a shared shell utility module (`scripts/common.sh`) for reusable logging, command checks, timers, and npm-safe execution.
-2. Added timestamped, sectioned script output for easier CI and local debugging.
-3. Added reusable repository-root validation to avoid accidental execution from incorrect paths.
-4. Added centralized required-command checks and clear failure messaging.
-5. Added npm safe wrapper that strips legacy proxy environment keys producing noisy npm warnings.
-6. Enhanced `doctor.sh` with git branch/commit diagnostics.
-7. Enhanced `doctor.sh` to validate lockfile and backend descriptor presence.
-8. Standardized Node/npm/Java/Maven reporting in diagnostics output.
-9. Improved `bootstrap.sh` with explicit frontend/backend phases and duration reporting.
-10. Improved `verify-frontend.sh` with quality-gate sequencing and stage-level messages.
-11. Improved `verify-backend.sh` with a consistent timing and diagnostics structure.
-12. Improved `verify-all.sh` orchestration and total duration reporting.
-13. Extended Makefile ergonomics with `verify-strict`, `check-lockfiles`, and `clean` targets.
-14. Added script comments where behavior requires non-obvious context (notably npm env sanitization).
-15. Completed full-stack verification after implementing all updates.
+1. Added runner configuration via environment variables for log level, no-color output, dry-run mode, summary output, and continue-on-error behavior.
+2. Added configurable frontend and backend directory roots for non-standard workspace layouts.
+3. Added leveled logging (`debug/info/warn/error`) with color-aware fallback behavior.
+4. Added reusable file and directory precondition guards.
+5. Added a reusable command runner with dry-run support.
+6. Added step result collectors for status, duration, and contextual message data.
+7. Added `run_step` stage timing wrapper for all key scripts.
+8. Added execution summary reporting to each script run.
+9. Added optional continue-on-error mode for comprehensive troubleshooting runs.
+10. Added shared shell error trap utilities for line-level failure diagnostics.
+11. Refactored `doctor.sh` to run staged validations and runtime guidance output.
+12. Centralized lockfile and metadata checks via shared validators.
+13. Refactored `bootstrap.sh` into staged frontend and backend dependency setup.
+14. Refactored `verify-frontend.sh` into explicit quality-gate stages.
+15. Refactored `verify-backend.sh` into staged runtime config/test/package checks.
+16. Added backend packaging sanity check (`mvn package -DskipTests`) during verification.
+17. Refactored `verify-all.sh` orchestration into summarized staged execution.
+18. Added Makefile helpers for verbose doctor output, no-color diagnostics, fast verification, dry-run verification, and continue-on-error verification.
+19. Added `scripts/test-automation.sh` smoke tests for script syntax, dry-run orchestration, and summary behavior.
+20. Updated semantic version metadata and release documentation artifacts.
 
 ---
 
@@ -40,9 +45,9 @@ This release focused on making development and verification workflows safer, cle
 
 What it does:
 
-- Installs frontend dependencies with `npm ci` (through the safe npm wrapper).
-- Prefetches backend Maven dependencies for faster offline and CI test runs.
-- Prints elapsed duration.
+- Installs frontend dependencies with `npm ci` using sanitized npm environment variables.
+- Resolves backend Maven dependencies for offline and faster repeated runs.
+- Prints per-step timing and a final summary.
 
 ### 2) Run environment diagnostics
 
@@ -53,9 +58,10 @@ What it does:
 What it checks:
 
 - Required commands (`git`, `node`, `npm`, `java`, backend Maven wrapper)
-- Current branch and short commit hash
-- Node/npm/Java/Maven versions
-- Frontend lockfile and backend `pom.xml` presence
+- Required metadata (`backend/pom.xml`, both lockfiles)
+- Git branch and short commit
+- Node/npm/Java/Maven wrapper versions
+- Preferred Java runtime guidance
 
 ### 3) Verify frontend quality gates
 
@@ -68,7 +74,7 @@ Runs in order:
 - format check
 - lint
 - Svelte type-check
-- frontend unit tests
+- unit tests
 - production build
 
 ### 4) Verify backend quality gates
@@ -77,9 +83,11 @@ Runs in order:
 ./scripts/verify-backend.sh
 ```
 
-Runs:
+Runs in order:
 
-- backend Maven test suite (`./mvnw -B test`)
+- Java runtime configuration check
+- Maven test suite
+- package sanity build (`-DskipTests`)
 
 ### 5) Verify everything end-to-end
 
@@ -92,17 +100,35 @@ Runs:
 - doctor
 - frontend verification
 - backend verification
-- total duration summary
+- consolidated step summaries
 
-### 6) Makefile shortcuts
+### 6) Automation smoke tests
+
+```bash
+./scripts/test-automation.sh
+```
+
+Runs:
+
+- bash parse checks for all scripts
+- dry-run orchestration check
+- summary output smoke check
+
+### 7) Makefile shortcuts
 
 ```bash
 make help
 make bootstrap
 make doctor
+make doctor-verbose
+make doctor-no-color
 make check-lockfiles
 make verify-frontend
 make verify-backend
+make verify-fast
+make verify-dry-run
+make verify-continue
+make test-automation
 make test-frontend
 make test-backend
 make verify-strict
@@ -112,14 +138,35 @@ make clean
 
 ---
 
-## Testing and validation examples
+## Environment-driven runner controls
 
-### Quick local confidence pass
+All script commands support these optional controls:
 
 ```bash
+BPM_RUNNER_LOG_LEVEL=debug    # debug|info|warn|error
+BPM_RUNNER_NO_COLOR=1         # disable ANSI color output
+BPM_RUNNER_DRY_RUN=1          # print commands only
+BPM_RUNNER_SUMMARY=0          # suppress summary table
+BPM_RUNNER_CONTINUE_ON_ERROR=1 # continue staging despite failures
+BPM_FRONTEND_DIR=/custom/frontend
+BPM_BACKEND_DIR=/custom/backend
+```
+
+Example:
+
+```bash
+BPM_RUNNER_LOG_LEVEL=debug BPM_RUNNER_NO_COLOR=1 ./scripts/doctor.sh
+```
+
+---
+
+## Testing and validation examples
+
+### Quick confidence pass
+
+```bash
+./scripts/test-automation.sh
 ./scripts/doctor.sh
-./scripts/verify-frontend.sh
-./scripts/verify-backend.sh
 ```
 
 ### Full CI-like pass
@@ -129,17 +176,23 @@ make clean
 ./scripts/verify-all.sh
 ```
 
-### Strict frontend test pass with coverage
+### Strict verification with frontend coverage
 
 ```bash
 make verify-strict
+```
+
+### Troubleshooting pass without hard-stop
+
+```bash
+BPM_RUNNER_CONTINUE_ON_ERROR=1 ./scripts/verify-all.sh
 ```
 
 ---
 
 ## Semantic versioning update
 
-- Previous version: `1.3.0`
-- Current version: `1.4.0`
+- Previous version: `1.4.0`
+- Current version: `1.5.0`
 - Type: **minor**
-- Rationale: significant non-breaking workflow and reliability enhancements were added without changing public API contracts.
+- Rationale: backward-compatible feature additions to tooling and verification workflows.

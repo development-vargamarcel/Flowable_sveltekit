@@ -1,5 +1,6 @@
-## 1.4.0
-- Added shared script utilities and standardized timestamped diagnostics/logging.
-- Hardened doctor/bootstrap/verify automation with better checks and duration reporting.
-- Added Makefile quality-of-life targets (`verify-strict`, `check-lockfiles`, `clean`).
-- Updated usage documentation and examples to match the current workflow.
+## 1.5.0
+- Added configurable automation runner controls (dry-run, continue-on-error, log levels, no-color mode) in shared script utilities.
+- Refactored doctor/bootstrap/verify scripts into staged, timed steps with consolidated execution summaries and error traps.
+- Added backend packaging sanity checks to verification and introduced Makefile convenience targets for fast/dry-run/verbose workflows.
+- Added automation smoke tests for script syntax, dry-run orchestration, and summary behavior.
+- Updated usage/documentation examples and semantic version metadata to reflect the new release.

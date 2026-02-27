@@ -13,7 +13,7 @@
 
     <groupId>com.demo</groupId>
     <artifactId>bpm-backend</artifactId>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
     <name>BPM Backend</name>
     <description>Flowable BPM Backend with Spring Boot</description>
 
