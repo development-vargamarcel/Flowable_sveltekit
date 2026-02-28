@@ -1,38 +1,44 @@
-# Implementation Plan: Reliability, Verification, and Developer Workflow Hardening
+# Implementation Plan: End-to-End Automation, Diagnostics, and Quality Improvements
 
-## Scope and goals
-This plan upgrades the repository automation toolchain to be more robust, diagnosable, and CI-friendly while preserving existing workflows. The scope includes shell automation scripts, Makefile ergonomics, and end-user/developer documentation consistency.
+## Objective
+Deliver a full-day, production-grade improvement pass for repository automation by strengthening diagnostics, verification, reporting, execution controls, and documentation fidelity. The implementation will be fully validated with executable checks.
 
-## Planned improvements (full-day execution set)
+## Planned improvements (22 major items)
 
-1. [x] Add centralized runtime configuration knobs (log level, color control, dry-run mode, summary toggle) in shared shell utilities.
-2. [x] Add configurable frontend/backend directory overrides to support non-standard CI workspace layouts.
-3. [x] Introduce colored, level-aware logging helpers (`debug/info/warn/error`) with graceful no-color fallback.
-4. [x] Add reusable file and directory precondition guards for faster, clearer failure diagnostics.
-5. [x] Add command execution tracing helper for dry-run and debug output consistency.
-6. [x] Add structured step recording primitives (pass/fail state + duration + message).
-7. [x] Add standardized step runner wrapper that times each stage and enforces consistent status output.
-8. [x] Add execution summary renderer that aggregates all staged checks and reports failures in one place.
-9. [x] Add optional continue-on-error mode for investigative runs without early aborts.
-10. [x] Add reusable shell error trap installation to capture failed command, line, and exit code context.
-11. [x] Refactor `scripts/doctor.sh` into staged validation functions with explicit command, metadata, and toolchain checkpoints.
-12. [x] Extend diagnostics to validate lockfiles and backend metadata through reusable validators.
-13. [x] Refactor `scripts/bootstrap.sh` into separately timed frontend/backend bootstrap stages.
-14. [x] Refactor `scripts/verify-frontend.sh` into individually timed quality gates (format/lint/type-test/build).
-15. [x] Refactor `scripts/verify-backend.sh` into staged runtime config + tests + packaging sanity verification.
-16. [x] Add backend packaging verification (`mvn package -DskipTests`) to catch build issues not surfaced by test-only runs.
-17. [x] Refactor `scripts/verify-all.sh` orchestration to stage and summarize doctor/frontend/backend passes.
-18. [x] Expand Makefile with new quality-of-life targets (`verify-fast`, `verify-dry-run`, `doctor-verbose`, `doctor-no-color`, `verify-continue`).
-19. [x] Add centralized script smoke-test harness (`scripts/test-automation.sh`) to validate helper behaviors and script parse integrity.
-20. [x] Update release/version and operational documentation (`UsageAndDocumentationAndExamples.md`, `VERSION.md`, `changelog`) to reflect new workflow semantics, examples, and version bump.
+1. Add strict environment variable validation for automation runner toggles to prevent silent misconfiguration.
+2. Add canonical path normalization for frontend/backend directory overrides.
+3. Add deterministic locale/timezone defaults for reproducible script output in CI.
+4. Add structured run metadata capture (run id, UTC timestamp, host, shell version).
+5. Add optional persistent run log files and artifact directory management.
+6. Add configurable summary format output (`table` and `json`) for machine-consumable CI reporting.
+7. Add reusable helper to write JSON-safe strings and generate summary JSON payloads.
+8. Add execution step index tracking and richer step status model (`PASS`, `FAIL`, `SKIP`).
+9. Add a generic retry helper with max-attempts and delay controls for network-sensitive stages.
+10. Add optional timeout helper integration for long-running command safety.
+11. Extend command/file/dir precondition helpers with clear context-rich diagnostics.
+12. Add stage skipping controls for frontend and backend verification gates.
+13. Add optional frontend coverage stage to `verify-frontend.sh`.
+14. Add optional backend verify goal stage (`mvn verify`) for deeper validation.
+15. Harden `bootstrap.sh` with retryable frontend/backend dependency installation.
+16. Expand `doctor.sh` with OS/kernel, CPU, memory, and disk diagnostics.
+17. Expand `doctor.sh` with script executability checks and npm lockfile consistency checks.
+18. Expand `verify-all.sh` with optional bootstrap pre-step and unified artifact reporting.
+19. Expand Makefile with CI/report-focused targets for JSON summaries and strict pipelines.
+20. Expand `test-automation.sh` with helper behavior smoke tests (validation, JSON summary generation, retry utility).
+21. Update `UsageAndDocumentationAndExamples.md` with all new controls, workflows, and examples.
+22. Bump semantic version and update `VERSION.md` and `changelog` for this release.
 
-## Verification checklist
+## Verification strategy
 - Run automation smoke tests.
-- Run doctor diagnostics.
-- Run frontend verification gates.
-- Run backend verification gates.
-- Run full-stack verification orchestration.
-- Ensure formatting/linting and tests pass through the project’s existing commands.
+- Run diagnostics in default and JSON-summary modes.
+- Run bootstrap to install/refresh dependencies.
+- Run frontend verification (with and without optional stages).
+- Run backend verification.
+- Run full orchestration verification.
+- Run existing project tests through scripted quality gates.
 
-## Completion status
-All listed items were implemented and validated in this execution pass.
+## Completion checklist
+- [x] All planned improvements implemented.
+- [x] All modified scripts parse and execute successfully.
+- [x] Project verification commands pass (see command log below).
+- [x] Documentation/version/changelog aligned with delivered functionality.

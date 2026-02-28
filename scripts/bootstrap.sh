@@ -12,13 +12,13 @@ start="$(start_timer)"
 bootstrap_frontend() {
   cd "$BPM_FRONTEND_DIR"
   log_info "Installing frontend dependencies with npm ci"
-  npm_safe ci
+  run_with_retry "$BPM_RUNNER_RETRY_COUNT" "$BPM_RUNNER_RETRY_DELAY_SECONDS" npm_safe ci
 }
 
 bootstrap_backend() {
   cd "$BPM_BACKEND_DIR"
   log_info "Resolving backend Maven dependencies for offline use"
-  ./mvnw -B -q -DskipTests dependency:go-offline
+  run_with_retry "$BPM_RUNNER_RETRY_COUNT" "$BPM_RUNNER_RETRY_DELAY_SECONDS" ./mvnw -B -q -DskipTests dependency:go-offline
 }
 
 log_section "Dependency bootstrap"
