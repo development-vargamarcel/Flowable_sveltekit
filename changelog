@@ -1,6 +1,5 @@
-## 1.5.0
-- Added configurable automation runner controls (dry-run, continue-on-error, log levels, no-color mode) in shared script utilities.
-- Refactored doctor/bootstrap/verify scripts into staged, timed steps with consolidated execution summaries and error traps.
-- Added backend packaging sanity checks to verification and introduced Makefile convenience targets for fast/dry-run/verbose workflows.
-- Added automation smoke tests for script syntax, dry-run orchestration, and summary behavior.
-- Updated usage/documentation examples and semantic version metadata to reflect the new release.
+## 1.6.0
+- Added strict environment validation, deterministic runtime metadata, retry/timeout support, optional log files, and JSON summary artifacts for automation scripts.
+- Expanded diagnostics with host/system checks, script executability checks, and frontend lockfile consistency validation.
+- Added frontend/backend stage-skip and optional strict verification toggles, plus new Makefile targets for report-oriented workflows.
+- Updated release metadata and usage documentation to reflect the new automation and verification capabilities.

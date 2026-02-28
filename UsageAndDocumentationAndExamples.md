@@ -2,36 +2,36 @@
 
 ## Current Version
 
-- **Frontend:** `1.5.0`
-- **Backend:** `1.5.0`
-- **Repository release:** `1.5.0` (**minor**) because this release introduces backward-compatible automation runner improvements, deeper staged verification, and enhanced operational documentation.
+- **Frontend:** `1.6.0`
+- **Backend:** `1.6.0`
+- **Repository release:** `1.6.0` (**minor**) because this release introduces backward-compatible automation diagnostics, reporting, and verification controls.
 
 ---
 
 ## What was implemented in this pass
 
-This release focused on reliability hardening, diagnosability, and workflow ergonomics for local development and CI:
-
-1. Added runner configuration via environment variables for log level, no-color output, dry-run mode, summary output, and continue-on-error behavior.
-2. Added configurable frontend and backend directory roots for non-standard workspace layouts.
-3. Added leveled logging (`debug/info/warn/error`) with color-aware fallback behavior.
-4. Added reusable file and directory precondition guards.
-5. Added a reusable command runner with dry-run support.
-6. Added step result collectors for status, duration, and contextual message data.
-7. Added `run_step` stage timing wrapper for all key scripts.
-8. Added execution summary reporting to each script run.
-9. Added optional continue-on-error mode for comprehensive troubleshooting runs.
-10. Added shared shell error trap utilities for line-level failure diagnostics.
-11. Refactored `doctor.sh` to run staged validations and runtime guidance output.
-12. Centralized lockfile and metadata checks via shared validators.
-13. Refactored `bootstrap.sh` into staged frontend and backend dependency setup.
-14. Refactored `verify-frontend.sh` into explicit quality-gate stages.
-15. Refactored `verify-backend.sh` into staged runtime config/test/package checks.
-16. Added backend packaging sanity check (`mvn package -DskipTests`) during verification.
-17. Refactored `verify-all.sh` orchestration into summarized staged execution.
-18. Added Makefile helpers for verbose doctor output, no-color diagnostics, fast verification, dry-run verification, and continue-on-error verification.
-19. Added `scripts/test-automation.sh` smoke tests for script syntax, dry-run orchestration, and summary behavior.
-20. Updated semantic version metadata and release documentation artifacts.
+1. Added strict validation for automation environment variables to prevent invalid runner configuration.
+2. Added canonical path normalization for overridden frontend/backend paths.
+3. Added deterministic locale/timezone exports for reproducible logs in CI.
+4. Added structured run metadata (`run id`, `start time`, `host`, `shell`).
+5. Added optional persistent run log files under `.automation/`.
+6. Added summary format control with `table` and `json` options.
+7. Added JSON-safe summary generation helpers for machine-consumable reporting.
+8. Added step indexing and richer status model with `PASS`, `FAIL`, and `SKIP`.
+9. Added reusable retry helper for network-sensitive commands.
+10. Added optional timeout support using `timeout` where available.
+11. Added executable-file precondition checks in shared script utilities.
+12. Added frontend stage skip controls (`format`, `lint`, `typecheck`, `tests`, `build`).
+13. Added optional frontend coverage execution in `verify-frontend.sh`.
+14. Added backend stage skip controls and optional `mvn verify` stage.
+15. Hardened `bootstrap.sh` using retry-aware dependency installation.
+16. Expanded `doctor.sh` with system diagnostics (OS/kernel/CPU/memory/disk).
+17. Expanded `doctor.sh` with automation script executability checks.
+18. Added lockfile consistency verification via `npm ls --package-lock-only`.
+19. Expanded `verify-all.sh` with optional bootstrap inclusion and artifact-aware logging.
+20. Added Makefile report-centric targets (`doctor-json`, `verify-json-report`, `verify-with-bootstrap`).
+21. Expanded `scripts/test-automation.sh` with JSON summary and retry helper smoke tests.
+22. Updated all release docs/version metadata for semantic version `1.6.0`.
 
 ---
 
@@ -45,9 +45,9 @@ This release focused on reliability hardening, diagnosability, and workflow ergo
 
 What it does:
 
-- Installs frontend dependencies with `npm ci` using sanitized npm environment variables.
-- Resolves backend Maven dependencies for offline and faster repeated runs.
-- Prints per-step timing and a final summary.
+- Installs frontend dependencies with retryable `npm ci`.
+- Resolves backend Maven dependencies with retryable `dependency:go-offline`.
+- Prints step timing and a final summary.
 
 ### 2) Run environment diagnostics
 
@@ -57,11 +57,11 @@ What it does:
 
 What it checks:
 
-- Required commands (`git`, `node`, `npm`, `java`, backend Maven wrapper)
-- Required metadata (`backend/pom.xml`, both lockfiles)
-- Git branch and short commit
-- Node/npm/Java/Maven wrapper versions
-- Preferred Java runtime guidance
+- Required command/tool availability
+- Repository metadata and toolchain versions
+- Script executability and lockfiles
+- Lockfile consistency (`npm ls --package-lock-only`)
+- Host/runtime diagnostics (OS/kernel/CPU/memory/disk)
 
 ### 3) Verify frontend quality gates
 
@@ -69,7 +69,7 @@ What it checks:
 ./scripts/verify-frontend.sh
 ```
 
-Runs in order:
+Default stages:
 
 - format check
 - lint
@@ -77,17 +77,29 @@ Runs in order:
 - unit tests
 - production build
 
+Optional:
+
+```bash
+BPM_FRONTEND_ENABLE_COVERAGE=1 ./scripts/verify-frontend.sh
+```
+
 ### 4) Verify backend quality gates
 
 ```bash
 ./scripts/verify-backend.sh
 ```
 
-Runs in order:
+Default stages:
 
-- Java runtime configuration check
+- Java runtime configuration
 - Maven test suite
-- package sanity build (`-DskipTests`)
+- packaging sanity build
+
+Optional:
+
+```bash
+BPM_BACKEND_ENABLE_VERIFY=1 ./scripts/verify-backend.sh
+```
 
 ### 5) Verify everything end-to-end
 
@@ -95,12 +107,11 @@ Runs in order:
 ./scripts/verify-all.sh
 ```
 
-Runs:
+Optional bootstrap-inclusive run:
 
-- doctor
-- frontend verification
-- backend verification
-- consolidated step summaries
+```bash
+BPM_VERIFY_INCLUDE_BOOTSTRAP=1 ./scripts/verify-all.sh
+```
 
 ### 6) Automation smoke tests
 
@@ -110,9 +121,10 @@ Runs:
 
 Runs:
 
-- bash parse checks for all scripts
+- bash parse checks
 - dry-run orchestration check
-- summary output smoke check
+- JSON summary smoke test
+- retry helper smoke test
 
 ### 7) Makefile shortcuts
 
@@ -120,79 +132,77 @@ Runs:
 make help
 make bootstrap
 make doctor
-make doctor-verbose
-make doctor-no-color
-make check-lockfiles
-make verify-frontend
-make verify-backend
-make verify-fast
-make verify-dry-run
-make verify-continue
-make test-automation
-make test-frontend
-make test-backend
-make verify-strict
+make doctor-json
 make verify
-make clean
+make verify-with-bootstrap
+make verify-json-report
+make verify-strict
+make test-automation
 ```
 
 ---
 
 ## Environment-driven runner controls
 
-All script commands support these optional controls:
-
 ```bash
-BPM_RUNNER_LOG_LEVEL=debug    # debug|info|warn|error
-BPM_RUNNER_NO_COLOR=1         # disable ANSI color output
-BPM_RUNNER_DRY_RUN=1          # print commands only
-BPM_RUNNER_SUMMARY=0          # suppress summary table
-BPM_RUNNER_CONTINUE_ON_ERROR=1 # continue staging despite failures
+BPM_RUNNER_LOG_LEVEL=debug
+BPM_RUNNER_NO_COLOR=1
+BPM_RUNNER_DRY_RUN=1
+BPM_RUNNER_SUMMARY=1
+BPM_RUNNER_SUMMARY_FORMAT=json
+BPM_RUNNER_CONTINUE_ON_ERROR=1
+BPM_RUNNER_LOG_TO_FILE=1
+BPM_RUNNER_ARTIFACTS_DIR=.automation
+BPM_RUNNER_TIMEOUT_SECONDS=1200
+BPM_RUNNER_RETRY_COUNT=3
+BPM_RUNNER_RETRY_DELAY_SECONDS=3
 BPM_FRONTEND_DIR=/custom/frontend
 BPM_BACKEND_DIR=/custom/backend
 ```
 
-Example:
+Stage controls:
 
 ```bash
-BPM_RUNNER_LOG_LEVEL=debug BPM_RUNNER_NO_COLOR=1 ./scripts/doctor.sh
+BPM_FRONTEND_SKIP_FORMAT=1
+BPM_FRONTEND_SKIP_LINT=1
+BPM_FRONTEND_SKIP_TYPECHECK=1
+BPM_FRONTEND_SKIP_TESTS=1
+BPM_FRONTEND_SKIP_BUILD=1
+BPM_FRONTEND_ENABLE_COVERAGE=1
+BPM_BACKEND_SKIP_TESTS=1
+BPM_BACKEND_SKIP_PACKAGE=1
+BPM_BACKEND_ENABLE_VERIFY=1
 ```
 
 ---
 
 ## Testing and validation examples
 
-### Quick confidence pass
+### Standard local verification
 
 ```bash
 ./scripts/test-automation.sh
 ./scripts/doctor.sh
-```
-
-### Full CI-like pass
-
-```bash
-./scripts/bootstrap.sh
 ./scripts/verify-all.sh
 ```
 
-### Strict verification with frontend coverage
+### CI-style verification with machine-readable artifacts
+
+```bash
+BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_LOG_TO_FILE=1 ./scripts/verify-all.sh
+```
+
+### Strict verification
 
 ```bash
 make verify-strict
-```
-
-### Troubleshooting pass without hard-stop
-
-```bash
-BPM_RUNNER_CONTINUE_ON_ERROR=1 ./scripts/verify-all.sh
 ```
 
 ---
 
 ## Semantic versioning update
 
-- Previous version: `1.4.0`
-- Current version: `1.5.0`
+- Previous version: `1.5.0`
+- Current version: `1.6.0`
 - Type: **minor**
-- Rationale: backward-compatible feature additions to tooling and verification workflows.
+- Rationale: backward-compatible enhancement of automation diagnostics/reporting and verification flexibility.
