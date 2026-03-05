@@ -1,5 +1,4 @@
-## 1.6.0
-- Added strict environment validation, deterministic runtime metadata, retry/timeout support, optional log files, and JSON summary artifacts for automation scripts.
-- Expanded diagnostics with host/system checks, script executability checks, and frontend lockfile consistency validation.
-- Added frontend/backend stage-skip and optional strict verification toggles, plus new Makefile targets for report-oriented workflows.
-- Updated release metadata and usage documentation to reflect the new automation and verification capabilities.
+## 1.7.0
+- Added stronger stage-toggle validation across frontend/backend/full verification scripts and shared numeric validation utilities.
+- Added configurable frontend lint warning gate (`BPM_FRONTEND_LINT_MAX_WARNINGS`) and cleaner build behavior by disabling Sentry telemetry in automated builds.
+- Refreshed implementation planning and usage documentation; validated with bootstrap, automation smoke tests, and full-stack verification.

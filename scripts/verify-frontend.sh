@@ -9,10 +9,25 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 : "${BPM_FRONTEND_SKIP_TESTS:=0}"
 : "${BPM_FRONTEND_SKIP_BUILD:=0}"
 : "${BPM_FRONTEND_ENABLE_COVERAGE:=0}"
+: "${BPM_FRONTEND_LINT_MAX_WARNINGS:=-1}"
 
 ensure_repo_root
 ensure_standard_dirs
 install_error_trap
+
+validate_toggle "$BPM_FRONTEND_SKIP_FORMAT" "BPM_FRONTEND_SKIP_FORMAT"
+validate_toggle "$BPM_FRONTEND_SKIP_LINT" "BPM_FRONTEND_SKIP_LINT"
+validate_toggle "$BPM_FRONTEND_SKIP_TYPECHECK" "BPM_FRONTEND_SKIP_TYPECHECK"
+validate_toggle "$BPM_FRONTEND_SKIP_TESTS" "BPM_FRONTEND_SKIP_TESTS"
+validate_toggle "$BPM_FRONTEND_SKIP_BUILD" "BPM_FRONTEND_SKIP_BUILD"
+validate_toggle "$BPM_FRONTEND_ENABLE_COVERAGE" "BPM_FRONTEND_ENABLE_COVERAGE"
+
+if [ "$BPM_FRONTEND_LINT_MAX_WARNINGS" != "-1" ]; then
+  if ! [[ "$BPM_FRONTEND_LINT_MAX_WARNINGS" =~ ^[0-9]+$ ]]; then
+    log_error "Invalid BPM_FRONTEND_LINT_MAX_WARNINGS '$BPM_FRONTEND_LINT_MAX_WARNINGS'. Expected -1 or a non-negative integer."
+    exit 1
+  fi
+fi
 
 start="$(start_timer)"
 cd "$BPM_FRONTEND_DIR"
@@ -20,10 +35,20 @@ cd "$BPM_FRONTEND_DIR"
 log_section "Frontend verification"
 
 frontend_format_check() { npm_safe run format:check; }
-frontend_lint() { npm_safe run lint; }
+frontend_lint() {
+  # Allow teams to progressively tighten lint quality gates without changing package scripts.
+  if [ "$BPM_FRONTEND_LINT_MAX_WARNINGS" -ge 0 ]; then
+    npm_safe run lint -- --max-warnings "$BPM_FRONTEND_LINT_MAX_WARNINGS"
+    return
+  fi
+  npm_safe run lint
+}
 frontend_type_check() { npm_safe run check; }
 frontend_unit_tests() { npm_safe run test:ci; }
-frontend_build() { npm_safe run build; }
+frontend_build() {
+  # Keep CI output clean and deterministic when Sentry auth is not configured.
+  SENTRY_TELEMETRY=0 npm_safe run build
+}
 frontend_coverage() { npm_safe run test:coverage; }
 
 if [ "$BPM_FRONTEND_SKIP_FORMAT" = "0" ]; then
