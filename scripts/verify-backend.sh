@@ -11,6 +11,10 @@ ensure_repo_root
 ensure_standard_dirs
 install_error_trap
 
+validate_toggle "$BPM_BACKEND_SKIP_TESTS" "BPM_BACKEND_SKIP_TESTS"
+validate_toggle "$BPM_BACKEND_SKIP_PACKAGE" "BPM_BACKEND_SKIP_PACKAGE"
+validate_toggle "$BPM_BACKEND_ENABLE_VERIFY" "BPM_BACKEND_ENABLE_VERIFY"
+
 start="$(start_timer)"
 cd "$BPM_BACKEND_DIR"
 

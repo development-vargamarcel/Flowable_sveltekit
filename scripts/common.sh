@@ -46,6 +46,15 @@ validate_toggle() {
   fi
 }
 
+validate_non_negative_integer() {
+  local value="$1"
+  local name="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "Invalid $name '$value'. Expected a non-negative integer." >&2
+    return 1
+  fi
+}
+
 validate_env() {
   validate_toggle "$BPM_RUNNER_NO_COLOR" "BPM_RUNNER_NO_COLOR"
   validate_toggle "$BPM_RUNNER_DRY_RUN" "BPM_RUNNER_DRY_RUN"
@@ -70,20 +79,9 @@ validate_env() {
       ;;
   esac
 
-  if ! [[ "$BPM_RUNNER_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]]; then
-    echo "Invalid BPM_RUNNER_TIMEOUT_SECONDS '$BPM_RUNNER_TIMEOUT_SECONDS'. Expected a non-negative integer." >&2
-    return 1
-  fi
-
-  if ! [[ "$BPM_RUNNER_RETRY_COUNT" =~ ^[0-9]+$ ]]; then
-    echo "Invalid BPM_RUNNER_RETRY_COUNT '$BPM_RUNNER_RETRY_COUNT'. Expected a non-negative integer." >&2
-    return 1
-  fi
-
-  if ! [[ "$BPM_RUNNER_RETRY_DELAY_SECONDS" =~ ^[0-9]+$ ]]; then
-    echo "Invalid BPM_RUNNER_RETRY_DELAY_SECONDS '$BPM_RUNNER_RETRY_DELAY_SECONDS'. Expected a non-negative integer." >&2
-    return 1
-  fi
+  validate_non_negative_integer "$BPM_RUNNER_TIMEOUT_SECONDS" "BPM_RUNNER_TIMEOUT_SECONDS"
+  validate_non_negative_integer "$BPM_RUNNER_RETRY_COUNT" "BPM_RUNNER_RETRY_COUNT"
+  validate_non_negative_integer "$BPM_RUNNER_RETRY_DELAY_SECONDS" "BPM_RUNNER_RETRY_DELAY_SECONDS"
 
   if ! BPM_FRONTEND_DIR="$(normalize_path "$BPM_FRONTEND_DIR")"; then
     echo "Unable to resolve BPM_FRONTEND_DIR: $BPM_FRONTEND_DIR" >&2

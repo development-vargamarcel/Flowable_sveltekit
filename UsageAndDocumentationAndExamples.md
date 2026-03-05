@@ -2,9 +2,9 @@
 
 ## Current Version
 
-- **Frontend:** `1.6.0`
-- **Backend:** `1.6.0`
-- **Repository release:** `1.6.0` (**minor**) because this release introduces backward-compatible automation diagnostics, reporting, and verification controls.
+- **Frontend:** `1.7.0`
+- **Backend:** `1.7.0`
+- **Repository release:** `1.7.0` (**minor**) because this release adds stricter verification input validation and frontend lint/build quality-gate controls while remaining backward compatible.
 
 ---
 
@@ -31,7 +31,10 @@
 19. Expanded `verify-all.sh` with optional bootstrap inclusion and artifact-aware logging.
 20. Added Makefile report-centric targets (`doctor-json`, `verify-json-report`, `verify-with-bootstrap`).
 21. Expanded `scripts/test-automation.sh` with JSON summary and retry helper smoke tests.
-22. Updated all release docs/version metadata for semantic version `1.6.0`.
+22. Updated all release docs/version metadata for semantic version `1.7.0`.
+23. Added explicit toggle validation in `verify-frontend.sh`, `verify-backend.sh`, and `verify-all.sh`.
+24. Added `BPM_FRONTEND_LINT_MAX_WARNINGS` and documented stricter lint gate behavior.
+25. Disabled Sentry telemetry during scripted production builds to reduce non-actionable CI noise.
 
 ---
 
@@ -80,7 +83,8 @@ Default stages:
 Optional:
 
 ```bash
-BPM_FRONTEND_ENABLE_COVERAGE=1 ./scripts/verify-frontend.sh
+BPM_FRONTEND_ENABLE_COVERAGE=1
+BPM_FRONTEND_LINT_MAX_WARNINGS=0 ./scripts/verify-frontend.sh
 ```
 
 ### 4) Verify backend quality gates
@@ -169,6 +173,7 @@ BPM_FRONTEND_SKIP_TYPECHECK=1
 BPM_FRONTEND_SKIP_TESTS=1
 BPM_FRONTEND_SKIP_BUILD=1
 BPM_FRONTEND_ENABLE_COVERAGE=1
+BPM_FRONTEND_LINT_MAX_WARNINGS=0
 BPM_BACKEND_SKIP_TESTS=1
 BPM_BACKEND_SKIP_PACKAGE=1
 BPM_BACKEND_ENABLE_VERIFY=1
@@ -202,7 +207,7 @@ make verify-strict
 
 ## Semantic versioning update
 
-- Previous version: `1.5.0`
-- Current version: `1.6.0`
+- Previous version: `1.6.0`
+- Current version: `1.7.0`
 - Type: **minor**
-- Rationale: backward-compatible enhancement of automation diagnostics/reporting and verification flexibility.
+- Rationale: backward-compatible enhancement of verification strictness, input validation, and CI build signal quality.

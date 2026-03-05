@@ -9,6 +9,8 @@ ensure_repo_root
 ensure_standard_dirs
 install_error_trap
 
+validate_toggle "$BPM_VERIFY_INCLUDE_BOOTSTRAP" "BPM_VERIFY_INCLUDE_BOOTSTRAP"
+
 start="$(start_timer)"
 
 verify_bootstrap() { "$ROOT_DIR/scripts/bootstrap.sh"; }
