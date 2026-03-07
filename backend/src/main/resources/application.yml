@@ -30,9 +30,9 @@ spring:
   main:
     lazy-initialization: true
 
-  # Default profile is postgresql, can be overridden with SPRING_PROFILES_ACTIVE=h2
+  # Default profile is h2 (including production) unless overridden
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:postgresql}
+    active: ${SPRING_PROFILES_ACTIVE:h2}
 
   # JPA Configuration for business tables (common settings)
   jpa:
@@ -122,10 +122,8 @@ logging:
     com.zaxxer.hikari: INFO
 
 ---
-
----
 # ============================================
-# PostgreSQL Profile (Production)
+# PostgreSQL Profile (Optional)
 # ============================================
 spring:
   config:
@@ -137,7 +135,7 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:password}
-    # HikariCP connection pool settings - optimized for production
+    # HikariCP connection pool settings for optional PostgreSQL deployments
     hikari:
       # Explicitly set driver class name to avoid H2 driver being auto-detected
       driver-class-name: org.postgresql.Driver
@@ -163,3 +161,40 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+
+---
+# ============================================
+# H2 Profile (Default + Production)
+# ============================================
+spring:
+  config:
+    activate:
+      on-profile: h2
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/flowable;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE;AUTO_RECONNECT=TRUE}
+    driver-class-name: org.h2.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      driver-class-name: org.h2.Driver
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:5}
+      idle-timeout: 300000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      pool-name: FlowableHikariPool
+
+  sql:
+    init:
+      mode: never
+
+  h2:
+    console:
+      enabled: false
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
