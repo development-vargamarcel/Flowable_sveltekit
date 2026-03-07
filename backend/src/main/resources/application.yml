@@ -121,47 +121,6 @@ logging:
     com.demo.bpm: INFO
     com.zaxxer.hikari: INFO
 
----
-# ============================================
-# PostgreSQL Profile (Optional)
-# ============================================
-spring:
-  config:
-    activate:
-      on-profile: postgresql
-
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/flowable}
-    driver-class-name: org.postgresql.Driver
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:password}
-    # HikariCP connection pool settings for optional PostgreSQL deployments
-    hikari:
-      # Explicitly set driver class name to avoid H2 driver being auto-detected
-      driver-class-name: org.postgresql.Driver
-      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:2}
-      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:10}
-      idle-timeout: 300000
-      connection-timeout: 30000
-      max-lifetime: 1800000
-      pool-name: FlowableHikariPool
-
-  # Run PostgreSQL schema on startup
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema-postgresql.sql
-
-  # Disable H2 console in PostgreSQL mode
-  h2:
-    console:
-      enabled: false
-
-  jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-
 
 ---
 # ============================================
@@ -173,7 +132,7 @@ spring:
       on-profile: h2
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/flowable;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE;AUTO_RECONNECT=TRUE}
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/flowable;MODE=LEGACY;DB_CLOSE_ON_EXIT=FALSE;AUTO_RECONNECT=TRUE}
     driver-class-name: org.h2.Driver
     username: ${SPRING_DATASOURCE_USERNAME:sa}
     password: ${SPRING_DATASOURCE_PASSWORD:}

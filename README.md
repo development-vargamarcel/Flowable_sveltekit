@@ -108,9 +108,10 @@ The application uses an `.env` file for configuration. Copy `.env.example` to `.
 
 **Key Variables:**
 
-- `POSTGRES_DB`: Database name (default: `flowable`)
-- `POSTGRES_USER`: Database user (default: `postgres`)
-- `POSTGRES_PASSWORD`: Database password
+- `SPRING_PROFILES_ACTIVE`: Active profile (`h2` by default, including production)
+- `SPRING_DATASOURCE_URL`: H2 JDBC URL
+- `SPRING_DATASOURCE_USERNAME`: H2 username (`sa` by default)
+- `SPRING_DATASOURCE_PASSWORD`: H2 password (blank by default)
 - `SPRING_MAIL_HOST`: SMTP host for emails
 - `SPRING_MAIL_USERNAME`: SMTP username
 - `SPRING_MAIL_PASSWORD`: SMTP password
@@ -202,7 +203,7 @@ These scripts mirror CI behavior and reduce local/CI drift.
 | Component | Technology                             |
 | --------- | -------------------------------------- |
 | Backend   | Java 17, Spring Boot 3.2, Flowable 7.0 |
-| Database  | PostgreSQL                             |
+| Database  | H2 (file-backed)                       |
 | Frontend  | SvelteKit 2.x, Svelte 5, Tailwind CSS  |
 | Build     | Maven, Vite, Node.js 20                |
 | Container | Docker, Docker Compose                 |
