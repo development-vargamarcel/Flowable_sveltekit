@@ -6,7 +6,7 @@ This guide covers how to set up and run the application locally.
 
 - **Java 17+** (for Backend)
 - **Node.js 20+** (for Frontend)
-- **Docker & Docker Compose** (for Database and/or full stack)
+- **Docker & Docker Compose** (for full stack)
 - **Maven** (optional, wrapper provided)
 
 ## Environment Configuration
@@ -16,13 +16,13 @@ This guide covers how to set up and run the application locally.
    cp .env.example .env
    ```
 2. Edit `.env` and set your configuration variables. Important ones include:
-   - `POSTGRES_USER`
-   - `POSTGRES_PASSWORD`
+   - `SPRING_PROFILES_ACTIVE`
+   - `SPRING_DATASOURCE_URL`
    - `SPRING_MAIL_*` (for email notifications)
 
 ## Running with Docker Compose (Recommended)
 
-To run the full stack (Database + Backend + Frontend):
+To run the full stack (Backend + Frontend):
 
 ```bash
 docker-compose up --build
@@ -31,21 +31,9 @@ docker-compose up --build
 - Frontend: [http://localhost:3000](http://localhost:3000)
 - Backend: [http://localhost:8080](http://localhost:8080)
 
-To run only the database:
-
-```bash
-docker-compose up -d postgres
-```
-
 ## Manual Development
 
-### 1. Database
-Start the PostgreSQL database:
-```bash
-docker-compose up -d postgres
-```
-
-### 2. Backend
+### 1. Backend
 Navigate to the `backend` directory:
 ```bash
 cd backend
@@ -58,7 +46,7 @@ Build and run:
 ```
 The backend will start on port 8080.
 
-### 3. Frontend
+### 2. Frontend
 Navigate to the `frontend` directory:
 ```bash
 cd frontend
@@ -77,5 +65,5 @@ The frontend will start on [http://localhost:5173](http://localhost:5173).
 
 ## Troubleshooting
 
-- **Database Connection**: Ensure `POSTGRES_USER` and `POSTGRES_PASSWORD` in `.env` match what's in `application.yml` (or override via environment variables).
+- **Database Connection**: Ensure your H2 datasource variables in `.env` match `application.yml` defaults (or override via environment variables).
 - **Frontend API**: The frontend proxies requests to `http://localhost:8080` by default. If your backend is on a different port, update `vite.config.ts`.
