@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       sentrySvelteKit({
+        // Disable plugin telemetry for deterministic and quieter local/CI builds.
+        telemetry: false,
         // Source maps upload configuration
         // Set SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT environment variables
         sourceMapsUploadOptions: {

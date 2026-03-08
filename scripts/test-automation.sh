@@ -6,6 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 ensure_repo_root
 ensure_standard_dirs
 install_error_trap
+ensure_git_clean_if_required
 
 log_section "Automation smoke tests"
 
@@ -26,6 +27,22 @@ summary_json_smoke_test() {
   artifacts_dir="$(mktemp -d)"
   BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_ARTIFACTS_DIR="$artifacts_dir" "$ROOT_DIR/scripts/doctor.sh" >/dev/null
   test -n "$(find "$artifacts_dir" -name 'summary-*.json' -print -quit)"
+}
+
+
+summary_markdown_smoke_test() {
+  local artifacts_dir
+  artifacts_dir="$(mktemp -d)"
+  BPM_RUNNER_SUMMARY_FORMAT=markdown BPM_RUNNER_ARTIFACTS_DIR="$artifacts_dir" "$ROOT_DIR/scripts/doctor.sh" >/dev/null
+  test -n "$(find "$artifacts_dir" -name 'summary-*.md' -print -quit)"
+}
+
+clean_git_guard_smoke_test() {
+  # Repository is expected to be dirty during local development; guard should fail in that case.
+  if (cd "$ROOT_DIR" && BPM_RUNNER_REQUIRE_CLEAN_GIT=1 "$ROOT_DIR/scripts/doctor.sh" >/dev/null 2>&1); then
+    log_error "Expected clean-git guard to fail on dirty working tree"
+    return 1
+  fi
 }
 
 retry_helper_smoke_test() {
@@ -50,6 +67,8 @@ retry_helper_smoke_test() {
 run_step "Parse-check automation scripts" common_shellcheck
 run_step "Verify dry-run orchestration mode" dry_run_verify_all
 run_step "Verify JSON summary renderer" summary_json_smoke_test
+run_step "Verify Markdown summary renderer" summary_markdown_smoke_test
+run_step "Verify clean-git guard behavior" clean_git_guard_smoke_test
 run_step "Verify retry helper behavior" retry_helper_smoke_test
 
 print_summary

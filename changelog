@@ -1,4 +1,4 @@
-## 1.7.0
-- Added stronger stage-toggle validation across frontend/backend/full verification scripts and shared numeric validation utilities.
-- Added configurable frontend lint warning gate (`BPM_FRONTEND_LINT_MAX_WARNINGS`) and cleaner build behavior by disabling Sentry telemetry in automated builds.
-- Refreshed implementation planning and usage documentation; validated with bootstrap, automation smoke tests, and full-stack verification.
+## 1.8.0
+- Added repository-clean enforcement toggle (`BPM_RUNNER_REQUIRE_CLEAN_GIT`) across automation scripts.
+- Added Markdown summary artifact support (`BPM_RUNNER_SUMMARY_FORMAT=markdown`) and richer per-step timing metadata in summaries.
+- Added new Makefile reporting/guard targets and refreshed docs, planning notes, and verification guidance for the updated automation workflow.

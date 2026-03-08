@@ -6,6 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 ensure_repo_root
 ensure_standard_dirs
 install_error_trap
+ensure_git_clean_if_required
 
 start="$(start_timer)"
 

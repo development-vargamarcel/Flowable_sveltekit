@@ -14,6 +14,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 ensure_repo_root
 ensure_standard_dirs
 install_error_trap
+ensure_git_clean_if_required
 
 validate_toggle "$BPM_FRONTEND_SKIP_FORMAT" "BPM_FRONTEND_SKIP_FORMAT"
 validate_toggle "$BPM_FRONTEND_SKIP_LINT" "BPM_FRONTEND_SKIP_LINT"
@@ -47,7 +48,7 @@ frontend_type_check() { npm_safe run check; }
 frontend_unit_tests() { npm_safe run test:ci; }
 frontend_build() {
   # Keep CI output clean and deterministic when Sentry auth is not configured.
-  SENTRY_TELEMETRY=0 npm_safe run build
+  SENTRY_TELEMETRY=0 SENTRY_VITE_PLUGIN_TELEMETRY=0 npm_safe run build
 }
 frontend_coverage() { npm_safe run test:coverage; }
 
