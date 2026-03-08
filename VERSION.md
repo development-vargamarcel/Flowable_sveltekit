@@ -1,10 +1,10 @@
 # Version
 
-Current version: `1.7.0`
+Current version: `1.8.0`
 
 Semantic versioning rationale:
 
-- Previous: `1.6.0`
-- Current: `1.7.0`
+- Previous: `1.7.0`
+- Current: `1.8.0`
 - Change type: **minor**
-- Reason: added backward-compatible verification controls, stricter toggle validation, and improved frontend lint/build quality-gate configurability.
+- Reason: expanded automation reliability with clean-git gating, markdown reporting artifacts, and richer step timing metadata while preserving backward compatibility.

@@ -10,6 +10,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 ensure_repo_root
 ensure_standard_dirs
 install_error_trap
+ensure_git_clean_if_required
 
 validate_toggle "$BPM_BACKEND_SKIP_TESTS" "BPM_BACKEND_SKIP_TESTS"
 validate_toggle "$BPM_BACKEND_SKIP_PACKAGE" "BPM_BACKEND_SKIP_PACKAGE"

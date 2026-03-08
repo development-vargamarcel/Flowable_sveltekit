@@ -14,6 +14,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 : "${BPM_RUNNER_SUMMARY:=1}"
 : "${BPM_RUNNER_SUMMARY_FORMAT:=table}"
 : "${BPM_RUNNER_CONTINUE_ON_ERROR:=0}"
+: "${BPM_RUNNER_REQUIRE_CLEAN_GIT:=0}"
 : "${BPM_RUNNER_LOG_TO_FILE:=0}"
 : "${BPM_RUNNER_ARTIFACTS_DIR:=$ROOT_DIR/.automation}"
 : "${BPM_RUNNER_TIMEOUT_SECONDS:=0}"
@@ -60,6 +61,7 @@ validate_env() {
   validate_toggle "$BPM_RUNNER_DRY_RUN" "BPM_RUNNER_DRY_RUN"
   validate_toggle "$BPM_RUNNER_SUMMARY" "BPM_RUNNER_SUMMARY"
   validate_toggle "$BPM_RUNNER_CONTINUE_ON_ERROR" "BPM_RUNNER_CONTINUE_ON_ERROR"
+  validate_toggle "$BPM_RUNNER_REQUIRE_CLEAN_GIT" "BPM_RUNNER_REQUIRE_CLEAN_GIT"
   validate_toggle "$BPM_RUNNER_LOG_TO_FILE" "BPM_RUNNER_LOG_TO_FILE"
 
   case "$BPM_RUNNER_LOG_LEVEL" in
@@ -71,10 +73,10 @@ validate_env() {
   esac
 
   case "$BPM_RUNNER_SUMMARY_FORMAT" in
-    table|json)
+    table|json|markdown)
       ;;
     *)
-      echo "Invalid BPM_RUNNER_SUMMARY_FORMAT '$BPM_RUNNER_SUMMARY_FORMAT'. Expected table|json." >&2
+      echo "Invalid BPM_RUNNER_SUMMARY_FORMAT '$BPM_RUNNER_SUMMARY_FORMAT'. Expected table|json|markdown." >&2
       return 1
       ;;
   esac
@@ -132,6 +134,8 @@ declare -a STEP_DURATIONS=()
 declare -a STEP_MESSAGES=()
 declare -a STEP_NAMES=()
 declare -a STEP_INDICES=()
+declare -a STEP_STARTED_AT=()
+declare -a STEP_ENDED_AT=()
 STEP_COUNTER=0
 
 write_log_file() {
@@ -278,6 +282,8 @@ record_step() {
   local status="$2"
   local duration="$3"
   local message="$4"
+  local started_at="${5:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}"
+  local ended_at="${6:-$started_at}"
 
   STEP_COUNTER=$((STEP_COUNTER + 1))
   STEP_INDICES+=("$STEP_COUNTER")
@@ -285,6 +291,8 @@ record_step() {
   STEP_RESULTS+=("$status")
   STEP_DURATIONS+=("$duration")
   STEP_MESSAGES+=("$message")
+  STEP_STARTED_AT+=("$started_at")
+  STEP_ENDED_AT+=("$ended_at")
 }
 
 run_step() {
@@ -295,23 +303,32 @@ run_step() {
   start="$(start_timer)"
   log_info "Starting: $name"
 
+  local started_at
+  started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
   if [ "$BPM_RUNNER_DRY_RUN" = "1" ]; then
-    record_step "$name" "SKIP" "0" "dry-run"
+    local ended_at
+    ended_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+    record_step "$name" "SKIP" "0" "dry-run" "$started_at" "$ended_at"
     log_info "Skipped (dry-run): $name"
     return 0
   fi
 
   if "$@"; then
     local duration
+    local ended_at
     duration="$(elapsed_seconds "$start")"
-    record_step "$name" "PASS" "$duration" ""
+    ended_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+    record_step "$name" "PASS" "$duration" "" "$started_at" "$ended_at"
     log_info "Completed: $name (${duration}s)"
     return 0
   fi
 
   local duration
+  local ended_at
   duration="$(elapsed_seconds "$start")"
-  record_step "$name" "FAIL" "$duration" "Command failed"
+  ended_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  record_step "$name" "FAIL" "$duration" "Command failed" "$started_at" "$ended_at"
   log_error "Failed: $name (${duration}s)"
 
   if [ "$BPM_RUNNER_CONTINUE_ON_ERROR" = "1" ]; then
@@ -379,11 +396,13 @@ print_summary_json() {
       if [ "$i" -eq $((${#STEP_RESULTS[@]} - 1)) ]; then
         comma=''
       fi
-      printf '    {"index": %s, "name": "%s", "status": "%s", "durationSeconds": %s, "message": "%s"}%s\n' \
+      printf '    {"index": %s, "name": "%s", "status": "%s", "durationSeconds": %s, "startedAt": "%s", "endedAt": "%s", "message": "%s"}%s\n' \
         "${STEP_INDICES[$i]}" \
         "$(json_escape "${STEP_NAMES[$i]}")" \
         "$(json_escape "${STEP_RESULTS[$i]}")" \
         "${STEP_DURATIONS[$i]}" \
+        "$(json_escape "${STEP_STARTED_AT[$i]}")" \
+        "$(json_escape "${STEP_ENDED_AT[$i]}")" \
         "$(json_escape "${STEP_MESSAGES[$i]}")" \
         "$comma"
     done
@@ -392,6 +411,33 @@ print_summary_json() {
   } >"$summary_file"
 
   log_info "Wrote JSON summary: $summary_file"
+}
+
+print_summary_markdown() {
+  mkdir -p "$BPM_RUNNER_ARTIFACTS_DIR"
+  local summary_file="$BPM_RUNNER_ARTIFACTS_DIR/summary-$RUN_ID.md"
+  {
+    printf '# Execution summary\n\n'
+    printf -- '- Run ID: `%s`\n' "$RUN_ID"
+    printf -- '- Started At (UTC): `%s`\n' "$RUN_STARTED_AT"
+    printf -- '- Host: `%s`\n' "$RUN_HOSTNAME"
+    printf -- '- Shell: `%s`\n\n' "$RUN_SHELL"
+    printf '| # | Step | Status | Duration (s) | Started (UTC) | Ended (UTC) | Message |\n'
+    printf '|---:|---|---|---:|---|---|---|\n'
+    local i
+    for i in "${!STEP_RESULTS[@]}"; do
+      printf '| %s | %s | %s | %s | %s | %s | %s |\n' \
+        "${STEP_INDICES[$i]}" \
+        "${STEP_NAMES[$i]}" \
+        "${STEP_RESULTS[$i]}" \
+        "${STEP_DURATIONS[$i]}" \
+        "${STEP_STARTED_AT[$i]}" \
+        "${STEP_ENDED_AT[$i]}" \
+        "${STEP_MESSAGES[$i]}"
+    done
+  } >"$summary_file"
+
+  log_info "Wrote Markdown summary: $summary_file"
 }
 
 print_summary() {
@@ -404,6 +450,12 @@ print_summary() {
   if [ "$BPM_RUNNER_SUMMARY_FORMAT" = "json" ]; then
     print_summary_table
     print_summary_json
+    return $?
+  fi
+
+  if [ "$BPM_RUNNER_SUMMARY_FORMAT" = "markdown" ]; then
+    print_summary_table
+    print_summary_markdown
     return $?
   fi
 
@@ -448,4 +500,15 @@ handle_error_trap() {
 
 install_error_trap() {
   trap 'handle_error_trap $? $LINENO "$BASH_COMMAND"' ERR
+}
+
+
+ensure_git_clean_if_required() {
+  if [ "$BPM_RUNNER_REQUIRE_CLEAN_GIT" = "1" ]; then
+    if [ -n "$(git -C "$ROOT_DIR" status --porcelain)" ]; then
+      log_error "Repository has uncommitted changes and BPM_RUNNER_REQUIRE_CLEAN_GIT=1"
+      return 1
+    fi
+    log_info "Repository working tree is clean"
+  fi
 }

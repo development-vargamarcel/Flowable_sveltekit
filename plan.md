@@ -1,45 +1,50 @@
-# Implementation Plan and Execution Report
+# Implementation Plan and Execution Report (v1.8.0)
 
-## Scope
-Improve existing automation, verification, and release-quality workflows with production-ready reliability improvements, stronger validation, and updated operational documentation.
+## Objective
+Perform a full reliability and quality hardening pass across repository automation, verification workflows, and release documentation, then fully implement and validate every planned item.
 
-## Major Improvements (24)
+## Major Improvements Planned and Implemented (24)
 
-1. Add strict validation for all runner-level boolean toggles.
-2. Add reusable non-negative integer validation helper for numeric runner controls.
-3. Add canonical normalization for configurable frontend/backend paths.
-4. Enforce deterministic locale/timezone for stable CI output.
-5. Record run metadata (run id, UTC start time, host, shell).
-6. Add optional file logging to artifact directory.
-7. Support summary formats (`table` and `json`) for humans and CI tooling.
-8. Add JSON-safe string escaping utility for artifact generation.
-9. Track step index/status/duration/message in a unified execution model.
-10. Provide retry helper for transient command failures.
-11. Add timeout integration when GNU `timeout` is available.
-12. Expand precondition helpers for file/dir/executable checks.
-13. Add frontend gate skip controls (format/lint/typecheck/tests/build).
-14. Add frontend optional coverage stage.
-15. Add backend gate skip controls (tests/package) and optional verify stage.
-16. Add retry-based dependency bootstrap for frontend and backend.
-17. Expand diagnostics with OS/kernel/CPU/memory/disk signals.
-18. Expand diagnostics with script executability checks.
-19. Add lockfile consistency validation to diagnostics.
-20. Add orchestration-level optional bootstrap inclusion in full verify.
-21. Add Makefile targets for JSON/report-oriented CI usage.
-22. Add automation smoke tests for parser checks, retry helper, and summary JSON creation.
-23. Add stronger toggle validation in frontend/backend/full verification entrypoints.
-24. Add configurable frontend lint warning threshold (`BPM_FRONTEND_LINT_MAX_WARNINGS`) and Sentry telemetry suppression for cleaner non-authenticated build runs.
+1. Validate all runner boolean toggles consistently across shared automation utilities.
+2. Validate runner numeric controls with centralized non-negative integer checks.
+3. Normalize configurable frontend/backend paths to canonical absolute paths.
+4. Enforce deterministic locale/timezone (`LANG`, `LC_ALL`, `TZ`) for repeatable CI logs.
+5. Capture standardized run metadata (`run id`, UTC start time, host, shell).
+6. Add optional persistent run log output in `.automation/` artifacts.
+7. Support machine-friendly JSON summary output for CI integrations.
+8. Add JSON-safe escaping helper to prevent malformed summary files.
+9. Track step status and durations in a unified execution model.
+10. Add retry wrapper for transient command/network failures.
+11. Add optional command timeout support when GNU `timeout` is present.
+12. Add stronger precondition checks for required files, directories, and executability.
+13. Add frontend stage skip controls for format/lint/typecheck/tests/build.
+14. Add optional frontend coverage execution gate.
+15. Add backend stage skip controls and optional backend verify stage.
+16. Harden bootstrap with retryable frontend/backend dependency installation.
+17. Expand diagnostics with host details (OS/kernel/CPU/memory/disk).
+18. Validate executability for every script in `scripts/`.
+19. Validate lockfile presence and frontend lockfile consistency.
+20. Add orchestration option to include bootstrap in full verification.
+21. Add report-oriented Makefile targets for JSON output workflows.
+22. Add automation smoke tests for parsing, dry-run, JSON summary, retry behavior.
+23. Add frontend lint warning threshold gate and CI-noise suppression for build telemetry.
+24. Add clean-git enforcement mode plus markdown summary output with per-step timestamps.
 
-## Execution Notes
-All plan items were implemented and then validated through:
-- bootstrap dependency installation,
-- automation smoke tests,
-- diagnostics,
-- full-stack verification (frontend + backend).
+## Execution Log
+- Updated shared automation core (`scripts/common.sh`) to support:
+  - clean git guard (`BPM_RUNNER_REQUIRE_CLEAN_GIT`),
+  - markdown summaries (`BPM_RUNNER_SUMMARY_FORMAT=markdown`),
+  - per-step start/end UTC timestamps included in internal tracking and JSON output.
+- Applied clean-git enforcement hook to all automation entrypoints.
+- Added Makefile targets for markdown reporting and clean-git verification.
+- Expanded automation smoke tests with markdown summary and clean-git guard validation.
+- Updated semantic versions to `1.8.0` (frontend/backend/repo docs).
+- Updated release notes (`changelog`) and comprehensive usage documentation.
 
 ## Completion Checklist
-- [x] Planned improvements implemented.
-- [x] Scripts parse and run successfully.
-- [x] Dependencies installed.
-- [x] Verification pipeline executed end-to-end.
-- [x] Documentation/version/changelog updated.
+- [x] All planned improvements implemented.
+- [x] Missing dependencies/tooling installed using bootstrap.
+- [x] Automation smoke tests executed.
+- [x] Diagnostics executed.
+- [x] Full-stack frontend/backend verification executed.
+- [x] Documentation and version metadata updated.

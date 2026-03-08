@@ -1,4 +1,4 @@
-.PHONY: help bootstrap doctor doctor-verbose doctor-no-color doctor-json verify verify-fast verify-dry-run verify-continue verify-with-bootstrap verify-json-report verify-frontend verify-backend verify-strict test-frontend test-backend clean check-lockfiles test-automation
+.PHONY: help bootstrap doctor doctor-verbose doctor-no-color doctor-json doctor-markdown verify verify-fast verify-dry-run verify-continue verify-with-bootstrap verify-json-report verify-markdown-report verify-clean-git verify-frontend verify-backend verify-strict test-frontend test-backend clean check-lockfiles test-automation
 
 help:
 	@echo "Available targets:"
@@ -7,11 +7,14 @@ help:
 	@echo "  doctor-verbose        Print diagnostics with debug logging"
 	@echo "  doctor-no-color       Print diagnostics without ANSI color output"
 	@echo "  doctor-json           Print diagnostics and write JSON summary artifacts"
+	@echo "  doctor-markdown       Print diagnostics and write Markdown summary artifacts"
 	@echo "  verify-fast           Run frontend and backend tests only"
 	@echo "  verify-dry-run        Print verification commands without executing"
 	@echo "  verify-continue       Continue summary collection even if a stage fails"
 	@echo "  verify-with-bootstrap Run bootstrap before verification"
 	@echo "  verify-json-report    Run verification and emit JSON step summaries"
+	@echo "  verify-markdown-report Run verification and emit Markdown step summaries"
+	@echo "  verify-clean-git      Run verification only when git working tree is clean"
 	@echo "  verify-frontend       Run frontend quality gates"
 	@echo "  verify-backend        Run backend quality gates"
 	@echo "  verify-strict         Run full verification plus frontend coverage and backend verify"
@@ -37,6 +40,9 @@ doctor-no-color:
 doctor-json:
 	BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_LOG_TO_FILE=1 ./scripts/doctor.sh
 
+doctor-markdown:
+	BPM_RUNNER_SUMMARY_FORMAT=markdown BPM_RUNNER_LOG_TO_FILE=1 ./scripts/doctor.sh
+
 verify-frontend:
 	./scripts/verify-frontend.sh
 
@@ -58,6 +64,12 @@ verify-with-bootstrap:
 
 verify-json-report:
 	BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_LOG_TO_FILE=1 ./scripts/verify-all.sh
+
+verify-markdown-report:
+	BPM_RUNNER_SUMMARY_FORMAT=markdown BPM_RUNNER_LOG_TO_FILE=1 ./scripts/verify-all.sh
+
+verify-clean-git:
+	BPM_RUNNER_REQUIRE_CLEAN_GIT=1 ./scripts/verify-all.sh
 
 verify-strict:
 	BPM_FRONTEND_ENABLE_COVERAGE=1 BPM_BACKEND_ENABLE_VERIFY=1 ./scripts/verify-all.sh
