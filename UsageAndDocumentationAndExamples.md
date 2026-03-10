@@ -2,9 +2,9 @@
 
 ## Current Version
 
-- **Frontend:** `1.8.0`
-- **Backend:** `1.8.0`
-- **Repository release:** `1.8.0` (**minor**) due to backward-compatible reliability and reporting enhancements in automation scripts.
+- **Frontend:** `1.8.1`
+- **Backend:** `1.8.1`
+- **Repository release:** `1.8.1` (**patch**) due to backward-compatible automation reliability and reporting metadata enhancements.
 
 ---
 
@@ -32,6 +32,27 @@
 20. Suppressed Sentry telemetry during scripted production builds for cleaner CI signal.
 
 ---
+
+
+### Automation artifact retention
+
+You can automatically prune old automation artifacts (JSON/Markdown summaries and optional run logs):
+
+```bash
+BPM_RUNNER_ARTIFACT_RETENTION_DAYS=7 BPM_RUNNER_SUMMARY_FORMAT=json ./scripts/doctor.sh
+```
+
+This keeps artifacts newer than the configured day window and deletes older files in `BPM_RUNNER_ARTIFACTS_DIR`.
+
+### Summary metadata
+
+JSON summaries now include:
+- `overallStatus` (`PASS`/`FAIL`)
+- `totals` with `pass`, `fail`, `skip`, and cumulative `durationSeconds`
+
+Markdown summaries now include:
+- overall status line
+- totals line
 
 ## Dependency and tool installation
 

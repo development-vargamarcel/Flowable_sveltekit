@@ -26,7 +26,16 @@ summary_json_smoke_test() {
   local artifacts_dir
   artifacts_dir="$(mktemp -d)"
   BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_ARTIFACTS_DIR="$artifacts_dir" "$ROOT_DIR/scripts/doctor.sh" >/dev/null
-  test -n "$(find "$artifacts_dir" -name 'summary-*.json' -print -quit)"
+  local summary_file
+  summary_file="$(find "$artifacts_dir" -name 'summary-*.json' -print -quit)"
+  test -n "$summary_file"
+  node -e '
+    const fs = require("node:fs");
+    const payload = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    if (!payload.overallStatus || !payload.totals || typeof payload.totals.pass !== "number") {
+      process.exit(1);
+    }
+  ' "$summary_file"
 }
 
 
@@ -35,6 +44,16 @@ summary_markdown_smoke_test() {
   artifacts_dir="$(mktemp -d)"
   BPM_RUNNER_SUMMARY_FORMAT=markdown BPM_RUNNER_ARTIFACTS_DIR="$artifacts_dir" "$ROOT_DIR/scripts/doctor.sh" >/dev/null
   test -n "$(find "$artifacts_dir" -name 'summary-*.md' -print -quit)"
+}
+
+artifact_retention_smoke_test() {
+  local artifacts_dir stale_file
+  artifacts_dir="$(mktemp -d)"
+  stale_file="$artifacts_dir/stale.txt"
+  printf 'old\n' >"$stale_file"
+  touch -d '20 days ago' "$stale_file"
+  BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_ARTIFACTS_DIR="$artifacts_dir" BPM_RUNNER_ARTIFACT_RETENTION_DAYS=7 "$ROOT_DIR/scripts/doctor.sh" >/dev/null
+  test ! -f "$stale_file"
 }
 
 clean_git_guard_smoke_test() {
@@ -68,6 +87,7 @@ run_step "Parse-check automation scripts" common_shellcheck
 run_step "Verify dry-run orchestration mode" dry_run_verify_all
 run_step "Verify JSON summary renderer" summary_json_smoke_test
 run_step "Verify Markdown summary renderer" summary_markdown_smoke_test
+run_step "Verify artifact retention pruning" artifact_retention_smoke_test
 run_step "Verify clean-git guard behavior" clean_git_guard_smoke_test
 run_step "Verify retry helper behavior" retry_helper_smoke_test
 

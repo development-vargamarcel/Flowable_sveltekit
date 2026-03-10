@@ -1,10 +1,10 @@
 # Version
 
-Current version: `1.8.0`
+Current version: `1.8.1`
 
 Semantic versioning rationale:
 
-- Previous: `1.7.0`
-- Current: `1.8.0`
-- Change type: **minor**
-- Reason: expanded automation reliability with clean-git gating, markdown reporting artifacts, and richer step timing metadata while preserving backward compatibility.
+- Previous: `1.8.0`
+- Current: `1.8.1`
+- Change type: **patch**
+- Reason: automation reliability fixes and reporting metadata enhancements without introducing API changes.

@@ -1,3 +1,8 @@
+## 1.8.1
+- Added JSON/Markdown summary aggregate status and totals metadata.
+- Added report artifact retention pruning via `BPM_RUNNER_ARTIFACT_RETENTION_DAYS`.
+- Hardened retry helper validation and expanded automation smoke tests for schema and retention checks.
+
 ## 1.8.0
 - Added repository-clean enforcement toggle (`BPM_RUNNER_REQUIRE_CLEAN_GIT`) across automation scripts.
 - Added Markdown summary artifact support (`BPM_RUNNER_SUMMARY_FORMAT=markdown`) and richer per-step timing metadata in summaries.

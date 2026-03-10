@@ -60,10 +60,13 @@ print_system_diagnostics() {
 }
 
 validate_npm_lock_consistency() {
-  (
+  if ! (
     cd "$BPM_FRONTEND_DIR"
     npm_safe ls --package-lock-only >/dev/null
-  )
+  ); then
+    log_error "Frontend lockfile consistency check failed. Run ./scripts/bootstrap.sh or npm ci in frontend/."
+    return 1
+  fi
   log_info "Frontend lockfile consistency check passed"
 }
 
