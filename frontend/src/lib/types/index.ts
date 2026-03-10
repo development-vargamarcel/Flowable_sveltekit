@@ -758,6 +758,43 @@ export interface SaveGridRowsRequest {
   rows: Record<string, ProcessVariableValue>[];
 }
 
+/**
+ * Field definition used in configurable document types.
+ */
+export interface DocumentTypeFieldDefinition {
+  name: string;
+  type: string;
+  required?: boolean;
+  label?: string;
+  options?: string[];
+}
+
+/**
+ * Configurable document type definition.
+ */
+export interface DocumentTypeDefinition {
+  key: string;
+  name: string;
+  description?: string;
+  schemaJson?: string;
+  fields?: DocumentTypeFieldDefinition[];
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Request payload to create or update a document type.
+ */
+export interface DocumentTypeDefinitionRequest {
+  key?: string;
+  name: string;
+  description?: string;
+  schemaJson?: string;
+  fields?: DocumentTypeFieldDefinition[];
+  active?: boolean;
+}
+
 // ============================================
 // Notification Types
 // ============================================

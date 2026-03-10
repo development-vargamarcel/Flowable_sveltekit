@@ -36,7 +36,7 @@ export const tasksApi = {
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const result = await fetchApi<{ content: Task[] } | Task[]>(`/api/tasks${queryString}`);
     if (Array.isArray(result)) return result;
-    return (result as any).content || [];
+    return result.content ?? [];
   },
 
   /**

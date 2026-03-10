@@ -1,3 +1,8 @@
+## 1.8.2
+- Tightened frontend API typing by replacing `any`-based document/task/notification contracts with shared interfaces.
+- Improved process documentation page reliability with explicit BPMN viewer/registry typing and component cleanup on unmount.
+- Updated release metadata and usage documentation to align with the 1.8.2 patch release.
+
 ## 1.8.1
 - Added JSON/Markdown summary aggregate status and totals metadata.
 - Added report artifact retention pruning via `BPM_RUNNER_ARTIFACT_RETENTION_DAYS`.
