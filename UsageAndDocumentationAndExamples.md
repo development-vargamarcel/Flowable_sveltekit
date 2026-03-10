@@ -2,9 +2,9 @@
 
 ## Current Version
 
-- **Frontend:** `1.8.1`
-- **Backend:** `1.8.1`
-- **Repository release:** `1.8.1` (**patch**) due to backward-compatible automation reliability and reporting metadata enhancements.
+- **Frontend:** `1.8.2`
+- **Backend:** `1.8.2`
+- **Repository release:** `1.8.2` (**patch**) due to backward-compatible automation reliability and reporting metadata enhancements.
 
 ---
 
@@ -32,6 +32,21 @@
 20. Suppressed Sentry telemetry during scripted production builds for cleaner CI signal.
 
 ---
+
+## Additional implementation updates in 1.8.2
+
+1. Replaced weak `any` API response types for document types and notifications with explicit shared TypeScript interfaces.
+2. Added dedicated document-type payload models (`DocumentTypeDefinition`, `DocumentTypeDefinitionRequest`) to keep API contracts centralized and consistent.
+3. Removed unsafe task list casting in `tasksApi.getTasks` and now use discriminated response handling without `any`.
+4. Hardened process documentation page BPMN viewer typing to reduce runtime/type fragility and added viewer cleanup on unmount.
+5. Removed unused script-task/document-type placeholders from process docs page to prevent dead-state drift.
+
+### Copy-ready quick validation
+
+```bash
+cd frontend && npm run check && npm run test:ci
+cd ../backend && ./mvnw -q test -DskipITs
+```
 
 
 ### Automation artifact retention

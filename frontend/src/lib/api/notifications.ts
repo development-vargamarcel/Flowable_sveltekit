@@ -1,5 +1,6 @@
 import { fetchApi } from './core';
 import { createLogger } from '$lib/utils/logger';
+import type { Notification } from '$lib/types';
 
 const log = createLogger('api.notifications');
 
@@ -9,7 +10,7 @@ export const notificationsApi = {
    * Get all notifications for the current user.
    * @returns A promise that resolves to an array of notifications.
    */
-  async getNotifications(): Promise<any[]> {
+  async getNotifications(): Promise<Notification[]> {
     log.debug('getNotifications called');
     return fetchApi('/api/notifications');
   },

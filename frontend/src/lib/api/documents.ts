@@ -6,7 +6,9 @@ import type {
   SaveDocumentRequest,
   Page,
   GridRowDTO,
-  SaveGridRowsRequest
+  SaveGridRowsRequest,
+  DocumentTypeDefinition,
+  DocumentTypeDefinitionRequest
 } from '$lib/types';
 import { createLogger } from '$lib/utils/logger';
 
@@ -236,7 +238,7 @@ export const documentsApi = {
    * Get all document type definitions.
    * @returns A promise that resolves to an array of document types.
    */
-  async getDocumentTypes(): Promise<any[]> {
+  async getDocumentTypes(): Promise<DocumentTypeDefinition[]> {
     log.debug('getDocumentTypes called');
     return fetchApi('/api/document-types');
   },
@@ -246,7 +248,7 @@ export const documentsApi = {
    * @param key - The key of the document type.
    * @returns A promise that resolves to the document type definition.
    */
-  async getDocumentType(key: string): Promise<any> {
+  async getDocumentType(key: string): Promise<DocumentTypeDefinition> {
     log.debug('getDocumentType called', { key });
     return fetchApi(`/api/document-types/${key}`);
   },
@@ -256,7 +258,7 @@ export const documentsApi = {
    * @param data - The document type data.
    * @returns A promise that resolves to the created document type.
    */
-  async createDocumentType(data: any): Promise<any> {
+  async createDocumentType(data: DocumentTypeDefinitionRequest): Promise<DocumentTypeDefinition> {
     log.debug('createDocumentType called');
     return fetchApi('/api/document-types', {
       method: 'POST',
@@ -270,7 +272,10 @@ export const documentsApi = {
    * @param data - The updated document type data.
    * @returns A promise that resolves to the updated document type.
    */
-  async updateDocumentType(key: string, data: any): Promise<any> {
+  async updateDocumentType(
+    key: string,
+    data: DocumentTypeDefinitionRequest
+  ): Promise<DocumentTypeDefinition> {
     log.debug('updateDocumentType called', { key });
     return fetchApi(`/api/document-types/${key}`, {
       method: 'PUT',

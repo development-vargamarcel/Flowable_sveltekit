@@ -5,30 +5,82 @@
 
   import BpmnViewer from 'bpmn-js/lib/Viewer';
 
+  type ViewerHandle = {
+    importXML: (xml: string) => Promise<unknown>;
+    get: (service: 'canvas' | 'elementRegistry') => unknown;
+    destroy?: () => void;
+  };
+
+  type BpmnBusinessObject = {
+    id?: string;
+    name?: string;
+    assignee?: string;
+    candidateGroups?: string;
+    formKey?: string;
+    class?: string;
+    delegateExpression?: string;
+    expression?: string;
+    scriptFormat?: string;
+    documentation?: Array<{ text?: string }>;
+  };
+
+  type BpmnElement = {
+    id: string;
+    type: string;
+    businessObject?: BpmnBusinessObject;
+  };
+
+  type Canvas = {
+    zoom: (mode: 'fit-viewport') => void;
+  };
+
+  type ElementRegistry = {
+    filter: (predicate: (element: BpmnElement) => boolean) => BpmnElement[];
+  };
+
+  type UserTaskSummary = {
+    id: string;
+    name: string;
+    assignee?: string;
+    candidateGroups?: string;
+    formKey?: string;
+    docs?: string;
+  };
+
+  type ServiceTaskSummary = {
+    id: string;
+    name: string;
+    type: 'Java Class' | 'Delegate' | 'Expression';
+    implementation?: string;
+  };
+
   let processId = $state('');
   let bpmnXml = $state('');
   let isLoading = $state(true);
   let error = $state('');
 
   let viewerContainer = $state<HTMLDivElement>();
-  let viewer: any = null;
+  let viewer: ViewerHandle | null = null;
 
   // Extracted metadata
   let processName = $state('');
   let description = $state('');
-  let userTasks: any[] = $state([]);
-  let serviceTasks: any[] = $state([]);
-  let scriptTasks: any[] = $state([]);
-  const docTypes: string[] = $state([]);
+  let userTasks: UserTaskSummary[] = $state([]);
+  let serviceTasks: ServiceTaskSummary[] = $state([]);
 
-  onMount(async () => {
+  onMount(() => {
     processId = $page.params.id ?? '';
     if (!processId) {
-       error = 'No process ID provided';
-       return;
+      error = 'No process ID provided';
+      return;
     }
 
-    await loadData();
+    void loadData();
+
+    return () => {
+      viewer?.destroy?.();
+      viewer = null;
+    };
   });
 
   async function loadData() {
@@ -51,44 +103,47 @@
 
     viewer = new BpmnViewer({
       container: viewerContainer
-    });
+    }) as ViewerHandle;
 
     viewer.importXML(bpmnXml).then(() => {
-        const canvas = viewer.get('canvas');
-        canvas.zoom('fit-viewport');
+      const canvas = viewer?.get('canvas') as Canvas | undefined;
+      canvas?.zoom('fit-viewport');
 
-        // Extract metadata using ElementRegistry
-        const elementRegistry = viewer.get('elementRegistry');
+      // Extract metadata using ElementRegistry
+      const elementRegistry = viewer?.get('elementRegistry') as ElementRegistry | undefined;
+      if (!elementRegistry) {
+        return;
+      }
 
-        // Find Process element
-        const process = elementRegistry.filter((e: any) => e.type === 'bpmn:Process')[0];
-        if (process && process.businessObject) {
-            processName = process.businessObject.name || process.businessObject.id;
-            description = process.businessObject.documentation?.[0]?.text || '';
-        }
+      // Find Process element
+      const process = elementRegistry.filter((e) => e.type === 'bpmn:Process')[0];
+      const businessObject = process?.businessObject;
+      if (businessObject) {
+        processName = businessObject.name || businessObject.id || 'Unnamed Process';
+        description = businessObject.documentation?.[0]?.text || '';
+      }
 
-        // Collect tasks
-        userTasks = elementRegistry.filter((e: any) => e.type === 'bpmn:UserTask').map((e: any) => ({
-            id: e.id,
-            name: e.businessObject.name || 'Unnamed Task',
-            assignee: e.businessObject.assignee,
-            candidateGroups: e.businessObject.candidateGroups,
-            formKey: e.businessObject.formKey,
-            docs: e.businessObject.documentation?.[0]?.text
-        }));
+      // Collect tasks
+      userTasks = elementRegistry.filter((e) => e.type === 'bpmn:UserTask').map((e) => ({
+        id: e.id,
+        name: e.businessObject?.name || 'Unnamed Task',
+        assignee: e.businessObject?.assignee,
+        candidateGroups: e.businessObject?.candidateGroups,
+        formKey: e.businessObject?.formKey,
+        docs: e.businessObject?.documentation?.[0]?.text
+      }));
 
-        serviceTasks = elementRegistry.filter((e: any) => e.type === 'bpmn:ServiceTask').map((e: any) => ({
-            id: e.id,
-            name: e.businessObject.name || 'Unnamed Service',
-            type: e.businessObject.class ? 'Java Class' : e.businessObject.delegateExpression ? 'Delegate' : 'Expression',
-            implementation: e.businessObject.class || e.businessObject.delegateExpression || e.businessObject.expression
-        }));
-
-        scriptTasks = elementRegistry.filter((e: any) => e.type === 'bpmn:ScriptTask').map((e: any) => ({
-            id: e.id,
-            name: e.businessObject.name || 'Unnamed Script',
-            format: e.businessObject.scriptFormat
-        }));
+      serviceTasks = elementRegistry.filter((e) => e.type === 'bpmn:ServiceTask').map((e) => ({
+        id: e.id,
+        name: e.businessObject?.name || 'Unnamed Service',
+        type: e.businessObject?.class
+          ? 'Java Class'
+          : e.businessObject?.delegateExpression
+            ? 'Delegate'
+            : 'Expression',
+        implementation:
+          e.businessObject?.class || e.businessObject?.delegateExpression || e.businessObject?.expression
+      }));
     });
   }
 

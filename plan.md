@@ -1,34 +1,34 @@
-# Implementation Plan and Execution Report (v1.8.1)
+# Implementation Plan and Execution Report (v1.8.2)
 
 ## Repository Review Scope
 Reviewed automation scripts, Makefile workflows, release/versioning files, and usage documentation to identify reliability defects, maintainability gaps, and validation weaknesses.
 
-## Major Improvement Items (Planned + Implemented)
+## Major Improvement Items (Completed)
 
-1. Add validation for artifact retention environment variable.
-2. Add guardrails in retry helper to reject invalid retry attempts (`<1`).
-3. Add summary-level aggregate status to JSON outputs.
-4. Add summary-level totals (pass/fail/skip/duration) to JSON outputs.
-5. Add summary-level aggregate status to Markdown outputs.
-6. Add summary-level totals to Markdown outputs.
-7. Escape markdown table pipe characters in summary step text.
-8. Add artifact pruning in JSON summary generation for old report files.
-9. Add artifact pruning in Markdown summary generation for old report files.
-10. Keep summary table output while still generating JSON/Markdown artifacts in one run path.
-11. Improve summary return behavior to preserve failure state while writing artifacts.
-12. Expand automation smoke tests to validate JSON summary schema fields.
-13. Expand automation smoke tests to verify artifact pruning behavior.
-14. Re-run script syntax checks (`bash -n`) after changes.
-15. Re-run automation smoke suite after changes.
-16. Re-run diagnostics script after changes.
-17. Re-run frontend verification after changes.
-18. Re-run backend verification after changes.
-19. Update release version references across frontend/backend/repository docs.
-20. Update changelog with new version and implemented features.
-21. Update `UsageAndDocumentationAndExamples.md` to reflect new controls and outputs.
-22. Update plan report with explicit completion checklist and verification evidence.
-23. Ensure versioning is semver-consistent for backward-compatible automation enhancements (patch bump).
-24. Perform final review of modified files for consistency and production readiness.
+- [x] Add validation for artifact retention environment variable.
+- [x] Add guardrails in retry helper to reject invalid retry attempts (`<1`).
+- [x] Add summary-level aggregate status to JSON outputs.
+- [x] Add summary-level totals (pass/fail/skip/duration) to JSON outputs.
+- [x] Add summary-level aggregate status to Markdown outputs.
+- [x] Add summary-level totals to Markdown outputs.
+- [x] Escape markdown table pipe characters in summary step text.
+- [x] Add artifact pruning in JSON summary generation for old report files.
+- [x] Add artifact pruning in Markdown summary generation for old report files.
+- [x] Keep summary table output while still generating JSON/Markdown artifacts in one run path.
+- [x] Improve summary return behavior to preserve failure state while writing artifacts.
+- [x] Expand automation smoke tests to validate JSON summary schema fields.
+- [x] Expand automation smoke tests to verify artifact pruning behavior.
+- [x] Re-run script syntax checks (`bash -n`) after changes.
+- [x] Re-run automation smoke suite after changes.
+- [x] Re-run diagnostics script after changes.
+- [x] Re-run frontend verification after changes.
+- [x] Re-run backend verification after changes.
+- [x] Update release version references across frontend/backend/repository docs.
+- [x] Update changelog with new version and implemented features.
+- [x] Update `UsageAndDocumentationAndExamples.md` to reflect new controls and outputs.
+- [x] Update plan report with explicit completion checklist and verification evidence.
+- [x] Ensure versioning is semver-consistent for backward-compatible automation enhancements (patch bump).
+- [x] Perform final review of modified files for consistency and production readiness.
 
 ## Task Completion Checklist
 - [x] Reviewed the relevant codebase
