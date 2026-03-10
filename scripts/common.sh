@@ -20,6 +20,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 : "${BPM_RUNNER_TIMEOUT_SECONDS:=0}"
 : "${BPM_RUNNER_RETRY_COUNT:=2}"
 : "${BPM_RUNNER_RETRY_DELAY_SECONDS:=2}"
+: "${BPM_RUNNER_ARTIFACT_RETENTION_DAYS:=14}"
 : "${BPM_FRONTEND_DIR:=$ROOT_DIR/frontend}"
 : "${BPM_BACKEND_DIR:=$ROOT_DIR/backend}"
 
@@ -84,6 +85,7 @@ validate_env() {
   validate_non_negative_integer "$BPM_RUNNER_TIMEOUT_SECONDS" "BPM_RUNNER_TIMEOUT_SECONDS"
   validate_non_negative_integer "$BPM_RUNNER_RETRY_COUNT" "BPM_RUNNER_RETRY_COUNT"
   validate_non_negative_integer "$BPM_RUNNER_RETRY_DELAY_SECONDS" "BPM_RUNNER_RETRY_DELAY_SECONDS"
+  validate_non_negative_integer "$BPM_RUNNER_ARTIFACT_RETENTION_DAYS" "BPM_RUNNER_ARTIFACT_RETENTION_DAYS"
 
   if ! BPM_FRONTEND_DIR="$(normalize_path "$BPM_FRONTEND_DIR")"; then
     echo "Unable to resolve BPM_FRONTEND_DIR: $BPM_FRONTEND_DIR" >&2
@@ -258,6 +260,10 @@ run_cmd() {
 run_with_retry() {
   local attempts="$1"
   local delay="$2"
+  if [ "$attempts" -lt 1 ]; then
+    log_error "run_with_retry requires attempts >= 1 (got: $attempts)"
+    return 1
+  fi
   shift 2
   local cmd=("$@")
   local try=1
@@ -382,15 +388,34 @@ print_summary_table() {
 
 print_summary_json() {
   mkdir -p "$BPM_RUNNER_ARTIFACTS_DIR"
+  if [ "$BPM_RUNNER_ARTIFACT_RETENTION_DAYS" -gt 0 ]; then
+    find "$BPM_RUNNER_ARTIFACTS_DIR" -type f -mtime "+$BPM_RUNNER_ARTIFACT_RETENTION_DAYS" -delete 2>/dev/null || true
+  fi
   local summary_file="$BPM_RUNNER_ARTIFACTS_DIR/summary-$RUN_ID.json"
+  local pass_count=0 fail_count=0 skip_count=0 total_duration=0
+  local overall_status="PASS"
+  local i
+  for i in "${!STEP_RESULTS[@]}"; do
+    case "${STEP_RESULTS[$i]}" in
+      PASS) pass_count=$((pass_count + 1)) ;;
+      FAIL)
+        fail_count=$((fail_count + 1))
+        overall_status="FAIL"
+        ;;
+      SKIP) skip_count=$((skip_count + 1)) ;;
+    esac
+    total_duration=$((total_duration + ${STEP_DURATIONS[$i]}))
+  done
+
   {
     printf '{\n'
     printf '  "runId": "%s",\n' "$(json_escape "$RUN_ID")"
     printf '  "startedAt": "%s",\n' "$(json_escape "$RUN_STARTED_AT")"
     printf '  "host": "%s",\n' "$(json_escape "$RUN_HOSTNAME")"
     printf '  "shell": "%s",\n' "$(json_escape "$RUN_SHELL")"
+    printf '  "overallStatus": "%s",\n' "$(json_escape "$overall_status")"
+    printf '  "totals": {"pass": %s, "fail": %s, "skip": %s, "durationSeconds": %s},\n' "$pass_count" "$fail_count" "$skip_count" "$total_duration"
     printf '  "steps": [\n'
-    local i
     for i in "${!STEP_RESULTS[@]}"; do
       local comma=','
       if [ "$i" -eq $((${#STEP_RESULTS[@]} - 1)) ]; then
@@ -415,25 +440,44 @@ print_summary_json() {
 
 print_summary_markdown() {
   mkdir -p "$BPM_RUNNER_ARTIFACTS_DIR"
+  if [ "$BPM_RUNNER_ARTIFACT_RETENTION_DAYS" -gt 0 ]; then
+    find "$BPM_RUNNER_ARTIFACTS_DIR" -type f -mtime "+$BPM_RUNNER_ARTIFACT_RETENTION_DAYS" -delete 2>/dev/null || true
+  fi
   local summary_file="$BPM_RUNNER_ARTIFACTS_DIR/summary-$RUN_ID.md"
+  local pass_count=0 fail_count=0 skip_count=0 total_duration=0
+  local overall_status="PASS"
+  local i
+  for i in "${!STEP_RESULTS[@]}"; do
+    case "${STEP_RESULTS[$i]}" in
+      PASS) pass_count=$((pass_count + 1)) ;;
+      FAIL)
+        fail_count=$((fail_count + 1))
+        overall_status="FAIL"
+        ;;
+      SKIP) skip_count=$((skip_count + 1)) ;;
+    esac
+    total_duration=$((total_duration + ${STEP_DURATIONS[$i]}))
+  done
+
   {
     printf '# Execution summary\n\n'
     printf -- '- Run ID: `%s`\n' "$RUN_ID"
     printf -- '- Started At (UTC): `%s`\n' "$RUN_STARTED_AT"
     printf -- '- Host: `%s`\n' "$RUN_HOSTNAME"
-    printf -- '- Shell: `%s`\n\n' "$RUN_SHELL"
+    printf -- '- Shell: `%s`\n' "$RUN_SHELL"
+    printf -- '- Overall status: `%s`\n' "$overall_status"
+    printf -- '- Totals: pass=%s, fail=%s, skip=%s, duration=%ss\n\n' "$pass_count" "$fail_count" "$skip_count" "$total_duration"
     printf '| # | Step | Status | Duration (s) | Started (UTC) | Ended (UTC) | Message |\n'
     printf '|---:|---|---|---:|---|---|---|\n'
-    local i
     for i in "${!STEP_RESULTS[@]}"; do
       printf '| %s | %s | %s | %s | %s | %s | %s |\n' \
         "${STEP_INDICES[$i]}" \
-        "${STEP_NAMES[$i]}" \
+        "${STEP_NAMES[$i]//|/\\|}" \
         "${STEP_RESULTS[$i]}" \
         "${STEP_DURATIONS[$i]}" \
         "${STEP_STARTED_AT[$i]}" \
         "${STEP_ENDED_AT[$i]}" \
-        "${STEP_MESSAGES[$i]}"
+        "${STEP_MESSAGES[$i]//|/\\|}"
     done
   } >"$summary_file"
 
@@ -447,19 +491,20 @@ print_summary() {
   echo
   log_section "Execution summary"
 
+  local table_status=0
+  print_summary_table || table_status=$?
+
   if [ "$BPM_RUNNER_SUMMARY_FORMAT" = "json" ]; then
-    print_summary_table
     print_summary_json
-    return $?
+    return "$table_status"
   fi
 
   if [ "$BPM_RUNNER_SUMMARY_FORMAT" = "markdown" ]; then
-    print_summary_table
     print_summary_markdown
-    return $?
+    return "$table_status"
   fi
 
-  print_summary_table
+  return "$table_status"
 }
 
 npm_safe() {
