@@ -1,24 +1,31 @@
 import { sentrySvelteKit } from '@sentry/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type PluginOption } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  return {
-    plugins: [
+  const hasSentryUploadConfig =
+    Boolean(process.env.SENTRY_AUTH_TOKEN) &&
+    Boolean(process.env.SENTRY_ORG) &&
+    Boolean(process.env.SENTRY_PROJECT);
+
+  const plugins: PluginOption[] = [sveltekit()];
+
+  if (hasSentryUploadConfig) {
+    plugins.unshift(
       sentrySvelteKit({
-        // Disable plugin telemetry for deterministic and quieter local/CI builds.
         telemetry: false,
-        // Source maps upload configuration
-        // Set SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT environment variables
         sourceMapsUploadOptions: {
           org: process.env.SENTRY_ORG,
           project: process.env.SENTRY_PROJECT,
           authToken: process.env.SENTRY_AUTH_TOKEN
         }
-      }),
-      sveltekit()
-    ],
+      })
+    );
+  }
+
+  return {
+    plugins,
     server: {
       port: 3000,
       host: '0.0.0.0',

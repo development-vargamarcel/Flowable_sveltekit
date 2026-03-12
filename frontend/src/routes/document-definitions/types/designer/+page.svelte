@@ -3,10 +3,11 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
+  import type { FormField, GridDefinition, ProcessFieldLibrary } from '$lib/types';
   import FieldLibraryPanel from '$lib/components/FieldLibraryPanel.svelte';
   import DynamicForm from '$lib/components/DynamicForm.svelte';
+  import { getErrorMessage } from '$lib/utils/error-message';
 
-  // State
   let key = $state('');
   let name = $state('');
   let description = $state('');
@@ -16,19 +17,28 @@
   let error = $state('');
   let success = $state('');
 
-  // The schema is basically the FieldLibrary structure
-  let schema = $state<{
-    fields: any[];
-    grids: any[];
-  }>({
+  let schema = $state<ProcessFieldLibrary>({
     fields: [],
     grids: []
   });
 
-  // Preview state
   let showPreview = $state(true);
-  let previewValues = $state({});
-  const previewErrors = $state({});
+  let previewValues = $state<Record<string, unknown>>({});
+  const previewErrors = $state<Record<string, string>>({});
+
+  function toProcessFieldLibrary(value: unknown): ProcessFieldLibrary {
+    if (!value || typeof value !== 'object') {
+      return { fields: [], grids: [] };
+    }
+
+    const candidate = value as { fields?: unknown; grids?: unknown };
+
+    // We only need structural safety for preview/editor binding; detailed field validation happens server-side.
+    return {
+      fields: Array.isArray(candidate.fields) ? (candidate.fields as FormField[]) : [],
+      grids: Array.isArray(candidate.grids) ? (candidate.grids as GridDefinition[]) : []
+    };
+  }
 
   onMount(async () => {
     const keyParam = $page.url.searchParams.get('key');
@@ -47,14 +57,10 @@
       name = docType.name;
       description = docType.description || '';
       if (docType.schemaJson) {
-        try {
-          schema = JSON.parse(docType.schemaJson);
-        } catch (e) {
-          console.error('Failed to parse schema JSON', e);
-        }
+        schema = toProcessFieldLibrary(JSON.parse(docType.schemaJson));
       }
-    } catch (err) {
-      error = 'Failed to load document type';
+    } catch (err: unknown) {
+      error = getErrorMessage(err, 'Failed to load document type');
       console.error(err);
     } finally {
       isLoading = false;
@@ -85,29 +91,25 @@
       } else {
         await api.createDocumentType(payload);
         success = 'Document type created successfully';
-        // Switch to edit mode logic effectively
         isEditMode = true;
-        // Ideally navigate to edit URL to prevent duplicate creation on refresh,
-        // but simple success message is fine for now
       }
 
       setTimeout(() => {
         goto('/documents/types');
       }, 1500);
-    } catch (err: any) {
-      error = err.message || 'Failed to save document type';
+    } catch (err: unknown) {
+      error = getErrorMessage(err, 'Failed to save document type');
     } finally {
       isSaving = false;
     }
   }
 
-  function handleSchemaChange(newSchema: any) {
+  function handleSchemaChange(newSchema: ProcessFieldLibrary) {
     schema = newSchema;
   }
 </script>
 
 <div class="min-h-screen bg-gray-50 flex flex-col">
-  <!-- Header -->
   <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">
@@ -142,7 +144,6 @@
   </div>
 
   <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-    <!-- Metadata Sidebar -->
     <div
       class="w-full md:w-80 bg-white border-r border-gray-200 p-6 overflow-y-auto md:h-full h-auto border-b md:border-b-0 flex-shrink-0"
     >
@@ -200,10 +201,8 @@
       {/if}
     </div>
 
-    <!-- Designer Area -->
     <div class="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
       <div class="h-full flex flex-col xl:flex-row gap-6">
-        <!-- Editor Column -->
         <div class="flex-1 min-w-0 flex flex-col gap-6">
           <div class="bg-white rounded-lg shadow p-6 flex-1">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Schema Definition</h3>
@@ -220,7 +219,6 @@
           </div>
         </div>
 
-        <!-- Preview Column -->
         {#if showPreview}
           <div class="w-full xl:w-96 flex-shrink-0 flex flex-col gap-6">
             <div class="bg-white rounded-lg shadow p-6 flex-1 overflow-y-auto xl:sticky xl:top-6">

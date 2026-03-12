@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api/client';
+  import type { DocumentTypeDefinition } from '$lib/types';
   import { demoDocumentTypes } from '$lib/utils/demo-document-types';
+  import { getErrorMessage } from '$lib/utils/error-message';
 
-  let documentTypes = $state<any[]>([]);
+  let documentTypes = $state<DocumentTypeDefinition[]>([]);
   let isLoading = $state(true);
   let error = $state('');
 
@@ -16,9 +18,9 @@
     error = '';
     try {
       documentTypes = await api.getDocumentTypes();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error loading document types:', err);
-      error = 'Failed to load document types';
+      error = getErrorMessage(err, 'Failed to load document types');
     } finally {
       isLoading = false;
     }
@@ -30,8 +32,8 @@
     try {
       await api.deleteDocumentType(key);
       await loadDocumentTypes();
-    } catch (err) {
-      error = 'Failed to delete document type';
+    } catch (err: unknown) {
+      error = getErrorMessage(err, 'Failed to delete document type');
     }
   }
 
@@ -41,7 +43,7 @@
     let loadCount = 0;
 
     try {
-      // First, get existing types to avoid duplicates/errors
+      // First, get existing types to avoid duplicates/errors.
       const existing = await api.getDocumentTypes();
       const existingKeys = new Set(existing.map((d) => d.key));
 
@@ -61,9 +63,9 @@
       if (loadCount === 0) {
         alert('All demo types are already installed.');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error loading demos:', err);
-      error = 'Failed to load some demo document types';
+      error = getErrorMessage(err, 'Failed to load some demo document types');
     } finally {
       isLoading = false;
     }
@@ -98,7 +100,7 @@
     {/if}
 
     {#if isLoading}
-      <div class="text-center py-12">Loading...</div>
+      <div class="text-center py-12">Loading document types...</div>
     {:else if documentTypes.length === 0}
       <div class="rounded-lg bg-white p-12 text-center shadow">
         <p class="text-gray-500">No document types defined yet.</p>

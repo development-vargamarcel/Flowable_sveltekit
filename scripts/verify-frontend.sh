@@ -9,6 +9,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 : "${BPM_FRONTEND_SKIP_TESTS:=0}"
 : "${BPM_FRONTEND_SKIP_BUILD:=0}"
 : "${BPM_FRONTEND_ENABLE_COVERAGE:=0}"
+: "${BPM_FRONTEND_ENABLE_BROWSER_SMOKE:=0}"
 : "${BPM_FRONTEND_LINT_MAX_WARNINGS:=-1}"
 
 ensure_repo_root
@@ -22,6 +23,7 @@ validate_toggle "$BPM_FRONTEND_SKIP_TYPECHECK" "BPM_FRONTEND_SKIP_TYPECHECK"
 validate_toggle "$BPM_FRONTEND_SKIP_TESTS" "BPM_FRONTEND_SKIP_TESTS"
 validate_toggle "$BPM_FRONTEND_SKIP_BUILD" "BPM_FRONTEND_SKIP_BUILD"
 validate_toggle "$BPM_FRONTEND_ENABLE_COVERAGE" "BPM_FRONTEND_ENABLE_COVERAGE"
+validate_toggle "$BPM_FRONTEND_ENABLE_BROWSER_SMOKE" "BPM_FRONTEND_ENABLE_BROWSER_SMOKE"
 
 if [ "$BPM_FRONTEND_LINT_MAX_WARNINGS" != "-1" ]; then
   if ! [[ "$BPM_FRONTEND_LINT_MAX_WARNINGS" =~ ^[0-9]+$ ]]; then
@@ -51,6 +53,7 @@ frontend_build() {
   SENTRY_TELEMETRY=0 SENTRY_VITE_PLUGIN_TELEMETRY=0 npm_safe run build
 }
 frontend_coverage() { npm_safe run test:coverage; }
+frontend_browser_console_smoke() { npm_safe run test:browser-console; }
 
 if [ "$BPM_FRONTEND_SKIP_FORMAT" = "0" ]; then
   run_step "Frontend formatting check" frontend_format_check
@@ -85,6 +88,11 @@ fi
 if [ "$BPM_FRONTEND_ENABLE_COVERAGE" = "1" ]; then
   # Coverage can be expensive, so it is opt-in and intentionally separate from the default verification flow.
   run_step "Frontend coverage report" frontend_coverage
+fi
+
+if [ "$BPM_FRONTEND_ENABLE_BROWSER_SMOKE" = "1" ]; then
+  # Optional browser-level smoke test that fails on uncaught client runtime/console errors.
+  run_step "Frontend browser console smoke check" frontend_browser_console_smoke
 fi
 
 log_info "Frontend verification completed in $(elapsed_seconds "$start")s"

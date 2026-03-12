@@ -1,6 +1,6 @@
 {
   "name": "bpm-frontend",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "private": true,
   "scripts": {
     "dev": "vite dev",
@@ -22,7 +22,8 @@
     "verify": "npm run lint && npm run check && npm run test:ci",
     "verify:full": "npm run format:check && npm run lint && npm run check && npm run test:ci && npm run build",
     "test:session-utils": "vitest run src/lib/utils/session-utils.test.ts",
-    "verify:strict": "npm run verify:full && npm run test:coverage"
+    "verify:strict": "npm run verify:full && npm run test:coverage",
+    "test:browser-console": "node ./scripts/browser-console-smoke.mjs"
   },
   "devDependencies": {
     "@lucide/svelte": "^0.575.0",

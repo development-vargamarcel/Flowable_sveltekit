@@ -1,10 +1,10 @@
 # Version
 
-Current version: `1.8.2`
+Current version: `1.8.3`
 
 Semantic versioning rationale:
 
-- Previous: `1.8.1`
-- Current: `1.8.2`
+- Previous: `1.8.2`
+- Current: `1.8.3`
 - Change type: **patch**
-- Reason: automation reliability fixes and reporting metadata enhancements without introducing API changes.
+- Reason: backward-compatible frontend robustness improvements, stronger error handling/typing, and new optional browser console smoke validation.

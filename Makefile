@@ -1,4 +1,4 @@
-.PHONY: help bootstrap doctor doctor-verbose doctor-no-color doctor-json doctor-markdown verify verify-fast verify-dry-run verify-continue verify-with-bootstrap verify-json-report verify-markdown-report verify-clean-git verify-frontend verify-backend verify-strict test-frontend test-backend clean check-lockfiles test-automation
+.PHONY: help bootstrap doctor doctor-verbose doctor-no-color doctor-json doctor-markdown verify verify-fast verify-dry-run verify-continue verify-with-bootstrap verify-json-report verify-markdown-report verify-clean-git verify-frontend verify-backend verify-strict verify-browser-smoke test-frontend test-backend clean check-lockfiles test-automation
 
 help:
 	@echo "Available targets:"
@@ -73,6 +73,9 @@ verify-clean-git:
 
 verify-strict:
 	BPM_FRONTEND_ENABLE_COVERAGE=1 BPM_BACKEND_ENABLE_VERIFY=1 ./scripts/verify-all.sh
+
+verify-browser-smoke:
+	BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 ./scripts/verify-frontend.sh
 
 test-frontend:
 	cd frontend && npm run test:ci
