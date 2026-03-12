@@ -64,6 +64,15 @@ clean_git_guard_smoke_test() {
   fi
 }
 
+
+
+browser_smoke_toggle_validation_test() {
+  if (cd "$ROOT_DIR" && BPM_FRONTEND_ENABLE_BROWSER_SMOKE=2 "$ROOT_DIR/scripts/verify-frontend.sh" >/dev/null 2>&1); then
+    log_error "Expected browser smoke toggle validation to fail for invalid value"
+    return 1
+  fi
+}
+
 retry_helper_smoke_test() {
   local counter_file
   counter_file="$(mktemp)"
@@ -89,6 +98,7 @@ run_step "Verify JSON summary renderer" summary_json_smoke_test
 run_step "Verify Markdown summary renderer" summary_markdown_smoke_test
 run_step "Verify artifact retention pruning" artifact_retention_smoke_test
 run_step "Verify clean-git guard behavior" clean_git_guard_smoke_test
+run_step "Verify browser smoke toggle validation" browser_smoke_toggle_validation_test
 run_step "Verify retry helper behavior" retry_helper_smoke_test
 
 print_summary

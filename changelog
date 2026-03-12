@@ -1,3 +1,11 @@
+## 1.8.3
+- Added shared frontend error normalization utility with tests and removed `any`-based catch handling in key routes.
+- Hardened process instance and document type pages with explicit loading/error/empty states and safer date/message rendering.
+- Typed document type designer schema handling using `ProcessFieldLibrary` with guarded JSON parsing.
+- Made Sentry source-map upload conditional to eliminate noisy build warnings without credentials.
+- Added browser console smoke check tooling (`npm run test:browser-console`) and optional verification toggle (`BPM_FRONTEND_ENABLE_BROWSER_SMOKE`).
+- Extended automation smoke tests and Makefile targets to cover new browser-smoke controls.
+
 ## 1.8.2
 - Tightened frontend API typing by replacing `any`-based document/task/notification contracts with shared interfaces.
 - Improved process documentation page reliability with explicit BPMN viewer/registry typing and component cleanup on unmount.
@@ -7,8 +15,3 @@
 - Added JSON/Markdown summary aggregate status and totals metadata.
 - Added report artifact retention pruning via `BPM_RUNNER_ARTIFACT_RETENTION_DAYS`.
 - Hardened retry helper validation and expanded automation smoke tests for schema and retention checks.
-
-## 1.8.0
-- Added repository-clean enforcement toggle (`BPM_RUNNER_REQUIRE_CLEAN_GIT`) across automation scripts.
-- Added Markdown summary artifact support (`BPM_RUNNER_SUMMARY_FORMAT=markdown`) and richer per-step timing metadata in summaries.
-- Added new Makefile reporting/guard targets and refreshed docs, planning notes, and verification guidance for the updated automation workflow.

@@ -1,225 +1,159 @@
-# Usage, Documentation, and Examples
+# Usage, Documentation, and Examples (Release 1.8.3)
 
-## Current Version
-
-- **Frontend:** `1.8.2`
-- **Backend:** `1.8.2`
-- **Repository release:** `1.8.2` (**patch**) due to backward-compatible automation reliability and reporting metadata enhancements.
-
----
-
-## What was implemented in this pass
-
-1. Hardened environment validation for runner toggles and numeric controls.
-2. Added canonical path normalization for configurable frontend/backend directories.
-3. Standardized deterministic runtime locale/timezone for reproducible logs.
-4. Added richer run metadata capture (run ID, UTC start, host, shell).
-5. Added optional file logging for automation runs.
-6. Added JSON and Markdown summary artifact modes.
-7. Expanded step telemetry with index/status/duration/start/end/message.
-8. Added reusable retry helper for transient command failures.
-9. Added optional timeout integration where available.
-10. Expanded precondition and executable checks in shared helpers.
-11. Added frontend stage skip controls and optional coverage execution.
-12. Added backend stage skip controls and optional `mvn verify` stage.
-13. Added robust dependency bootstrap with retry.
-14. Expanded diagnostics for OS/kernel/CPU/memory/disk and lockfile consistency.
-15. Added optional bootstrap inclusion during full verification.
-16. Added Makefile targets for JSON and Markdown report workflows.
-17. Added automation smoke tests for parse, dry-run, retry, JSON summary, and Markdown summary.
-18. Added clean-working-tree enforcement mode (`BPM_RUNNER_REQUIRE_CLEAN_GIT`).
-19. Added lint warning threshold control (`BPM_FRONTEND_LINT_MAX_WARNINGS`).
-20. Suppressed Sentry telemetry during scripted production builds for cleaner CI signal.
+## Version alignment
+- **Frontend:** `1.8.3`
+- **Backend:** `1.8.3`
+- **Repository release:** `1.8.3` (**patch**) for frontend robustness, safer typing, and stronger browser/runtime verification automation.
 
 ---
 
-## Additional implementation updates in 1.8.2
+## Setup instructions
 
-1. Replaced weak `any` API response types for document types and notifications with explicit shared TypeScript interfaces.
-2. Added dedicated document-type payload models (`DocumentTypeDefinition`, `DocumentTypeDefinitionRequest`) to keep API contracts centralized and consistent.
-3. Removed unsafe task list casting in `tasksApi.getTasks` and now use discriminated response handling without `any`.
-4. Hardened process documentation page BPMN viewer typing to reduce runtime/type fragility and added viewer cleanup on unmount.
-5. Removed unused script-task/document-type placeholders from process docs page to prevent dead-state drift.
+### Prerequisites
+- Node.js 20+
+- npm 10+
+- Java 17+ (Java 21 preferred by verification scripts)
 
-### Copy-ready quick validation
-
-```bash
-cd frontend && npm run check && npm run test:ci
-cd ../backend && ./mvnw -q test -DskipITs
-```
-
-
-### Automation artifact retention
-
-You can automatically prune old automation artifacts (JSON/Markdown summaries and optional run logs):
-
-```bash
-BPM_RUNNER_ARTIFACT_RETENTION_DAYS=7 BPM_RUNNER_SUMMARY_FORMAT=json ./scripts/doctor.sh
-```
-
-This keeps artifacts newer than the configured day window and deletes older files in `BPM_RUNNER_ARTIFACTS_DIR`.
-
-### Summary metadata
-
-JSON summaries now include:
-- `overallStatus` (`PASS`/`FAIL`)
-- `totals` with `pass`, `fail`, `skip`, and cumulative `durationSeconds`
-
-Markdown summaries now include:
-- overall status line
-- totals line
-
-## Dependency and tool installation
-
-Run the bootstrap script to install all required project dependencies:
-
+### One-time bootstrap
 ```bash
 ./scripts/bootstrap.sh
 ```
 
-This command performs:
+This installs frontend dependencies (`npm ci`) and warms backend Maven dependencies for offline usage.
 
-- `npm ci` in `frontend/` with retry support.
-- `./mvnw -DskipTests dependency:go-offline` in `backend/` with retry support.
+### Manual setup (alternative)
+```bash
+cd frontend && npm ci
+cd ../backend && ./mvnw -B -q -DskipTests dependency:go-offline
+```
 
 ---
 
-## Core verification workflow
+## Usage instructions
 
-### 1) Diagnostics
-
+### Start local development
 ```bash
-./scripts/doctor.sh
+# terminal 1
+cd backend && ./mvnw spring-boot:run
+
+# terminal 2
+cd frontend && npm run dev
 ```
 
-### 2) Frontend verification
+### Access key routes
+- Dashboard: `/dashboard`
+- Process instances: `/process-instances`
+- Document type list: `/document-definitions/types`
+- Document type designer: `/document-definitions/types/designer`
 
-```bash
-./scripts/verify-frontend.sh
-```
+---
 
-### 3) Backend verification
+## Testing and validation steps
 
-```bash
-./scripts/verify-backend.sh
-```
-
-### 4) Full-stack verification
-
+### Core full-stack validation
 ```bash
 ./scripts/verify-all.sh
 ```
 
-With bootstrap included:
-
+### Frontend-only validation
 ```bash
-BPM_VERIFY_INCLUDE_BOOTSTRAP=1 ./scripts/verify-all.sh
+./scripts/verify-frontend.sh
+```
+
+### Backend-only validation
+```bash
+./scripts/verify-backend.sh
+```
+
+### Strict validation profile
+```bash
+BPM_FRONTEND_ENABLE_COVERAGE=1 BPM_BACKEND_ENABLE_VERIFY=1 ./scripts/verify-all.sh
+```
+
+### Browser console smoke validation (new)
+```bash
+BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 ./scripts/verify-frontend.sh
+```
+
+### Automation script smoke tests
+```bash
+./scripts/test-automation.sh
 ```
 
 ---
 
-## Reporting modes
+## Important implementation notes
 
-### JSON summary artifact
-
-```bash
-BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_LOG_TO_FILE=1 ./scripts/verify-all.sh
-```
-
-### Markdown summary artifact
-
-```bash
-BPM_RUNNER_SUMMARY_FORMAT=markdown BPM_RUNNER_LOG_TO_FILE=1 ./scripts/verify-all.sh
-```
+1. Route-level frontend error handling now centralizes unknown error normalization through `getErrorMessage` to avoid `any` catches and inconsistent user messaging.
+2. Process instances and document type listing pages now include explicit loading/error/empty states for predictable UX.
+3. Document type designer schema state now uses `ProcessFieldLibrary` typing with safe parsing guards before binding into editor/preview components.
+4. Sentry Vite plugin source map upload is now conditional on required env vars (`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`) so local/CI builds without Sentry credentials remain clean.
+5. Browser smoke checking can be enabled in frontend verification to fail on uncaught page errors/console runtime errors.
 
 ---
 
-## Clean-git enforcement
+## Environment controls
 
-Fail fast if the repository has uncommitted changes:
-
+### Runner controls
 ```bash
-BPM_RUNNER_REQUIRE_CLEAN_GIT=1 ./scripts/verify-all.sh
-```
-
----
-
-## Makefile shortcuts
-
-```bash
-make help
-make bootstrap
-make doctor
-make doctor-json
-make doctor-markdown
-make verify
-make verify-with-bootstrap
-make verify-json-report
-make verify-markdown-report
-make verify-clean-git
-make verify-strict
-make test-automation
-```
-
----
-
-## Environment controls (copy-ready)
-
-```bash
-BPM_RUNNER_LOG_LEVEL=debug
-BPM_RUNNER_NO_COLOR=1
+BPM_RUNNER_LOG_LEVEL=info
+BPM_RUNNER_NO_COLOR=0
 BPM_RUNNER_DRY_RUN=0
 BPM_RUNNER_SUMMARY=1
 BPM_RUNNER_SUMMARY_FORMAT=table
-BPM_RUNNER_CONTINUE_ON_ERROR=0
+BPM_RUNNER_LOG_TO_FILE=0
 BPM_RUNNER_REQUIRE_CLEAN_GIT=0
-BPM_RUNNER_LOG_TO_FILE=1
 BPM_RUNNER_ARTIFACTS_DIR=.automation
-BPM_RUNNER_TIMEOUT_SECONDS=1200
-BPM_RUNNER_RETRY_COUNT=3
-BPM_RUNNER_RETRY_DELAY_SECONDS=3
 ```
 
-Frontend stage controls:
-
+### Frontend controls
 ```bash
 BPM_FRONTEND_SKIP_FORMAT=0
 BPM_FRONTEND_SKIP_LINT=0
 BPM_FRONTEND_SKIP_TYPECHECK=0
 BPM_FRONTEND_SKIP_TESTS=0
 BPM_FRONTEND_SKIP_BUILD=0
-BPM_FRONTEND_ENABLE_COVERAGE=1
-BPM_FRONTEND_LINT_MAX_WARNINGS=0
+BPM_FRONTEND_ENABLE_COVERAGE=0
+BPM_FRONTEND_ENABLE_BROWSER_SMOKE=0
+BPM_FRONTEND_LINT_MAX_WARNINGS=-1
 ```
 
-Backend stage controls:
-
+### Backend controls
 ```bash
 BPM_BACKEND_SKIP_TESTS=0
 BPM_BACKEND_SKIP_PACKAGE=0
-BPM_BACKEND_ENABLE_VERIFY=1
+BPM_BACKEND_ENABLE_VERIFY=0
 ```
 
 ---
 
-## Example end-to-end command sets
+## Copy-ready examples
 
-### Quick local health check
-
+### Simple example: quick health check
 ```bash
 ./scripts/doctor.sh
-./scripts/test-automation.sh
+./scripts/verify-frontend.sh
+```
+
+### Simple example: targeted browser safety check
+```bash
+cd frontend && npm run test:browser-console
+```
+
+### Complete example: CI-like, strict, artifacted run
+```bash
+BPM_RUNNER_SUMMARY_FORMAT=json \
+BPM_RUNNER_LOG_TO_FILE=1 \
+BPM_FRONTEND_ENABLE_COVERAGE=1 \
+BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 \
+BPM_BACKEND_ENABLE_VERIFY=1 \
 ./scripts/verify-all.sh
 ```
 
-### Strict CI profile
-
+### Complete example: Makefile workflow
 ```bash
-BPM_RUNNER_SUMMARY_FORMAT=json BPM_RUNNER_LOG_TO_FILE=1 BPM_FRONTEND_ENABLE_COVERAGE=1 BPM_BACKEND_ENABLE_VERIFY=1 ./scripts/verify-all.sh
-```
-
-### Protected release check (clean tree + markdown artifact)
-
-```bash
-BPM_RUNNER_REQUIRE_CLEAN_GIT=1 BPM_RUNNER_SUMMARY_FORMAT=markdown BPM_RUNNER_LOG_TO_FILE=1 ./scripts/verify-all.sh
+make bootstrap
+make doctor-json
+make verify-browser-smoke
+make verify-strict
 ```
