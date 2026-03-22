@@ -358,24 +358,33 @@ public class FormDefinitionService {
      */
     public ProcessFormConfigDTO getProcessFormConfig(String processDefinitionId) {
         try (InputStream bpmnStream = repositoryService.getProcessModel(processDefinitionId)) {
+            if (bpmnStream == null) {
+                log.warn("No BPMN model found for process form config {}", processDefinitionId);
+                return createEmptyProcessFormConfig(processDefinitionId);
+            }
+
             String bpmnXml = new String(bpmnStream.readAllBytes(), StandardCharsets.UTF_8);
 
             return parseProcessFormConfigFromXml(bpmnXml, processDefinitionId);
         } catch (Exception e) {
             log.error("Error getting process form config for {}: {}", processDefinitionId, e.getMessage(), e);
-            return ProcessFormConfigDTO.builder()
-                    .processDefinitionId(processDefinitionId)
-                    .fieldLibrary(ProcessFieldLibraryDTO.builder()
-                            .fields(new ArrayList<>())
-                            .grids(new ArrayList<>())
-                            .build())
-                    .globalConditions(new ArrayList<>())
-                    .defaultGridConfig(ProcessFormConfigDTO.GridConfigDTO.builder()
-                            .columns(2)
-                            .gap(16)
-                            .build())
-                    .build();
+            return createEmptyProcessFormConfig(processDefinitionId);
         }
+    }
+
+    private ProcessFormConfigDTO createEmptyProcessFormConfig(String processDefinitionId) {
+        return ProcessFormConfigDTO.builder()
+                .processDefinitionId(processDefinitionId)
+                .fieldLibrary(ProcessFieldLibraryDTO.builder()
+                        .fields(new ArrayList<>())
+                        .grids(new ArrayList<>())
+                        .build())
+                .globalConditions(new ArrayList<>())
+                .defaultGridConfig(ProcessFormConfigDTO.GridConfigDTO.builder()
+                        .columns(2)
+                        .gap(16)
+                        .build())
+                .build();
     }
 
     private ProcessFormConfigDTO parseProcessFormConfigFromXml(String bpmnXml, String processDefinitionId) {
@@ -447,21 +456,6 @@ public class FormDefinitionService {
             log.error("Error parsing process form config from XML: {}", e.getMessage(), e);
             return createEmptyProcessFormConfig(processDefinitionId);
         }
-    }
-
-    private ProcessFormConfigDTO createEmptyProcessFormConfig(String processDefinitionId) {
-        return ProcessFormConfigDTO.builder()
-                .processDefinitionId(processDefinitionId)
-                .fieldLibrary(ProcessFieldLibraryDTO.builder()
-                        .fields(new ArrayList<>())
-                        .grids(new ArrayList<>())
-                        .build())
-                .globalConditions(new ArrayList<>())
-                .defaultGridConfig(ProcessFormConfigDTO.GridConfigDTO.builder()
-                        .columns(2)
-                        .gap(16)
-                        .build())
-                .build();
     }
 
     @SuppressWarnings("unchecked")

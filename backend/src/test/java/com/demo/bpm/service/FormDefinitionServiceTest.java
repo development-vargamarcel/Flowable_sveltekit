@@ -65,6 +65,21 @@ class FormDefinitionServiceTest {
     }
 
     @Test
+    void getProcessFormConfig_shouldReturnEmptyConfig_whenProcessModelIsMissing() {
+        when(repositoryService.getProcessModel("missingProcDefId")).thenReturn(null);
+
+        ProcessFormConfigDTO config = formDefinitionService.getProcessFormConfig("missingProcDefId");
+
+        assertNotNull(config);
+        assertEquals("missingProcDefId", config.getProcessDefinitionId());
+        assertTrue(config.getFieldLibrary().getFields().isEmpty());
+        assertTrue(config.getFieldLibrary().getGrids().isEmpty());
+        assertTrue(config.getGlobalConditions().isEmpty());
+        assertEquals(2, config.getDefaultGridConfig().getColumns());
+        assertEquals(16, config.getDefaultGridConfig().getGap());
+    }
+
+    @Test
     void getProcessFormConfig_shouldParseFieldLibrary() {
         String bpmnXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                 "<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" \n" +
