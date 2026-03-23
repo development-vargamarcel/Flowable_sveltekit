@@ -7,72 +7,97 @@ function createNotificationStore() {
   let unreadCount = $state(0);
   let loading = $state(false);
   let error = $state<string | null>(null);
-  let pollingInterval: any = null;
+  let hasLoaded = $state(false);
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
+
+  function applyNotifications(nextNotifications: Notification[]) {
+    notifications = nextNotifications;
+    unreadCount = nextNotifications.filter((notification) => !notification.read).length;
+  }
 
   async function loadNotifications() {
-    if (!browser) return;
+    if (!browser) {
+      return notifications;
+    }
+
     loading = true;
+    error = null;
+
     try {
-      notifications = await api.getNotifications();
-      updateUnreadCount();
+      const nextNotifications = await api.getNotifications();
+      applyNotifications(nextNotifications);
+      return notifications;
     } catch (err) {
       console.error('Failed to load notifications', err);
-      error = 'Failed to load notifications';
+      error = err instanceof Error ? err.message : 'Failed to load notifications';
+      return notifications;
     } finally {
       loading = false;
+      hasLoaded = true;
     }
   }
 
-  function updateUnreadCount() {
-    unreadCount = notifications.filter((n) => !n.read).length;
-  }
-
   async function markAsRead(id: string) {
-    // Optimistic update
-    const notification = notifications.find((n) => n.id === id);
-    if (notification && !notification.read) {
-      notification.read = true;
-      updateUnreadCount();
+    const targetNotification = notifications.find((notification) => notification.id === id);
 
-      try {
-        await api.markNotificationAsRead(id);
-      } catch (err) {
-        console.error('Failed to mark notification as read', err);
-        // Revert on error
-        notification.read = false;
-        updateUnreadCount();
-      }
+    if (!targetNotification || targetNotification.read) {
+      return;
+    }
+
+    const previousNotifications = notifications;
+    applyNotifications(
+      notifications.map((notification) =>
+        notification.id === id ? { ...notification, read: true } : notification
+      )
+    );
+
+    try {
+      await api.markNotificationAsRead(id);
+    } catch (err) {
+      console.error('Failed to mark notification as read', err);
+      error = err instanceof Error ? err.message : 'Failed to mark notification as read';
+      applyNotifications(previousNotifications);
     }
   }
 
   async function markAllAsRead() {
-    // Optimistic update
-    const unread = notifications.filter((n) => !n.read);
-    unread.forEach((n) => (n.read = true));
-    updateUnreadCount();
+    const hasUnreadNotifications = notifications.some((notification) => !notification.read);
+
+    if (!hasUnreadNotifications) {
+      return;
+    }
+
+    const previousNotifications = notifications;
+    applyNotifications(notifications.map((notification) => ({ ...notification, read: true })));
 
     try {
       await api.markAllNotificationsAsRead();
     } catch (err) {
-      console.error('Failed to mark all as read', err);
-      // Revert
-      unread.forEach((n) => (n.read = false));
-      updateUnreadCount();
+      console.error('Failed to mark all notifications as read', err);
+      error = err instanceof Error ? err.message : 'Failed to mark all notifications as read';
+      applyNotifications(previousNotifications);
     }
   }
 
   function startPolling(intervalMs = 30000) {
-    if (!browser) return;
-    loadNotifications();
+    if (!browser) {
+      return;
+    }
+
     stopPolling();
-    pollingInterval = setInterval(loadNotifications, intervalMs);
+    void loadNotifications();
+    pollingInterval = setInterval(() => {
+      void loadNotifications();
+    }, intervalMs);
   }
 
   function stopPolling() {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
+    if (!pollingInterval) {
+      return;
     }
+
+    clearInterval(pollingInterval);
+    pollingInterval = null;
   }
 
   return {
@@ -84,6 +109,12 @@ function createNotificationStore() {
     },
     get loading() {
       return loading;
+    },
+    get error() {
+      return error;
+    },
+    get hasLoaded() {
+      return hasLoaded;
     },
     loadNotifications,
     markAsRead,

@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { Bell } from '@lucide/svelte';
+  import { fly } from 'svelte/transition';
   import { notificationStore } from '$lib/stores/notifications.svelte';
-  import { fade, fly } from 'svelte/transition';
-  import { Bell, CheckSquare, AlertCircle, CheckCircle, Info } from '@lucide/svelte';
+  import { getNotificationDisplay } from '$lib/utils/notification-display';
 
   let showDropdown = $state(false);
   let dropdownRef: HTMLDivElement;
@@ -10,8 +11,7 @@
   function toggleDropdown() {
     showDropdown = !showDropdown;
     if (showDropdown) {
-      // Refresh when opening
-      notificationStore.loadNotifications();
+      void notificationStore.loadNotifications();
     }
   }
 
@@ -33,22 +33,11 @@
     notificationStore.stopPolling();
   });
 
-  function handleNotificationClick(notification: any) {
+  function handleNotificationClick(notification: { id: string; read: boolean }) {
     if (!notification.read) {
-      notificationStore.markAsRead(notification.id);
+      void notificationStore.markAsRead(notification.id);
     }
     showDropdown = false;
-  }
-
-  function getIconColor(type: string) {
-    switch (type) {
-      case 'TASK_ASSIGNED': return 'text-blue-500 bg-blue-50';
-      case 'TASK_DUE_SOON': return 'text-yellow-500 bg-yellow-50';
-      case 'TASK_OVERDUE': return 'text-red-500 bg-red-50';
-      case 'PROCESS_COMPLETED': return 'text-green-500 bg-green-50';
-      case 'PROCESS_REJECTED': return 'text-red-500 bg-red-50';
-      default: return 'text-gray-500 bg-gray-50';
-    }
   }
 </script>
 
@@ -93,27 +82,21 @@
         {:else}
           <ul class="divide-y divide-gray-100">
             {#each notificationStore.notifications as notification (notification.id)}
+              {@const notificationDisplay = getNotificationDisplay(notification.type)}
+              {@const IconComponent = notificationDisplay.icon}
               <li>
                 <a
                   href={notification.link || '#'}
-                  onclick={(e) => {
-                    if (!notification.link) e.preventDefault();
+                  onclick={(event) => {
+                    if (!notification.link) event.preventDefault();
                     handleNotificationClick(notification);
                   }}
                   class="block p-4 hover:bg-gray-50 transition-colors duration-150 {notification.read ? 'opacity-75' : 'bg-blue-50/30'}"
                 >
                   <div class="flex items-start">
                     <div class="flex-shrink-0 mr-3">
-                      <div class={`w-8 h-8 rounded-full flex items-center justify-center ${getIconColor(notification.type)}`}>
-                        {#if notification.type === 'TASK_ASSIGNED' || notification.type === 'TASK_DUE_SOON'}
-                          <CheckSquare class="w-4 h-4" />
-                        {:else if notification.type === 'TASK_OVERDUE' || notification.type === 'PROCESS_REJECTED'}
-                           <AlertCircle class="w-4 h-4" />
-                        {:else if notification.type === 'PROCESS_COMPLETED'}
-                          <CheckCircle class="w-4 h-4" />
-                        {:else}
-                          <Info class="w-4 h-4" />
-                        {/if}
+                      <div class={`w-8 h-8 rounded-full flex items-center justify-center ${notificationDisplay.colorClass}`}>
+                        <IconComponent class="w-4 h-4" />
                       </div>
                     </div>
                     <div class="flex-1 min-w-0">
@@ -137,7 +120,7 @@
           </ul>
         {/if}
       </div>
-      
+
       <div class="bg-gray-50 p-2 text-center border-t border-gray-100">
         <a href="/notifications" class="text-xs font-medium text-blue-600 hover:text-blue-800">
           View all notifications
