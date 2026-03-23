@@ -1,66 +1,109 @@
 /* eslint-disable no-console */
 import type { ProcessDefinition, ProcessInstance, Dashboard, Page } from '$lib/types';
 
-/**
- * Centralized process store for managing process definitions and instances.
- * Ensures synchronization across all components that consume process data.
- *
- * This store provides:
- * - Cached process definitions with automatic invalidation
- * - Dashboard data caching with SWR (stale-while-revalidate) pattern
- * - Event-driven updates when processes are deployed/deleted
- * - Stale data detection with background refresh
- * - Optimistic updates for better perceived performance
- */
 class ProcessStore {
   // Process definitions (deployed processes)
   definitions = $state<ProcessDefinition[]>([]);
-  definitionsLoading = $state(false);
-  definitionsRefreshing = $state(false);
-  definitionsError = $state<string | null>(null);
-  definitionsLastFetched = $state<number | null>(null);
 
   // My process instances
   myInstances = $state<Page<ProcessInstance> | null>(null);
-  myInstancesLoading = $state(false);
-  myInstancesRefreshing = $state(false);
-  myInstancesError = $state<string | null>(null);
-  myInstancesLastFetched = $state<number | null>(null);
 
   // Dashboard data
   dashboard = $state<Dashboard | null>(null);
-  dashboardLoading = $state(false);
-  dashboardRefreshing = $state(false);
-  dashboardError = $state<string | null>(null);
-  dashboardLastFetched = $state<number | null>(null);
 
-  // Cache configuration (in milliseconds)
-  private readonly CACHE_TTL = 30000; // 30 seconds - data is fresh
-  private readonly STALE_THRESHOLD = 5000; // 5 seconds - trigger background refresh
-  private readonly MAX_AGE = 300000; // 5 minutes - force refresh even with errors
+  private definitionsLoading = false;
+  private definitionsError: string | null = null;
+  private definitionsLastFetched: number | null = null;
+  private definitionsRequest: Promise<ProcessDefinition[]> | null = null;
+
+  private myInstancesLoading = false;
+  private myInstancesError: string | null = null;
+  private myInstancesLastFetched: number | null = null;
+  private myInstancesRequest: Promise<Page<ProcessInstance>> | null = null;
+
+  private dashboardLoading = false;
+  private dashboardError: string | null = null;
+  private dashboardLastFetched: number | null = null;
+  private dashboardRequest: Promise<Dashboard> | null = null;
+
+  private readonly CACHE_TTL = 30000;
 
   // Listeners for process changes
   private changeListeners = new Set<() => void>();
 
-  /**
-   * Check if cached data is still valid
-   */
   private isCacheValid(lastFetched: number | null): boolean {
     if (!lastFetched) return false;
     return Date.now() - lastFetched < this.CACHE_TTL;
   }
 
-  /**
-   * Check if data should be refreshed in the background
-   */
-  private isStale(lastFetched: number | null): boolean {
-    if (!lastFetched) return true;
-    return Date.now() - lastFetched > this.STALE_THRESHOLD;
+  private normalizeError(err: unknown, fallbackMessage: string): string {
+    return err instanceof Error ? err.message : fallbackMessage;
   }
 
-  /**
-   * Subscribe to process changes
-   */
+  private async loadCached<T>({
+    label,
+    currentValue,
+    hasValue,
+    getRequest,
+    setRequest,
+    setLoading,
+    setError,
+    getLastFetched,
+    setLastFetched,
+    updateValue,
+    fetchFn,
+    forceRefresh,
+    fallbackError
+  }: {
+    label: string;
+    currentValue: T | null;
+    hasValue: (value: T | null) => value is T;
+    getRequest: () => Promise<T> | null;
+    setRequest: (value: Promise<T> | null) => void;
+    setLoading: (value: boolean) => void;
+    setError: (value: string | null) => void;
+    getLastFetched: () => number | null;
+    setLastFetched: (value: number | null) => void;
+    updateValue: (value: T) => void;
+    fetchFn: () => Promise<T>;
+    forceRefresh: boolean;
+    fallbackError: string;
+  }): Promise<T> {
+    if (!forceRefresh && hasValue(currentValue) && this.isCacheValid(getLastFetched())) {
+      console.log(`[ProcessStore] Using cached ${label}`);
+      return currentValue;
+    }
+
+    const existingRequest = getRequest();
+    if (existingRequest) {
+      console.log(`[ProcessStore] ${label} load already in progress`);
+      return existingRequest;
+    }
+
+    console.log(`[ProcessStore] Loading ${label}`);
+    setLoading(true);
+    setError(null);
+
+    const request = (async () => {
+      try {
+        const data = await fetchFn();
+        updateValue(data);
+        setLastFetched(Date.now());
+        return data;
+      } catch (err) {
+        console.error(`[ProcessStore] Failed to load ${label}:`, err);
+        setError(this.normalizeError(err, fallbackError));
+        throw err;
+      } finally {
+        setLoading(false);
+        setRequest(null);
+      }
+    })();
+
+    setRequest(request);
+    return request;
+  }
+
   onProcessChange(listener: () => void): () => void {
     this.changeListeners.add(listener);
     return () => {
@@ -68,107 +111,100 @@ class ProcessStore {
     };
   }
 
-  /**
-   * Notify all listeners that processes have changed
-   */
   private notifyChange() {
     this.changeListeners.forEach((listener) => listener());
   }
 
-  /**
-   * Load process definitions with caching
-   */
   async loadDefinitions(
     fetchFn: () => Promise<ProcessDefinition[]>,
     forceRefresh = false
   ): Promise<ProcessDefinition[]> {
-    // Return cached data if valid and not forcing refresh
-    if (!forceRefresh && this.isCacheValid(this.definitionsLastFetched)) {
-      console.log('[ProcessStore] Using cached definitions');
-      return this.definitions;
-    }
-
-    console.log('[ProcessStore] Loading definitions');
-    this.definitionsLoading = true;
-    this.definitionsError = null;
-
-    try {
-      const data = await fetchFn();
-      this.definitions = data;
-      this.definitionsLastFetched = Date.now();
-      return data;
-    } catch (err) {
-      console.error('[ProcessStore] Failed to load definitions:', err);
-      const message = err instanceof Error ? err.message : 'Failed to load processes';
-      this.definitionsError = message;
-      throw err;
-    } finally {
-      this.definitionsLoading = false;
-    }
+    return this.loadCached({
+      label: 'definitions',
+      currentValue: this.definitions,
+      hasValue: (value): value is ProcessDefinition[] => value !== null && value.length > 0,
+      getRequest: () => this.definitionsRequest,
+      setRequest: (value) => {
+        this.definitionsRequest = value;
+      },
+      setLoading: (value) => {
+        this.definitionsLoading = value;
+      },
+      setError: (value) => {
+        this.definitionsError = value;
+      },
+      getLastFetched: () => this.definitionsLastFetched,
+      setLastFetched: (value) => {
+        this.definitionsLastFetched = value;
+      },
+      updateValue: (value) => {
+        this.definitions = value;
+      },
+      fetchFn,
+      forceRefresh,
+      fallbackError: 'Failed to load processes'
+    });
   }
 
-  /**
-   * Load my process instances with caching
-   */
   async loadMyInstances(
     fetchFn: () => Promise<Page<ProcessInstance>>,
     forceRefresh = false
   ): Promise<Page<ProcessInstance>> {
-    if (!forceRefresh && this.myInstances && this.isCacheValid(this.myInstancesLastFetched)) {
-      console.log('[ProcessStore] Using cached instances');
-      return this.myInstances;
-    }
-
-    console.log('[ProcessStore] Loading my instances');
-    this.myInstancesLoading = true;
-    this.myInstancesError = null;
-
-    try {
-      const data = await fetchFn();
-      this.myInstances = data;
-      this.myInstancesLastFetched = Date.now();
-      return data;
-    } catch (err) {
-      console.error('[ProcessStore] Failed to load instances:', err);
-      const message = err instanceof Error ? err.message : 'Failed to load process instances';
-      this.myInstancesError = message;
-      throw err;
-    } finally {
-      this.myInstancesLoading = false;
-    }
+    return this.loadCached({
+      label: 'my instances',
+      currentValue: this.myInstances,
+      hasValue: (value): value is Page<ProcessInstance> => value !== null,
+      getRequest: () => this.myInstancesRequest,
+      setRequest: (value) => {
+        this.myInstancesRequest = value;
+      },
+      setLoading: (value) => {
+        this.myInstancesLoading = value;
+      },
+      setError: (value) => {
+        this.myInstancesError = value;
+      },
+      getLastFetched: () => this.myInstancesLastFetched,
+      setLastFetched: (value) => {
+        this.myInstancesLastFetched = value;
+      },
+      updateValue: (value) => {
+        this.myInstances = value;
+      },
+      fetchFn,
+      forceRefresh,
+      fallbackError: 'Failed to load process instances'
+    });
   }
 
-  /**
-   * Load dashboard data with caching
-   */
   async loadDashboard(fetchFn: () => Promise<Dashboard>, forceRefresh = false): Promise<Dashboard> {
-    if (!forceRefresh && this.dashboard && this.isCacheValid(this.dashboardLastFetched)) {
-      console.log('[ProcessStore] Using cached dashboard');
-      return this.dashboard;
-    }
-
-    console.log('[ProcessStore] Loading dashboard');
-    this.dashboardLoading = true;
-    this.dashboardError = null;
-
-    try {
-      const data = await fetchFn();
-      this.dashboard = data;
-      this.dashboardLastFetched = Date.now();
-      return data;
-    } catch (err) {
-      console.error('[ProcessStore] Failed to load dashboard:', err);
-      const message = err instanceof Error ? err.message : 'Failed to load dashboard';
-      this.dashboardError = message;
-      throw err;
-    } finally {
-      this.dashboardLoading = false;
-    }
+    return this.loadCached({
+      label: 'dashboard',
+      currentValue: this.dashboard,
+      hasValue: (value): value is Dashboard => value !== null,
+      getRequest: () => this.dashboardRequest,
+      setRequest: (value) => {
+        this.dashboardRequest = value;
+      },
+      setLoading: (value) => {
+        this.dashboardLoading = value;
+      },
+      setError: (value) => {
+        this.dashboardError = value;
+      },
+      getLastFetched: () => this.dashboardLastFetched,
+      setLastFetched: (value) => {
+        this.dashboardLastFetched = value;
+      },
+      updateValue: (value) => {
+        this.dashboard = value;
+      },
+      fetchFn,
+      forceRefresh,
+      fallbackError: 'Failed to load dashboard'
+    });
   }
 
-  /**
-   * Invalidate all caches - call after deploying or deleting a process
-   */
   invalidateAll() {
     console.log('[ProcessStore] Invalidating all caches');
     this.definitionsLastFetched = null;
@@ -177,52 +213,27 @@ class ProcessStore {
     this.notifyChange();
   }
 
-  /**
-   * Invalidate only definitions cache
-   */
   invalidateDefinitions() {
     this.definitionsLastFetched = null;
     this.notifyChange();
   }
 
-  /**
-   * Invalidate only instances cache
-   */
   invalidateInstances() {
     this.myInstancesLastFetched = null;
     this.dashboardLastFetched = null;
     this.notifyChange();
   }
 
-  /**
-   * Add a newly deployed process definition to the store immediately
-   * This provides optimistic update while cache is invalidated
-   */
   addDeployedProcess(process: ProcessDefinition) {
-    // We append the new process to the list.
-    // Since we now support multiple versions, we just add it.
-    // The grouping logic will handle version sorting.
     this.definitions = [...this.definitions, process];
     this.invalidateDefinitions();
   }
 
-  /**
-   * Remove a process definition from the store
-   */
   removeProcess(processId: string) {
-    // If we are showing all versions, removing by ID just removes that version.
-    // However, the backend logic for deletion might cascade to all versions if we are not careful
-    // or if the user requested cascade.
-    // The current UI logic in manage page calls deleteProcess with cascade=false usually,
-    // or it might intend to delete the deployment which removes all contained processes.
-    // For safety, let's just filter out by ID.
     this.definitions = this.definitions.filter((p) => p.id !== processId);
     this.invalidateDefinitions();
   }
 
-  /**
-   * Get grouped processes by key (for manage page)
-   */
   get groupedDefinitions() {
     const groups = new Map<string, ProcessDefinition[]>();
 
@@ -233,7 +244,6 @@ class ProcessStore {
       groups.get(process.key)?.push(process);
     });
 
-    // Sort versions within each group (highest version first)
     groups.forEach((versions) => {
       versions.sort((a, b) => (b.version || 0) - (a.version || 0));
     });
@@ -245,23 +255,6 @@ class ProcessStore {
     }));
   }
 
-  /**
-   * Check if definitions should be refreshed
-   */
-  get shouldRefreshDefinitions(): boolean {
-    return this.isStale(this.definitionsLastFetched);
-  }
-
-  /**
-   * Check if dashboard should be refreshed
-   */
-  get shouldRefreshDashboard(): boolean {
-    return this.isStale(this.dashboardLastFetched);
-  }
-
-  /**
-   * Clear all data (e.g., on logout)
-   */
   clear() {
     this.definitions = [];
     this.myInstances = null;
@@ -272,6 +265,12 @@ class ProcessStore {
     this.definitionsError = null;
     this.myInstancesError = null;
     this.dashboardError = null;
+    this.definitionsRequest = null;
+    this.myInstancesRequest = null;
+    this.dashboardRequest = null;
+    this.definitionsLoading = false;
+    this.myInstancesLoading = false;
+    this.dashboardLoading = false;
   }
 }
 
