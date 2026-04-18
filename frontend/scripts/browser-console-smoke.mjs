@@ -65,7 +65,16 @@ try {
 
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      consoleErrors.push(message.text());
+      const text = message.text();
+      // Ignore expected 401s from the unauthenticated startup requests
+      if (
+        text.includes('401 (Unauthorized)') ||
+        text.includes('ApiError: Unauthorized') ||
+        text.includes('"status":401')
+      ) {
+        return;
+      }
+      consoleErrors.push(text);
     }
   });
 
