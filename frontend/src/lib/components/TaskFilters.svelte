@@ -217,8 +217,8 @@
 		</div>
 
 		<!-- Filters -->
-		<div class="flex flex-wrap gap-4">
-			<div class="w-40">
+		<div class="flex flex-wrap gap-2 sm:gap-4">
+			<div class="w-full sm:w-40">
 				<select
 					bind:value={filters.assignee}
 					onchange={handleChange}
@@ -232,7 +232,7 @@
 				</select>
 			</div>
 
-			<div class="w-32">
+			<div class="w-full sm:w-32">
 				<select
 					bind:value={filters.priority}
 					onchange={handleChange}
@@ -247,7 +247,7 @@
 				</select>
 			</div>
 
-			<div class="w-40">
+			<div class="w-full sm:w-40">
 				<select
 					bind:value={filters.sortBy}
 					onchange={handleChange}
@@ -278,8 +278,8 @@
 	</div>
 
 	<div class="mt-4 flex flex-col gap-3">
-		<div class="flex flex-col sm:flex-row sm:items-center gap-3">
-			<div class="flex items-center gap-2 flex-1">
+		<div class="flex flex-col gap-3">
+			<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
 				<label for="task-filter-preset" class="sr-only">Preset name</label>
 				<input
 					id="task-filter-preset"
@@ -288,7 +288,7 @@
 					placeholder="Save current filters as a preset..."
 					aria-describedby={presetHelpId}
 					autocomplete="off"
-					class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+					class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
 				/>
 				<p id={presetHelpId} class="sr-only">
 					Enter a name to save your current filters as a preset.
@@ -298,17 +298,19 @@
 					onclick={handleSavePreset}
 					disabled={!canSavePreset}
 					aria-disabled={!canSavePreset}
-					class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+					class="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					<BookmarkPlus class="h-4 w-4" />
 					Save Preset
 				</button>
+			</div>
+			<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
 				<button
 					type="button"
 					onclick={handleShareFilters}
 					disabled={!hasActiveFilters}
 					aria-disabled={!hasActiveFilters}
-					class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 border border-blue-200 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+					class="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 border border-blue-200 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					<LinkIcon class="h-4 w-4" />
 					Copy Filter Link

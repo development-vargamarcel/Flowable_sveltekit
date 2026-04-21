@@ -99,7 +99,7 @@
 {#if hasFields}
 	<div
 		class="dynamic-form"
-		style="display: grid; grid-template-columns: repeat({gridConfig.columns}, 1fr); gap: {gridConfig.gap}px;"
+		style="--cols: {gridConfig.columns}; --gap: {gridConfig.gap}px;"
 	>
 		{#each sortedItems as { type, item }}
 			{#if type === 'field'}
@@ -111,7 +111,7 @@
 
 				<div
 					class="form-field {field.cssClass || ''}"
-					style="grid-column: span {field.gridWidth};"
+					style="--span: {field.gridWidth};"
 				>
 					{#if field.type === 'checkbox'}
 						<CheckboxField {field} {value} {isReadonly} onchange={(val) => controller.handleFieldChange(field.name, val)} />
@@ -159,7 +159,7 @@
 				{@const gridState = controller.getGridState(grid)}
 				<div
 					class="form-grid {grid.cssClass || ''}"
-					style="grid-column: span {grid.gridWidth};"
+					style="--span: {grid.gridWidth};"
 				>
 					<DynamicGrid
 						bind:this={gridRefs[grid.name]}
@@ -198,13 +198,36 @@
 <style>
 	.dynamic-form {
 		width: 100%;
+		display: grid;
+		grid-template-columns: repeat(1, 1fr);
+		gap: var(--gap);
+	}
+
+	@media (min-width: 640px) {
+		.dynamic-form {
+			grid-template-columns: repeat(var(--cols), 1fr);
+		}
 	}
 
 	.form-field {
 		margin-bottom: 1rem;
+		grid-column: span 1;
+	}
+
+	@media (min-width: 640px) {
+		.form-field {
+			grid-column: span var(--span);
+		}
 	}
 
 	.form-grid {
 		margin-bottom: 1.5rem;
+		grid-column: span 1;
+	}
+
+	@media (min-width: 640px) {
+		.form-grid {
+			grid-column: span var(--span);
+		}
 	}
 </style>

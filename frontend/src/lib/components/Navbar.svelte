@@ -84,22 +84,24 @@
 			</div>
 
 			{#if authStore.isAuthenticated && authStore.user}
-				<div class="flex items-center space-x-4">
+				<div class="flex items-center space-x-2 sm:space-x-4">
 					<GlobalSearch />
-					<div class="hidden sm:flex items-center space-x-4">
-						<button
-							onclick={toggleDarkMode}
-							class="p-1 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
-							aria-label="Toggle dark mode"
-						>
-							{#if isDark}
-								<Sun class="w-5 h-5" />
-							{:else}
-								<Moon class="w-5 h-5" />
-							{/if}
-						</button>
 
-						<NotificationBell />
+					<button
+						onclick={toggleDarkMode}
+						class="p-1 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+						aria-label="Toggle dark mode"
+					>
+						{#if isDark}
+							<Sun class="w-5 h-5" />
+						{:else}
+							<Moon class="w-5 h-5" />
+						{/if}
+					</button>
+
+					<NotificationBell />
+
+					<div class="hidden sm:flex items-center space-x-4">
 						<div class="flex items-center space-x-2">
 							<a href="/profile" class="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white font-medium"
 								>{authStore.user.displayName}</a
@@ -118,7 +120,7 @@
 					</div>
 
 					<!-- Mobile menu button -->
-					<div class="sm:hidden">
+					<div class="sm:hidden flex items-center">
 						<Sheet.Root bind:open>
 							<Sheet.Trigger class="p-2 rounded-md text-gray-600 hover:text-gray-900">
 								<Menu class="h-6 w-6" />

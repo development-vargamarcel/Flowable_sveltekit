@@ -71,10 +71,10 @@
 		</div>
 	{/if}
 
-	<div class="flex justify-between items-start mb-3 pr-8">
-		<div class="flex-1">
-			<div class="flex items-center gap-2 mb-1">
-				<h3 class="font-semibold text-gray-900 dark:text-gray-100">{task.name}</h3>
+	<div class="flex justify-between items-start mb-3 pr-8 gap-2 flex-wrap sm:flex-nowrap">
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center gap-2 mb-1 flex-wrap">
+				<h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{task.name}</h3>
 				{#if dueStatus === 'overdue'}
 					<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
 						<AlertCircle class="w-3 h-3 mr-1" />
