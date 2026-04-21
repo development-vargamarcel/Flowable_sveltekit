@@ -112,14 +112,14 @@
 				</span>
 			</div>
 
-			<div class="flex items-center gap-2">
+			<div class="flex flex-wrap items-center gap-2">
 				{#if onBulkClaim}
 					<button
 						type="button"
 						onclick={handleBulkClaim}
 						disabled={selectedIds.size === 0}
 						aria-disabled={selectedIds.size === 0}
-						class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+						class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60 flex-1 sm:flex-none justify-center"
 					>
 						<UserCheck class="w-4 h-4" />
 						Claim Selected
@@ -131,7 +131,7 @@
 						onclick={handleBulkUnclaim}
 						disabled={selectedIds.size === 0}
 						aria-disabled={selectedIds.size === 0}
-						class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+						class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60 flex-1 sm:flex-none justify-center"
 					>
 						<UserX class="w-4 h-4" />
 						Unclaim Selected

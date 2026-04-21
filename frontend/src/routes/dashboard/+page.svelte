@@ -802,8 +802,8 @@
 		</div>
 
 		<!-- Process List -->
-		<div class="bg-white rounded-lg shadow overflow-hidden">
-			<div class="px-4 py-3 text-xs text-gray-500 border-b border-gray-200">
+		<div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
+			<div class="px-4 py-3 text-xs text-gray-500 border-b border-gray-200 min-w-full">
 				<div class="flex flex-wrap gap-2">
 					<span>
 						Showing {filteredCount} of {displayProcesses?.content.length ?? 0} processes on this page
@@ -830,25 +830,25 @@
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
 							>Process</th
 						>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell"
 							>Business Key</th
 						>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
 							>Status</th
 						>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell"
 							>Current Step</th
 						>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell"
 							>Level</th
 						>
 						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
 							>Started</th
 						>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell"
 							>Duration</th
 						>
-						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky right-0 bg-gray-50 shadow-[-2px_0_2px_-1px_rgba(0,0,0,0.05)]"
 							>Actions</th
 						>
 					</tr>
@@ -870,7 +870,7 @@
 										</div>
 									</div>
 								</td>
-								<td class="px-4 py-3 text-sm font-mono text-gray-600">{process.businessKey}</td>
+								<td class="px-4 py-3 text-sm font-mono text-gray-600 hidden sm:table-cell">{process.businessKey}</td>
 								<td class="px-4 py-3">
 									<span
 										class="px-2 py-1 rounded-full text-xs font-medium {getStatusColor(
@@ -883,7 +883,7 @@
 										<EscalationBadge count={process.escalationCount} />
 									{/if}
 								</td>
-								<td class="px-4 py-3 text-sm text-gray-600">
+								<td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
 									{#if process.currentTaskName}
 										<span class="font-medium">{process.currentTaskName}</span>
 										{#if process.currentAssignee}
@@ -893,7 +893,7 @@
 										<span class="text-gray-400">-</span>
 									{/if}
 								</td>
-								<td class="px-4 py-3">
+								<td class="px-4 py-3 hidden lg:table-cell">
 									<span
 										class="px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
 									>
@@ -901,10 +901,10 @@
 									</span>
 								</td>
 								<td class="px-4 py-3 text-sm text-gray-600">{formatDate(process.startTime)}</td>
-								<td class="px-4 py-3 text-sm text-gray-600"
+								<td class="px-4 py-3 text-sm text-gray-600 hidden xl:table-cell"
 									>{formatDuration(process.durationInMillis || null)}</td
 								>
-								<td class="px-4 py-3">
+								<td class="px-4 py-3 sticky right-0 bg-inherit shadow-[-2px_0_2px_-1px_rgba(0,0,0,0.05)]">
 									<div class="flex gap-2">
 										<button
 											onclick={() => viewProcessDetails(process)}

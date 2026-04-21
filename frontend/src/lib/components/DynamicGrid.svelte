@@ -850,7 +850,7 @@
               </Table.Head>
             {/each}
             {#if !readonly || enableRowActions}
-              <Table.Head class="text-right">Actions</Table.Head>
+              <Table.Head class="text-right sticky right-0 bg-gray-50 z-10 shadow-[-2px_0_2px_-1px_rgba(0,0,0,0.05)]">Actions</Table.Head>
             {/if}
           </Table.Row>
         </Table.Header>
@@ -992,7 +992,7 @@
                     </Table.Cell>
                 {/each}
                 {#if !readonly || enableRowActions}
-                    <Table.Cell class="text-right">
+                    <Table.Cell class="text-right sticky right-0 bg-inherit z-10 shadow-[-2px_0_2px_-1px_rgba(0,0,0,0.05)]">
                     <div class="flex justify-end gap-2">
                         {#if row.isEditing}
                         <Button
