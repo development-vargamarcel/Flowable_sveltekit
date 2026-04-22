@@ -1,11 +1,18 @@
 package com.demo.bpm.service;
 
 import com.demo.bpm.dto.TaskDTO;
+import com.demo.bpm.exception.InvalidOperationException;
+import com.demo.bpm.exception.ResourceNotFoundException;
 import com.demo.bpm.repository.ProcessConfigRepository;
 import com.demo.bpm.service.helpers.TaskQueryHelper;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
+import org.flowable.engine.repository.ProcessDefinition;
+import org.flowable.engine.repository.ProcessDefinitionQuery;
+import org.flowable.engine.runtime.ProcessInstance;
+import org.flowable.engine.runtime.ProcessInstanceQuery;
+import org.flowable.task.api.Task;
 import org.flowable.task.api.TaskQuery;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,9 +24,13 @@ import org.mockito.quality.Strictness;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -120,5 +131,122 @@ class TaskServiceTest {
         verify(taskQuery).taskCandidateOrAssigned(userId);
         verify(taskQuery).taskUnassigned();
         verify(taskQuery, never()).taskAssignee(anyString());
+    }
+
+    @Test
+    void completeTask_Success() {
+        String taskId = "task1";
+        String userId = "user1";
+        Map<String, Object> variables = Map.of("days", 5);
+
+        Task task = mock(Task.class);
+        when(task.getId()).thenReturn(taskId);
+        when(task.getAssignee()).thenReturn(userId);
+        when(task.getProcessInstanceId()).thenReturn("pi1");
+        when(task.getProcessDefinitionId()).thenReturn("pd1");
+
+        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+
+        ProcessInstanceQuery piQuery = mock(ProcessInstanceQuery.class);
+        when(runtimeService.createProcessInstanceQuery()).thenReturn(piQuery);
+        when(piQuery.processInstanceId("pi1")).thenReturn(piQuery);
+        when(piQuery.singleResult()).thenReturn(mock(ProcessInstance.class));
+
+        ProcessDefinitionQuery pdQuery = mock(ProcessDefinitionQuery.class);
+        when(repositoryService.createProcessDefinitionQuery()).thenReturn(pdQuery);
+        when(pdQuery.processDefinitionId("pd1")).thenReturn(pdQuery);
+        when(pdQuery.singleResult()).thenReturn(mock(ProcessDefinition.class));
+
+        taskService.completeTask(taskId, variables, userId);
+
+        verify(flowableTaskService).complete(eq(taskId), anyMap());
+    }
+
+    @Test
+    void completeTask_TaskNotFound_ThrowsException() {
+        String taskId = "invalid";
+        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(null);
+
+        assertThrows(ResourceNotFoundException.class, () ->
+            taskService.completeTask(taskId, Collections.emptyMap(), "user1"));
+    }
+
+    @Test
+    void completeTask_AssignedToOther_ThrowsException() {
+        String taskId = "task1";
+        Task task = mock(Task.class);
+        when(task.getAssignee()).thenReturn("otherUser");
+
+        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+
+        assertThrows(InvalidOperationException.class, () ->
+            taskService.completeTask(taskId, Collections.emptyMap(), "user1"));
+    }
+
+    @Test
+    void claimTask_Success() {
+        String taskId = "task1";
+        String userId = "user1";
+        Task task = mock(Task.class);
+        when(task.getAssignee()).thenReturn(null);
+
+        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+
+        taskService.claimTask(taskId, userId);
+
+        verify(flowableTaskService).claim(taskId, userId);
+    }
+
+    @Test
+    void claimTask_AlreadyAssigned_ThrowsException() {
+        String taskId = "task1";
+        Task task = mock(Task.class);
+        when(task.getAssignee()).thenReturn("otherUser");
+
+        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+
+        assertThrows(InvalidOperationException.class, () ->
+            taskService.claimTask(taskId, "user1"));
+    }
+
+    @Test
+    void delegateTask_Success() {
+        String taskId = "task1";
+        String currentUserId = "user1";
+        String targetUserId = "user2";
+        Task task = mock(Task.class);
+        when(task.getAssignee()).thenReturn(currentUserId);
+
+        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+
+        taskService.delegateTask(taskId, currentUserId, targetUserId);
+
+        verify(flowableTaskService).setAssignee(taskId, targetUserId);
+    }
+
+    @Test
+    void unclaimTask_Success() {
+        String taskId = "task1";
+        Task task = mock(Task.class);
+
+        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+
+        taskService.unclaimTask(taskId);
+
+        verify(flowableTaskService).unclaim(taskId);
     }
 }

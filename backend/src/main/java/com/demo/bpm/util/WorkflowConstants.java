@@ -23,6 +23,9 @@ public final class WorkflowConstants {
     public static final String VAR_STARTED_BY = "startedBy";
     public static final String VAR_EMPLOYEE_NAME = "employeeName";
 
+    public static final String DECISION_ESCALATE = "escalate";
+    public static final String DECISION_DE_ESCALATE = "de_escalate";
+
     public static final String LEVEL_SUPERVISOR = "SUPERVISOR";
     public static final String LEVEL_MANAGER = "MANAGER";
     public static final String LEVEL_DIRECTOR = "DIRECTOR";

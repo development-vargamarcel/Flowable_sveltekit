@@ -3,6 +3,8 @@ package com.demo.bpm.service;
 import com.demo.bpm.dto.DocumentDTO;
 import com.demo.bpm.dto.TaskDTO;
 import com.demo.bpm.entity.ProcessConfig;
+import com.demo.bpm.exception.InvalidOperationException;
+import com.demo.bpm.exception.ResourceNotFoundException;
 import com.demo.bpm.repository.ProcessConfigRepository;
 import com.demo.bpm.service.helpers.TaskQueryHelper;
 import com.demo.bpm.util.VariableStorageUtil;
@@ -103,15 +105,7 @@ public class TaskService {
     }
 
     public TaskDTO getTaskById(String taskId) {
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
-
-        return convertToDTO(task);
+        return convertToDTO(getTaskOrThrow(taskId));
     }
 
     public Map<String, Object> getTaskDetails(String taskId) {
@@ -129,14 +123,7 @@ public class TaskService {
      * 2. Business data from document/grid_rows tables
      */
     public Map<String, Object> getTaskVariables(String taskId) {
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
-
+        Task task = getTaskOrThrow(taskId);
         return getMergedVariables(task.getProcessInstanceId());
     }
 
@@ -180,15 +167,7 @@ public class TaskService {
     }
 
     public String getProcessDefinitionIdForTask(String taskId) {
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
-
-        return task.getProcessDefinitionId();
+        return getTaskOrThrow(taskId).getProcessDefinitionId();
     }
 
     /**
@@ -202,18 +181,12 @@ public class TaskService {
     public void delegateTask(String taskId, String currentUserId, String targetUserId) {
         log.debug("User {} delegating task {} to {}", currentUserId, taskId, targetUserId);
 
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
+        Task task = getTaskOrThrow(taskId);
 
         // Validate access - only assignee can delegate (or we could add admin check)
         if (task.getAssignee() != null && !task.getAssignee().equals(currentUserId)) {
             // For now, strict check: only assignee can delegate
-            throw new RuntimeException("Only the assignee can delegate the task");
+            throw new InvalidOperationException("Only the assignee can delegate the task");
         }
 
         // If task is unassigned, maybe allow claiming implicitly?
@@ -238,16 +211,10 @@ public class TaskService {
     @Transactional
     public void claimTask(String taskId, String userId) {
         log.debug("User {} attempting to claim task {}", userId, taskId);
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
+        Task task = getTaskOrThrow(taskId);
 
         if (task.getAssignee() != null) {
-            throw new RuntimeException("Task is already assigned to: " + task.getAssignee());
+            throw new InvalidOperationException("Task is already assigned to: " + task.getAssignee());
         }
 
         flowableTaskService.claim(taskId, userId);
@@ -262,14 +229,7 @@ public class TaskService {
     @Transactional
     public void unclaimTask(String taskId) {
         log.debug("Unclaiming task {}", taskId);
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
-
+        getTaskOrThrow(taskId);
         flowableTaskService.unclaim(taskId);
         log.info("Task {} unclaimed (assignee removed)", taskId);
     }
@@ -284,17 +244,11 @@ public class TaskService {
     @Transactional
     public void completeTask(String taskId, Map<String, Object> variables, String userId) {
         log.debug("User {} completing task {} with variables: {}", userId, taskId, variables);
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new RuntimeException("Task not found: " + taskId);
-        }
+        Task task = getTaskOrThrow(taskId);
 
         // Allow completion if user is assignee or task is unassigned
         if (task.getAssignee() != null && !task.getAssignee().equals(userId)) {
-            throw new RuntimeException("Task is assigned to another user");
+            throw new InvalidOperationException("Task is assigned to another user");
         }
 
         // If task is unassigned, claim it first
@@ -355,6 +309,17 @@ public class TaskService {
                 // Don't fail the task completion if business table save fails
             }
         }
+    }
+
+    private Task getTaskOrThrow(String taskId) {
+        Task task = flowableTaskService.createTaskQuery()
+                .taskId(taskId)
+                .singleResult();
+
+        if (task == null) {
+            throw new ResourceNotFoundException("Task not found: " + taskId);
+        }
+        return task;
     }
 
     private TaskDTO convertToDTO(Task task) {
