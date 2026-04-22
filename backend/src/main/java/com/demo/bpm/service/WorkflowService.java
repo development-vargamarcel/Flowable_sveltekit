@@ -145,12 +145,12 @@ public class WorkflowService {
         if (isEscalation) {
             int count = WorkflowVariableUtils.getIntVariable(currentVariables, WorkflowConstants.VAR_ESCALATION_COUNT, 0) + 1;
             updateVars.put(WorkflowConstants.VAR_ESCALATION_COUNT, count);
-            updateVars.put(WorkflowConstants.VAR_DECISION, "escalate");
+            updateVars.put(WorkflowConstants.VAR_DECISION, WorkflowConstants.DECISION_ESCALATE);
             updateVars.put(WorkflowConstants.VAR_ESCALATION_REASON, reason);
             updateVars.put(WorkflowConstants.VAR_ESCALATED_BY, userId);
             updateVars.put(WorkflowConstants.VAR_ESCALATED_AT, now);
         } else {
-            updateVars.put(WorkflowConstants.VAR_DECISION, "de_escalate");
+            updateVars.put(WorkflowConstants.VAR_DECISION, WorkflowConstants.DECISION_DE_ESCALATE);
             updateVars.put(WorkflowConstants.VAR_DE_ESCALATION_REASON, reason);
             updateVars.put(WorkflowConstants.VAR_DE_ESCALATED_BY, userId);
             updateVars.put(WorkflowConstants.VAR_DE_ESCALATED_AT, now);
