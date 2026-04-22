@@ -38,6 +38,8 @@ public class TaskService {
     private final BusinessTableService businessTableService;
     private final ProcessConfigRepository processConfigRepository;
     private final TaskQueryHelper taskQueryHelper;
+    private final com.demo.bpm.service.helpers.TaskCommonHelper taskCommonHelper;
+    private final com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
     /**
      * Retrieves tasks assigned to the specific user.
@@ -105,7 +107,7 @@ public class TaskService {
     }
 
     public TaskDTO getTaskById(String taskId) {
-        return convertToDTO(getTaskOrThrow(taskId));
+        return convertToDTO(taskCommonHelper.getTaskOrThrow(taskId));
     }
 
     public Map<String, Object> getTaskDetails(String taskId) {
@@ -123,51 +125,12 @@ public class TaskService {
      * 2. Business data from document/grid_rows tables
      */
     public Map<String, Object> getTaskVariables(String taskId) {
-        Task task = getTaskOrThrow(taskId);
-        return getMergedVariables(task.getProcessInstanceId());
-    }
-
-    /**
-     * Get merged variables from both Flowable (system vars) and document tables (business data).
-     */
-    private Map<String, Object> getMergedVariables(String processInstanceId) {
-        Map<String, Object> mergedVars = new HashMap<>();
-
-        // Get system variables from Flowable (variables starting with _)
-        try {
-            Map<String, Object> flowableVars = runtimeService.getVariables(processInstanceId);
-            if (flowableVars != null) {
-                mergedVars.putAll(flowableVars);
-            }
-        } catch (Exception e) {
-            log.debug("Could not get Flowable variables, process may have ended: {}", e.getMessage());
-        }
-
-        // Get business data from document table
-        try {
-            Optional<DocumentDTO> documentOpt = businessTableService.getDocument(processInstanceId, "main");
-            if (documentOpt.isPresent()) {
-                DocumentDTO document = documentOpt.get();
-
-                // Add document fields
-                if (document.getFields() != null) {
-                    mergedVars.putAll(document.getFields());
-                }
-
-                // Add grid data
-                if (document.getGrids() != null) {
-                    mergedVars.putAll(document.getGrids());
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Could not get document data: {}", e.getMessage());
-        }
-
-        return mergedVars;
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
+        return variableHelper.getMergedVariables(task.getProcessInstanceId());
     }
 
     public String getProcessDefinitionIdForTask(String taskId) {
-        return getTaskOrThrow(taskId).getProcessDefinitionId();
+        return taskCommonHelper.getTaskOrThrow(taskId).getProcessDefinitionId();
     }
 
     /**
@@ -181,13 +144,10 @@ public class TaskService {
     public void delegateTask(String taskId, String currentUserId, String targetUserId) {
         log.debug("User {} delegating task {} to {}", currentUserId, taskId, targetUserId);
 
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
 
-        // Validate access - only assignee can delegate (or we could add admin check)
-        if (task.getAssignee() != null && !task.getAssignee().equals(currentUserId)) {
-            // For now, strict check: only assignee can delegate
-            throw new InvalidOperationException("Only the assignee can delegate the task");
-        }
+        // Validate access - only assignee can delegate
+        taskCommonHelper.validateIsAssignee(task, currentUserId);
 
         // If task is unassigned, maybe allow claiming implicitly?
         // But usually delegation implies "I have it, I give it to you".
@@ -211,7 +171,7 @@ public class TaskService {
     @Transactional
     public void claimTask(String taskId, String userId) {
         log.debug("User {} attempting to claim task {}", userId, taskId);
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
 
         if (task.getAssignee() != null) {
             throw new InvalidOperationException("Task is already assigned to: " + task.getAssignee());
@@ -229,7 +189,7 @@ public class TaskService {
     @Transactional
     public void unclaimTask(String taskId) {
         log.debug("Unclaiming task {}", taskId);
-        getTaskOrThrow(taskId);
+        taskCommonHelper.getTaskOrThrow(taskId);
         flowableTaskService.unclaim(taskId);
         log.info("Task {} unclaimed (assignee removed)", taskId);
     }
@@ -244,12 +204,24 @@ public class TaskService {
     @Transactional
     public void completeTask(String taskId, Map<String, Object> variables, String userId) {
         log.debug("User {} completing task {} with variables: {}", userId, taskId, variables);
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
 
         // Allow completion if user is assignee or task is unassigned
-        if (task.getAssignee() != null && !task.getAssignee().equals(userId)) {
-            throw new InvalidOperationException("Task is assigned to another user");
-        }
+        taskCommonHelper.validateAssigneeOrUnassigned(task, userId);
+
+        internalCompleteTask(task, variables, userId);
+    }
+
+    /**
+     * Internal method for task completion shared by various workflow actions.
+     * Assumes validation has already been performed.
+     *
+     * @param task the task to complete
+     * @param variables the variables to complete the task with
+     * @param userId the user performing the completion
+     */
+    protected void internalCompleteTask(Task task, Map<String, Object> variables, String userId) {
+        String taskId = task.getId();
 
         // If task is unassigned, claim it first
         if (task.getAssignee() == null) {
@@ -274,11 +246,14 @@ public class TaskService {
         Map<String, Object> allVars = new HashMap<>(variables != null ? variables : Map.of());
 
         // Add completion metadata with _ prefix so they're stored in Flowable
-        allVars.put("_completedBy", userId);
-        allVars.put("_completedAt", java.time.LocalDateTime.now().toString());
+        if (!allVars.containsKey("_completedBy")) {
+            allVars.put("_completedBy", userId);
+        }
+        if (!allVars.containsKey("_completedAt")) {
+            allVars.put("_completedAt", java.time.LocalDateTime.now().toString());
+        }
 
         // Only pass system variables (starting with _) to Flowable
-        // Business variables will be stored in document/grid_rows tables only
         Map<String, Object> systemVars = VariableStorageUtil.filterSystemVariables(allVars);
 
         flowableTaskService.complete(taskId, systemVars);
@@ -290,10 +265,6 @@ public class TaskService {
                 Optional<ProcessConfig> config = processConfigRepository.findByProcessDefinitionKey(processDefKey);
                 String documentType = config.map(ProcessConfig::getDocumentType).orElse(null);
 
-                // Save all submitted variables to business tables
-                // Note: System variables (starting with _) are stored in Flowable
-                // Business variables are stored only in document/grid_rows
-                // We pass all variables here so system metadata is also available in document if needed
                 businessTableService.saveAllData(
                         processInstanceId,
                         businessKey,
@@ -306,25 +277,13 @@ public class TaskService {
                 log.info("Business table data saved for process instance: {}", processInstanceId);
             } catch (Exception e) {
                 log.error("Failed to save business table data for process {}: {}", processInstanceId, e.getMessage(), e);
-                // Don't fail the task completion if business table save fails
             }
         }
     }
 
-    private Task getTaskOrThrow(String taskId) {
-        Task task = flowableTaskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-
-        if (task == null) {
-            throw new ResourceNotFoundException("Task not found: " + taskId);
-        }
-        return task;
-    }
-
     private TaskDTO convertToDTO(Task task) {
         // Get merged variables from both Flowable (system vars) and document tables (business data)
-        Map<String, Object> variables = getMergedVariables(task.getProcessInstanceId());
+        Map<String, Object> variables = variableHelper.getMergedVariables(task.getProcessInstanceId());
         return taskQueryHelper.convertToDTO(task, variables);
     }
 

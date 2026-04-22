@@ -51,6 +51,10 @@ class TaskServiceTest {
     private ProcessConfigRepository processConfigRepository;
     @Mock
     private TaskQueryHelper taskQueryHelper;
+    @Mock
+    private com.demo.bpm.service.helpers.TaskCommonHelper taskCommonHelper;
+    @Mock
+    private com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
     @Mock
     private TaskQuery taskQuery;
@@ -145,9 +149,7 @@ class TaskServiceTest {
         when(task.getProcessInstanceId()).thenReturn("pi1");
         when(task.getProcessDefinitionId()).thenReturn("pd1");
 
-        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
         ProcessInstanceQuery piQuery = mock(ProcessInstanceQuery.class);
         when(runtimeService.createProcessInstanceQuery()).thenReturn(piQuery);
@@ -167,9 +169,7 @@ class TaskServiceTest {
     @Test
     void completeTask_TaskNotFound_ThrowsException() {
         String taskId = "invalid";
-        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(null);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenThrow(ResourceNotFoundException.class);
 
         assertThrows(ResourceNotFoundException.class, () ->
             taskService.completeTask(taskId, Collections.emptyMap(), "user1"));
@@ -181,9 +181,8 @@ class TaskServiceTest {
         Task task = mock(Task.class);
         when(task.getAssignee()).thenReturn("otherUser");
 
-        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
+        doThrow(InvalidOperationException.class).when(taskCommonHelper).validateAssigneeOrUnassigned(task, "user1");
 
         assertThrows(InvalidOperationException.class, () ->
             taskService.completeTask(taskId, Collections.emptyMap(), "user1"));
@@ -196,9 +195,7 @@ class TaskServiceTest {
         Task task = mock(Task.class);
         when(task.getAssignee()).thenReturn(null);
 
-        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
         taskService.claimTask(taskId, userId);
 
@@ -211,9 +208,7 @@ class TaskServiceTest {
         Task task = mock(Task.class);
         when(task.getAssignee()).thenReturn("otherUser");
 
-        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
         assertThrows(InvalidOperationException.class, () ->
             taskService.claimTask(taskId, "user1"));
@@ -227,9 +222,7 @@ class TaskServiceTest {
         Task task = mock(Task.class);
         when(task.getAssignee()).thenReturn(currentUserId);
 
-        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
         taskService.delegateTask(taskId, currentUserId, targetUserId);
 
@@ -241,9 +234,7 @@ class TaskServiceTest {
         String taskId = "task1";
         Task task = mock(Task.class);
 
-        when(flowableTaskService.createTaskQuery()).thenReturn(taskQuery);
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
         taskService.unclaimTask(taskId);
 
