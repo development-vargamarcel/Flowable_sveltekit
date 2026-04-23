@@ -6,7 +6,6 @@ import com.demo.bpm.entity.ProcessConfig;
 import com.demo.bpm.exception.InvalidOperationException;
 import com.demo.bpm.exception.ResourceNotFoundException;
 import com.demo.bpm.repository.ProcessConfigRepository;
-import com.demo.bpm.service.helpers.TaskQueryHelper;
 import com.demo.bpm.util.VariableStorageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +36,7 @@ public class TaskService {
     private final HistoryService historyService;
     private final BusinessTableService businessTableService;
     private final ProcessConfigRepository processConfigRepository;
-    private final TaskQueryHelper taskQueryHelper;
+    private final com.demo.bpm.mapper.TaskMapper taskMapper;
     private final com.demo.bpm.service.helpers.TaskCommonHelper taskCommonHelper;
     private final com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
@@ -107,7 +106,9 @@ public class TaskService {
     }
 
     public TaskDTO getTaskById(String taskId) {
-        return convertToDTO(taskCommonHelper.getTaskOrThrow(taskId));
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
+        Map<String, Object> variables = variableHelper.getMergedVariables(task.getProcessInstanceId());
+        return taskMapper.toDTO(task, variables);
     }
 
     public Map<String, Object> getTaskDetails(String taskId) {
@@ -284,7 +285,7 @@ public class TaskService {
     private TaskDTO convertToDTO(Task task) {
         // Get merged variables from both Flowable (system vars) and document tables (business data)
         Map<String, Object> variables = variableHelper.getMergedVariables(task.getProcessInstanceId());
-        return taskQueryHelper.convertToDTO(task, variables);
+        return taskMapper.toDTO(task, variables);
     }
 
     private List<TaskDTO> getTasks(org.flowable.task.api.TaskQuery query) {

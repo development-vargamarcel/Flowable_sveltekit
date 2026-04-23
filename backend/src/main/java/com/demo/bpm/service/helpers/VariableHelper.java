@@ -17,6 +17,7 @@ import java.util.Optional;
 public class VariableHelper {
 
     private final RuntimeService runtimeService;
+    private final org.flowable.engine.HistoryService historyService;
     private final BusinessTableService businessTableService;
 
     /**
@@ -35,7 +36,15 @@ public class VariableHelper {
                 mergedVars.putAll(flowableVars);
             }
         } catch (Exception e) {
-            log.debug("Could not get Flowable variables, process may have ended: {}", e.getMessage());
+            log.debug("Could not get Flowable variables, checking historic variables: {}", e.getMessage());
+            try {
+                historyService.createHistoricVariableInstanceQuery()
+                        .processInstanceId(processInstanceId)
+                        .list()
+                        .forEach(var -> mergedVars.put(var.getVariableName(), var.getValue()));
+            } catch (Exception e2) {
+                 log.debug("Could not get historic variables: {}", e2.getMessage());
+            }
         }
 
         // Get business data from document table

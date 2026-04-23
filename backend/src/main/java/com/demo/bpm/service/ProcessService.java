@@ -40,13 +40,14 @@ public class ProcessService {
     private final HistoryService historyService;
     private final ProcessConfigRepository processConfigRepository;
     private final BusinessTableService businessTableService;
+    private final com.demo.bpm.mapper.ProcessMapper processMapper;
 
     public List<ProcessDTO> getAvailableProcesses() {
         return repositoryService.createProcessDefinitionQuery()
                 .latestVersion()
                 .list()
                 .stream()
-                .map(this::convertToDTO)
+                .map(processMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
@@ -59,7 +60,7 @@ public class ProcessService {
             throw new ResourceNotFoundException("Process not found with id: " + processDefinitionId);
         }
 
-        return convertToDTO(processDefinition);
+        return processMapper.toDTO(processDefinition);
     }
 
     public List<ProcessDTO> getAllProcessDefinitions() {
@@ -67,7 +68,7 @@ public class ProcessService {
                 .orderByProcessDefinitionVersion().desc()
                 .list()
                 .stream()
-                .map(this::convertToDTO)
+                .map(processMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
@@ -127,7 +128,7 @@ public class ProcessService {
                     .processDefinitionId(instance.getProcessDefinitionId())
                     .singleResult();
 
-            return buildProcessInstanceDTO(
+            return processMapper.toInstanceDTO(
                     instance.getId(),
                     instance.getProcessDefinitionId(),
                     instance.getProcessDefinitionKey(),
@@ -149,7 +150,7 @@ public class ProcessService {
             throw new RuntimeException("Process instance not found: " + processInstanceId);
         }
 
-        return buildProcessInstanceDTO(
+        return processMapper.toInstanceDTO(
                 historicInstance.getId(),
                 historicInstance.getProcessDefinitionId(),
                 historicInstance.getProcessDefinitionKey(),
@@ -161,23 +162,6 @@ public class ProcessService {
                 historicInstance.getEndTime() != null,
                 false
         );
-    }
-
-    private ProcessInstanceDTO buildProcessInstanceDTO(String id, String definitionId, String definitionKey,
-                                                       String definitionName, String businessKey, java.util.Date startTime,
-                                                       String startUserId, Map<String, Object> variables, boolean ended, boolean suspended) {
-        return ProcessInstanceDTO.builder()
-                .id(id)
-                .processDefinitionId(definitionId)
-                .processDefinitionKey(definitionKey)
-                .processDefinitionName(definitionName)
-                .businessKey(businessKey)
-                .startTime(startTime.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
-                .startUserId(startUserId)
-                .variables(variables)
-                .ended(ended)
-                .suspended(suspended)
-                .build();
     }
 
     public Page<ProcessInstanceDTO> getActiveProcesses(String userId, Pageable pageable) {
@@ -195,18 +179,6 @@ public class ProcessService {
                 .collect(Collectors.toList());
 
         return new PageImpl<>(dtos, pageable, total);
-    }
-
-    private ProcessDTO convertToDTO(ProcessDefinition definition) {
-        return ProcessDTO.builder()
-                .id(definition.getId())
-                .key(definition.getKey())
-                .name(definition.getName())
-                .description(definition.getDescription())
-                .version(definition.getVersion())
-                .category(definition.getCategory())
-                .suspended(definition.isSuspended())
-                .build();
     }
 
     @Transactional
@@ -229,7 +201,7 @@ public class ProcessService {
             String documentType = extractDocumentTypeFromBpmn(definition.getId());
             updateProcessConfig(definition.getKey(), documentType);
 
-            return convertToDTO(definition);
+            return processMapper.toDTO(definition);
         } catch (Exception e) {
             log.error("Error deploying process: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to deploy process: " + e.getMessage(), e);

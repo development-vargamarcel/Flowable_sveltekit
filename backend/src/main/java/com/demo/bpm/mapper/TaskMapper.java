@@ -1,4 +1,4 @@
-package com.demo.bpm.service.helpers;
+package com.demo.bpm.mapper;
 
 import com.demo.bpm.dto.TaskDTO;
 import org.flowable.engine.RepositoryService;
@@ -12,17 +12,17 @@ import java.time.ZoneId;
 import java.util.Map;
 
 @Component
-public class TaskQueryHelper {
+public class TaskMapper {
 
     private final RuntimeService runtimeService;
     private final RepositoryService repositoryService;
 
-    public TaskQueryHelper(RuntimeService runtimeService, RepositoryService repositoryService) {
+    public TaskMapper(RuntimeService runtimeService, RepositoryService repositoryService) {
         this.runtimeService = runtimeService;
         this.repositoryService = repositoryService;
     }
 
-    public TaskDTO convertToDTO(Task task, Map<String, Object> variables) {
+    public TaskDTO toDTO(Task task, Map<String, Object> variables) {
         ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
                 .processInstanceId(task.getProcessInstanceId())
                 .singleResult();

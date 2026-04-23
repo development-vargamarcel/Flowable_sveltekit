@@ -33,134 +33,108 @@ public class WorkflowHistoryService {
     private final TaskService taskService;
     private final HistoryService historyService;
     private final RepositoryService repositoryService;
-    private final ObjectMapper objectMapper;
+    private final com.demo.bpm.mapper.WorkflowHistoryMapper workflowHistoryMapper;
     private final com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
     public WorkflowHistoryDTO getWorkflowHistory(String processInstanceId) {
-        // First try active process
         ProcessInstance activeInstance = runtimeService.createProcessInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .singleResult();
 
+        WorkflowHistoryDTO.WorkflowHistoryDTOBuilder builder = WorkflowHistoryDTO.builder()
+                .processInstanceId(processInstanceId);
+
         Map<String, Object> variables;
-        String status;
-        LocalDateTime startTime;
-        LocalDateTime endTime = null;
-        String processDefId;
-        String processDefKey;
-        String processDefName;
-        String businessKey;
-        String startUserId;
-        Long durationInMillis = null;
-
         if (activeInstance != null) {
-            variables = variableHelper.getMergedVariables(processInstanceId);
-            status = activeInstance.isSuspended() ? "SUSPENDED" : "ACTIVE";
-            startTime = activeInstance.getStartTime().toInstant()
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime();
-            processDefId = activeInstance.getProcessDefinitionId();
-            processDefKey = activeInstance.getProcessDefinitionKey();
-            businessKey = activeInstance.getBusinessKey();
-
-            ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
-                    .processDefinitionId(activeInstance.getProcessDefinitionId())
-                    .singleResult();
-            processDefName = definition != null ? definition.getName() : null;
-            startUserId = (String) variables.get(WorkflowConstants.VAR_STARTED_BY);
+            variables = mapActiveInstance(activeInstance, builder);
         } else {
-            // Check history
-            HistoricProcessInstance historicInstance = historyService.createHistoricProcessInstanceQuery()
-                    .processInstanceId(processInstanceId)
-                    .singleResult();
-
-            if (historicInstance == null) {
-                throw new ResourceNotFoundException("Process instance not found: " + processInstanceId);
-            }
-
-            variables = variableHelper.getMergedVariables(processInstanceId);
-
-            status = historicInstance.getEndTime() != null ? "COMPLETED" : "ACTIVE";
-            startTime = historicInstance.getStartTime().toInstant()
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime();
-            if (historicInstance.getEndTime() != null) {
-                endTime = historicInstance.getEndTime().toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime();
-                durationInMillis = historicInstance.getDurationInMillis();
-            }
-            processDefId = historicInstance.getProcessDefinitionId();
-            processDefKey = historicInstance.getProcessDefinitionKey();
-            processDefName = historicInstance.getProcessDefinitionName();
-            businessKey = historicInstance.getBusinessKey();
-            startUserId = historicInstance.getStartUserId();
+            variables = mapHistoricInstance(processInstanceId, builder);
         }
 
-        // Get current task info
-        String currentTaskId = null;
-        String currentTaskName = null;
-        String currentAssignee = null;
+        populateTaskInfo(processInstanceId, builder);
+        populateHistorySegments(processInstanceId, variables, builder);
+
+        return builder.build();
+    }
+
+    private Map<String, Object> mapActiveInstance(ProcessInstance instance, WorkflowHistoryDTO.WorkflowHistoryDTOBuilder builder) {
+        String processInstanceId = instance.getId();
+        Map<String, Object> variables = variableHelper.getMergedVariables(processInstanceId);
+
+        ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
+                .processDefinitionId(instance.getProcessDefinitionId())
+                .singleResult();
+
+        builder.status(instance.isSuspended() ? "SUSPENDED" : "ACTIVE")
+                .startTime(instance.getStartTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                .processDefinitionId(instance.getProcessDefinitionId())
+                .processDefinitionKey(instance.getProcessDefinitionKey())
+                .processDefinitionName(definition != null ? definition.getName() : null)
+                .businessKey(instance.getBusinessKey())
+                .initiatorId((String) variables.get(WorkflowConstants.VAR_STARTED_BY))
+                .initiatorName((String) variables.get(WorkflowConstants.VAR_EMPLOYEE_NAME))
+                .currentLevel(WorkflowVariableUtils.getStringVariable(variables, WorkflowConstants.VAR_CURRENT_LEVEL, WorkflowConstants.LEVEL_SUPERVISOR))
+                .escalationCount(WorkflowVariableUtils.getIntVariable(variables, WorkflowConstants.VAR_ESCALATION_COUNT, 0))
+                .variables(variables);
+
+        return variables;
+    }
+
+    private Map<String, Object> mapHistoricInstance(String processInstanceId, WorkflowHistoryDTO.WorkflowHistoryDTOBuilder builder) {
+        HistoricProcessInstance historicInstance = historyService.createHistoricProcessInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .singleResult();
+
+        if (historicInstance == null) {
+            throw new ResourceNotFoundException("Process instance not found: " + processInstanceId);
+        }
+
+        Map<String, Object> variables = variableHelper.getMergedVariables(processInstanceId);
+
+        builder.status(historicInstance.getEndTime() != null ? "COMPLETED" : "ACTIVE")
+                .startTime(historicInstance.getStartTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                .processDefinitionId(historicInstance.getProcessDefinitionId())
+                .processDefinitionKey(historicInstance.getProcessDefinitionKey())
+                .processDefinitionName(historicInstance.getProcessDefinitionName())
+                .businessKey(historicInstance.getBusinessKey())
+                .initiatorId(historicInstance.getStartUserId())
+                .initiatorName((String) variables.get(WorkflowConstants.VAR_EMPLOYEE_NAME))
+                .currentLevel(WorkflowVariableUtils.getStringVariable(variables, WorkflowConstants.VAR_CURRENT_LEVEL, WorkflowConstants.LEVEL_SUPERVISOR))
+                .escalationCount(WorkflowVariableUtils.getIntVariable(variables, WorkflowConstants.VAR_ESCALATION_COUNT, 0))
+                .variables(variables);
+
+        if (historicInstance.getEndTime() != null) {
+            builder.endTime(historicInstance.getEndTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                    .durationInMillis(historicInstance.getDurationInMillis());
+        }
+
+        return variables;
+    }
+
+    private void populateTaskInfo(String processInstanceId, WorkflowHistoryDTO.WorkflowHistoryDTOBuilder builder) {
         List<Task> currentTasks = taskService.createTaskQuery()
                 .processInstanceId(processInstanceId)
                 .list();
+
         if (!currentTasks.isEmpty()) {
             Task currentTask = currentTasks.get(0);
-            currentTaskId = currentTask.getId();
-            currentTaskName = currentTask.getName();
-            currentAssignee = currentTask.getAssignee();
+            builder.currentTaskId(currentTask.getId())
+                    .currentTaskName(currentTask.getName())
+                    .currentAssignee(currentTask.getAssignee());
         }
+    }
 
-        // Get task history
-        List<TaskHistoryDTO> taskHistory = getTaskHistory(processInstanceId);
-
-        // Get escalation history
-        List<EscalationDTO> escalationHistory = getEscalationHistory(variables);
-
-        // Get approvals
-        List<ApprovalDTO> approvals = getApprovalHistory(processInstanceId, variables);
-
-        // Get comments
-        List<CommentDTO> comments = getComments(processInstanceId);
-
-        return WorkflowHistoryDTO.builder()
-                .processInstanceId(processInstanceId)
-                .processDefinitionId(processDefId)
-                .processDefinitionKey(processDefKey)
-                .processDefinitionName(processDefName)
-                .businessKey(businessKey)
-                .status(status)
-                .initiatorId(startUserId)
-                .initiatorName((String) variables.get(WorkflowConstants.VAR_EMPLOYEE_NAME))
-                .startTime(startTime)
-                .endTime(endTime)
-                .durationInMillis(durationInMillis)
-                .currentTaskId(currentTaskId)
-                .currentTaskName(currentTaskName)
-                .currentAssignee(currentAssignee)
-                .currentLevel(WorkflowVariableUtils.getStringVariable(variables, WorkflowConstants.VAR_CURRENT_LEVEL, WorkflowConstants.LEVEL_SUPERVISOR))
-                .escalationCount(WorkflowVariableUtils.getIntVariable(variables, WorkflowConstants.VAR_ESCALATION_COUNT, 0))
-                .variables(variables)
-                .taskHistory(taskHistory)
-                .escalationHistory(escalationHistory)
-                .approvals(approvals)
-                .comments(comments)
-                .build();
+    private void populateHistorySegments(String processInstanceId, Map<String, Object> variables, WorkflowHistoryDTO.WorkflowHistoryDTOBuilder builder) {
+        builder.taskHistory(getTaskHistory(processInstanceId))
+                .escalationHistory(workflowHistoryMapper.toEscalationHistory(variables))
+                .approvals(workflowHistoryMapper.toApprovalHistory(processInstanceId, variables))
+                .comments(getComments(processInstanceId));
     }
 
     private List<CommentDTO> getComments(String processInstanceId) {
         log.debug("Fetching comments for process {}", processInstanceId);
         List<org.flowable.engine.task.Comment> comments = taskService.getProcessInstanceComments(processInstanceId);
-
-        return comments.stream()
-                .map(comment -> CommentDTO.builder()
-                        .id(comment.getId())
-                        .message(comment.getFullMessage())
-                        .authorId(comment.getUserId())
-                        .timestamp(comment.getTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime())
-                        .build())
-                .sorted(Comparator.comparing(CommentDTO::getTimestamp))
-                .collect(Collectors.toList());
+        return workflowHistoryMapper.toCommentDTOs(comments);
     }
 
     public List<TaskHistoryDTO> getTaskHistory(String processInstanceId) {
@@ -169,7 +143,12 @@ public class WorkflowHistoryService {
                 .orderByHistoricTaskInstanceEndTime().asc()
                 .list()
                 .stream()
-                .map(this::convertToTaskHistoryDTO)
+                .map(task -> {
+                    List<HistoricVariableInstance> taskVars = historyService.createHistoricVariableInstanceQuery()
+                            .taskId(task.getId())
+                            .list();
+                    return workflowHistoryMapper.toTaskHistoryDTO(task, taskVars);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -210,71 +189,4 @@ public class WorkflowHistoryService {
         return result;
     }
 
-    // Helper methods
-    private TaskHistoryDTO convertToTaskHistoryDTO(HistoricTaskInstance task) {
-        Map<String, Object> variables = new HashMap<>();
-        List<HistoricVariableInstance> taskVars = historyService.createHistoricVariableInstanceQuery()
-                .taskId(task.getId())
-                .list();
-        for (HistoricVariableInstance var : taskVars) {
-            variables.put(var.getVariableName(), var.getValue());
-        }
-
-        return TaskHistoryDTO.builder()
-                .id(task.getId())
-                .taskDefinitionKey(task.getTaskDefinitionKey())
-                .name(task.getName())
-                .description(task.getDescription())
-                .processInstanceId(task.getProcessInstanceId())
-                .assignee(task.getAssignee())
-                .owner(task.getOwner())
-                .createTime(task.getCreateTime().toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime())
-                .claimTime(task.getClaimTime() != null ?
-                        task.getClaimTime().toInstant()
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDateTime() : null)
-                .endTime(task.getEndTime() != null ?
-                        task.getEndTime().toInstant()
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDateTime() : null)
-                .durationInMillis(task.getDurationInMillis())
-                .deleteReason(task.getDeleteReason())
-                .variables(variables)
-                .build();
-    }
-
-    private List<EscalationDTO> getEscalationHistory(Map<String, Object> variables) {
-        return WorkflowVariableUtils.getListVariable(variables, WorkflowConstants.VAR_ESCALATION_HISTORY, objectMapper).stream()
-                .map(map -> EscalationDTO.builder()
-                        .id((String) map.get("id"))
-                        .taskId((String) map.get("taskId"))
-                        .fromLevel((String) map.get("fromLevel"))
-                        .toLevel((String) map.get("toLevel"))
-                        .fromUserId((String) map.get("fromUserId"))
-                        .reason((String) map.get("reason"))
-                        .type((String) map.get("type"))
-                        .timestamp(LocalDateTime.parse((String) map.get("timestamp")))
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    private List<ApprovalDTO> getApprovalHistory(String processInstanceId, Map<String, Object> variables) {
-        return WorkflowVariableUtils.getListVariable(variables, WorkflowConstants.VAR_APPROVAL_HISTORY, objectMapper).stream()
-                .map(map -> ApprovalDTO.builder()
-                        .id((String) map.get("id"))
-                        .processInstanceId(processInstanceId)
-                        .taskId((String) map.get("taskId"))
-                        .taskName((String) map.get("taskName"))
-                        .approverId((String) map.get("approverId"))
-                        .approverLevel((String) map.get("approverLevel"))
-                        .decision((String) map.get("decision"))
-                        .comments((String) map.get("comments"))
-                        .timestamp(LocalDateTime.parse((String) map.get("timestamp")))
-                        .stepOrder(((Number) map.getOrDefault("stepOrder", 0)).intValue())
-                        .isRequired(true)
-                        .build())
-                .collect(Collectors.toList());
-    }
 }
