@@ -34,6 +34,8 @@ class ProcessServiceTest {
     private ProcessConfigRepository processConfigRepository;
     @Mock
     private BusinessTableService businessTableService;
+    @Mock
+    private com.demo.bpm.mapper.ProcessMapper processMapper;
 
     @Mock
     private ProcessInstanceQuery processInstanceQuery;

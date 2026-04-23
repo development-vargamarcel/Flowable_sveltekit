@@ -47,7 +47,7 @@ class WorkflowHistoryServiceTest {
     @Mock
     private RepositoryService repositoryService;
     @Mock
-    private ObjectMapper objectMapper;
+    private com.demo.bpm.mapper.WorkflowHistoryMapper workflowHistoryMapper;
     @Mock
     private com.demo.bpm.service.helpers.VariableHelper variableHelper;
 

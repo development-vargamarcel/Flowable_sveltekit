@@ -4,7 +4,6 @@ import com.demo.bpm.dto.TaskDTO;
 import com.demo.bpm.exception.InvalidOperationException;
 import com.demo.bpm.exception.ResourceNotFoundException;
 import com.demo.bpm.repository.ProcessConfigRepository;
-import com.demo.bpm.service.helpers.TaskQueryHelper;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
@@ -50,7 +49,7 @@ class TaskServiceTest {
     @Mock
     private ProcessConfigRepository processConfigRepository;
     @Mock
-    private TaskQueryHelper taskQueryHelper;
+    private com.demo.bpm.mapper.TaskMapper taskMapper;
     @Mock
     private com.demo.bpm.service.helpers.TaskCommonHelper taskCommonHelper;
     @Mock
