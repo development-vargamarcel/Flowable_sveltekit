@@ -152,48 +152,41 @@ public class BusinessTableController {
      */
     @PostMapping("/save-draft")
     public ResponseEntity<?> saveDraft(@Valid @RequestBody SaveDraftRequest request) {
-        try {
-            String processInstanceId = request.getProcessInstanceId();
+        String processInstanceId = request.getProcessInstanceId();
 
-            // If no process instance exists, create a draft process instance
-            if (processInstanceId == null || processInstanceId.trim().isEmpty()) {
-                String businessKey = request.getBusinessKey();
-                if (businessKey == null || businessKey.trim().isEmpty()) {
-                    businessKey = request.getProcessDefinitionKey().toUpperCase() + "-DRAFT-" + System.currentTimeMillis();
-                }
-
-                ProcessInstanceDTO processInstance = processService.startProcess(
-                        request.getProcessDefinitionKey(),
-                        businessKey,
-                        request.getVariables(),
-                        request.getUserId()
-                );
-
-                processInstanceId = processInstance.getId();
+        // If no process instance exists, create a draft process instance
+        if (processInstanceId == null || processInstanceId.trim().isEmpty()) {
+            String businessKey = request.getBusinessKey();
+            if (businessKey == null || businessKey.trim().isEmpty()) {
+                businessKey = request.getProcessDefinitionKey().toUpperCase() + "-DRAFT-" + System.currentTimeMillis();
             }
 
-            // Save all data (document + grids)
-            businessTableService.saveAllData(
-                    processInstanceId,
-                    request.getBusinessKey(),
+            ProcessInstanceDTO processInstance = processService.startProcess(
                     request.getProcessDefinitionKey(),
-                    request.getProcessDefinitionName(),
+                    businessKey,
                     request.getVariables(),
                     request.getUserId()
             );
 
-            log.info("Saved draft for process instance: {}", processInstanceId);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Draft saved successfully",
-                    "processInstanceId", processInstanceId
-            ));
-        } catch (Exception e) {
-            log.error("Error saving draft: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
+            processInstanceId = processInstance.getId();
         }
+
+        // Save all data (document + grids)
+        businessTableService.saveAllData(
+                processInstanceId,
+                request.getBusinessKey(),
+                request.getProcessDefinitionKey(),
+                request.getProcessDefinitionName(),
+                request.getVariables(),
+                request.getUserId()
+        );
+
+        log.info("Saved draft for process instance: {}", processInstanceId);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Draft saved successfully",
+                "processInstanceId", processInstanceId
+        ));
     }
 
     // ==================== Grid Row Endpoints ====================

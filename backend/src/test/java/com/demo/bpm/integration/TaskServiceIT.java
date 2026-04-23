@@ -33,6 +33,6 @@ class TaskServiceIT extends BaseIntegrationTest {
 
         assertThat(foundTask).isNotNull();
         assertThat(foundTask.getId()).isEqualTo(task.getId());
-        assertThat(foundTask.getName()).isEqualTo("Approve Expense");
+        assertThat(foundTask.getName()).isEqualTo("Supervisor Approval");
     }
 }

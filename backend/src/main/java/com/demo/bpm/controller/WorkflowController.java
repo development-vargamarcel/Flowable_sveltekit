@@ -58,8 +58,7 @@ public class WorkflowController {
 
     @GetMapping("/processes/{processInstanceId}")
     public ResponseEntity<WorkflowHistoryDTO> getProcessHistory(@PathVariable String processInstanceId) {
-        WorkflowHistoryDTO history = workflowHistoryService.getWorkflowHistory(processInstanceId);
-        return ResponseEntity.ok(history);
+        return ResponseEntity.ok(workflowHistoryService.getWorkflowHistory(processInstanceId));
     }
 
     @GetMapping("/processes/{processInstanceId}/tasks")
