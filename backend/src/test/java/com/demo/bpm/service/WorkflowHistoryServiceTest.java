@@ -48,6 +48,8 @@ class WorkflowHistoryServiceTest {
     private RepositoryService repositoryService;
     @Mock
     private ObjectMapper objectMapper;
+    @Mock
+    private com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
     @Mock
     private ProcessInstanceQuery processInstanceQuery;
@@ -91,7 +93,7 @@ class WorkflowHistoryServiceTest {
         // Mock getWorkflowHistory internals
         when(runtimeService.createProcessInstanceQuery().processInstanceId("pi1")).thenReturn(processInstanceQuery);
         when(processInstanceQuery.singleResult()).thenReturn(pi);
-        when(runtimeService.getVariables("pi1")).thenReturn(Map.of("startedBy", "user1"));
+        when(variableHelper.getMergedVariables("pi1")).thenReturn(Map.of("startedBy", "user1"));
 
         when(taskQuery.processInstanceId("pi1")).thenReturn(taskQuery);
 
@@ -125,7 +127,7 @@ class WorkflowHistoryServiceTest {
         when(processInstanceQuery.processInstanceId(procId)).thenReturn(processInstanceQuery);
         when(processInstanceQuery.singleResult()).thenReturn(pi);
 
-        when(runtimeService.getVariables(procId)).thenReturn(Map.of("startedBy", "user1", "currentLevel", "SUPERVISOR"));
+        when(variableHelper.getMergedVariables(procId)).thenReturn(Map.of("startedBy", "user1", "currentLevel", "SUPERVISOR"));
 
         ProcessDefinition pd = mock(ProcessDefinition.class);
         when(pd.getName()).thenReturn("My Process");
@@ -169,10 +171,7 @@ class WorkflowHistoryServiceTest {
         when(historicProcessInstanceQuery.processInstanceId(procId)).thenReturn(historicProcessInstanceQuery);
         when(historicProcessInstanceQuery.singleResult()).thenReturn(hpi);
 
-        HistoricVariableInstanceQuery hviQuery = mock(HistoricVariableInstanceQuery.class);
-        when(historyService.createHistoricVariableInstanceQuery()).thenReturn(hviQuery);
-        when(hviQuery.processInstanceId(procId)).thenReturn(hviQuery);
-        when(hviQuery.list()).thenReturn(List.of());
+        when(variableHelper.getMergedVariables(procId)).thenReturn(Map.of());
 
         when(taskService.createTaskQuery()).thenReturn(taskQuery);
         when(taskQuery.processInstanceId(procId)).thenReturn(taskQuery);

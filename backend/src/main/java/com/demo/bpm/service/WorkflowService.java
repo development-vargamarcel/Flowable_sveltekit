@@ -26,8 +26,11 @@ public class WorkflowService {
 
     private final RuntimeService runtimeService;
     private final TaskService taskService;
+    private final com.demo.bpm.service.TaskService appTaskService;
     private final IdentityService identityService;
     private final HistoryRecorder historyRecorder;
+    private final com.demo.bpm.service.helpers.TaskCommonHelper taskCommonHelper;
+    private final com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
     /**
      * Adds a comment to a process instance.
@@ -88,9 +91,9 @@ public class WorkflowService {
     }
 
     private EscalationDTO processEscalation(String taskId, EscalationRequest request, String userId, boolean isEscalation) {
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
         String processInstanceId = task.getProcessInstanceId();
-        Map<String, Object> variables = runtimeService.getVariables(processInstanceId);
+        Map<String, Object> variables = variableHelper.getMergedVariables(processInstanceId);
         String currentLevel = WorkflowVariableUtils.getStringVariable(variables, WorkflowConstants.VAR_CURRENT_LEVEL, WorkflowConstants.LEVEL_SUPERVISOR);
 
         String targetLevel = request.getTargetLevel();
@@ -107,9 +110,10 @@ public class WorkflowService {
             request.getReason(), isEscalation, variables
         );
 
-        updateVariablesForEscalation(processInstanceId, isEscalation, variables, targetLevel, request.getReason(), userId);
+        Map<String, Object> escalationVars = getEscalationVariables(isEscalation, variables, targetLevel, request.getReason(), userId);
 
-        taskService.complete(taskId);
+        // Use unified task completion
+        appTaskService.internalCompleteTask(task, escalationVars, userId);
 
         log.info("Task {} (ProcessInstance: {}) {} from {} to {} by {}", taskId, processInstanceId, isEscalation ? "escalated" : "de-escalated", currentLevel, targetLevel, userId);
 
@@ -136,7 +140,7 @@ public class WorkflowService {
         }
     }
 
-    private void updateVariablesForEscalation(String processInstanceId, boolean isEscalation, Map<String, Object> currentVariables, String targetLevel, String reason, String userId) {
+    private Map<String, Object> getEscalationVariables(boolean isEscalation, Map<String, Object> currentVariables, String targetLevel, String reason, String userId) {
         Map<String, Object> updateVars = new HashMap<>();
         updateVars.put(WorkflowConstants.VAR_CURRENT_LEVEL, targetLevel);
 
@@ -156,37 +160,27 @@ public class WorkflowService {
             updateVars.put(WorkflowConstants.VAR_DE_ESCALATED_AT, now);
         }
 
-        runtimeService.setVariables(processInstanceId, updateVars);
+        return updateVars;
     }
 
     public List<String> getEscalationOptions(String taskId) {
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
         String currentLevel = getCurrentLevel(task.getProcessInstanceId());
         return EscalationUtils.getNextLevels(currentLevel);
     }
 
     public List<String> getDeEscalationOptions(String taskId) {
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
         String currentLevel = getCurrentLevel(task.getProcessInstanceId());
         return EscalationUtils.getPreviousLevels(currentLevel);
     }
 
     private String getCurrentLevel(String processInstanceId) {
         return WorkflowVariableUtils.getStringVariable(
-            runtimeService.getVariables(processInstanceId),
+            variableHelper.getMergedVariables(processInstanceId),
             WorkflowConstants.VAR_CURRENT_LEVEL,
             WorkflowConstants.LEVEL_SUPERVISOR
         );
-    }
-
-    private Task getTaskOrThrow(String taskId) {
-        Task task = taskService.createTaskQuery()
-                .taskId(taskId)
-                .singleResult();
-        if (task == null) {
-            throw new ResourceNotFoundException("Task not found: " + taskId);
-        }
-        return task;
     }
 
     /**
@@ -200,11 +194,11 @@ public class WorkflowService {
     @Transactional
     public void handoffTask(String taskId, String toUserId, String reason, String fromUserId) {
         log.debug("Handing off task {} from {} to {} due to: {}", taskId, fromUserId, toUserId, reason);
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
         String processInstanceId = task.getProcessInstanceId();
 
         historyRecorder.recordHandoffHistory(processInstanceId, taskId, task.getName(),
-            fromUserId, toUserId, reason, runtimeService.getVariables(processInstanceId));
+            fromUserId, toUserId, reason, variableHelper.getMergedVariables(processInstanceId));
 
         // Unclaim and reassign
         if (task.getAssignee() != null) {
@@ -227,12 +221,12 @@ public class WorkflowService {
     @Transactional
     public ApprovalDTO recordApproval(String taskId, String decision, String comments, String userId) {
         log.debug("Recording approval for task {} by user {}. Decision: {}", taskId, userId, decision);
-        Task task = getTaskOrThrow(taskId);
+        Task task = taskCommonHelper.getTaskOrThrow(taskId);
         String processInstanceId = task.getProcessInstanceId();
         String currentLevel = getCurrentLevel(processInstanceId);
 
         var result = historyRecorder.recordApprovalHistory(processInstanceId, taskId, task.getName(),
-            userId, currentLevel, decision, comments, runtimeService.getVariables(processInstanceId));
+            userId, currentLevel, decision, comments, variableHelper.getMergedVariables(processInstanceId));
 
         // Update variables
         Map<String, Object> updateVars = new HashMap<>();
@@ -240,7 +234,8 @@ public class WorkflowService {
         updateVars.put(WorkflowConstants.VAR_APPROVAL_COMMENTS, comments);
         updateVars.put(WorkflowConstants.VAR_COMPLETED_BY, userId);
 
-        taskService.complete(taskId, updateVars);
+        // Use unified task completion
+        appTaskService.internalCompleteTask(task, updateVars, userId);
 
         log.info("Approval recorded for task {} (ProcessInstance: {}) by {} - Decision: {}", taskId, processInstanceId, userId, decision);
 

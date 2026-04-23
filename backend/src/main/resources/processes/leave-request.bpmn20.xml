@@ -9,20 +9,20 @@
     <sequenceFlow sourceRef="startEvent" targetRef="supervisorApproval" />
 
     <userTask id="supervisorApproval" name="Supervisor Approval" flowable:candidateGroups="SUPERVISOR">
-      <documentation>Review leave request for ${days} days</documentation>
+      <documentation>Review leave request for ${_days} days</documentation>
     </userTask>
     <sequenceFlow sourceRef="supervisorApproval" targetRef="daysCheckGateway" />
 
     <exclusiveGateway id="daysCheckGateway" />
     <sequenceFlow sourceRef="daysCheckGateway" targetRef="executiveApproval">
-      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${days > 5}]]></conditionExpression>
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${_days > 5}]]></conditionExpression>
     </sequenceFlow>
     <sequenceFlow sourceRef="daysCheckGateway" targetRef="endEvent">
-      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${days <= 5}]]></conditionExpression>
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${_days <= 5}]]></conditionExpression>
     </sequenceFlow>
 
     <userTask id="executiveApproval" name="Executive Approval" flowable:candidateGroups="EXECUTIVE">
-      <documentation>Review long leave request for ${days} days</documentation>
+      <documentation>Review long leave request for ${_days} days</documentation>
     </userTask>
     <sequenceFlow sourceRef="executiveApproval" targetRef="endEvent" />
 

@@ -34,6 +34,7 @@ public class WorkflowHistoryService {
     private final HistoryService historyService;
     private final RepositoryService repositoryService;
     private final ObjectMapper objectMapper;
+    private final com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
     public WorkflowHistoryDTO getWorkflowHistory(String processInstanceId) {
         // First try active process
@@ -53,7 +54,7 @@ public class WorkflowHistoryService {
         Long durationInMillis = null;
 
         if (activeInstance != null) {
-            variables = runtimeService.getVariables(processInstanceId);
+            variables = variableHelper.getMergedVariables(processInstanceId);
             status = activeInstance.isSuspended() ? "SUSPENDED" : "ACTIVE";
             startTime = activeInstance.getStartTime().toInstant()
                     .atZone(ZoneId.systemDefault())
@@ -77,14 +78,7 @@ public class WorkflowHistoryService {
                 throw new ResourceNotFoundException("Process instance not found: " + processInstanceId);
             }
 
-            List<HistoricVariableInstance> historicVars = historyService.createHistoricVariableInstanceQuery()
-                    .processInstanceId(processInstanceId)
-                    .list();
-
-            variables = new HashMap<>();
-            for (HistoricVariableInstance var : historicVars) {
-                variables.put(var.getVariableName(), var.getValue());
-            }
+            variables = variableHelper.getMergedVariables(processInstanceId);
 
             status = historicInstance.getEndTime() != null ? "COMPLETED" : "ACTIVE";
             startTime = historicInstance.getStartTime().toInstant()

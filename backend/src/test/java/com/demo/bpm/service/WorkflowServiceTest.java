@@ -35,21 +35,19 @@ class WorkflowServiceTest {
     @Mock
     private TaskService taskService;
     @Mock
+    private com.demo.bpm.service.TaskService appTaskService;
+    @Mock
     private HistoryRecorder historyRecorder;
-
-    // ObjectMapper is likely no longer used directly in WorkflowService or it's used via HistoryRecorder/Utils
-    // but check if it's injected. The WorkflowService now injects HistoryRecorder.
+    @Mock
+    private com.demo.bpm.service.helpers.TaskCommonHelper taskCommonHelper;
+    @Mock
+    private com.demo.bpm.service.helpers.VariableHelper variableHelper;
 
     @Mock
     private TaskQuery taskQuery;
 
     @InjectMocks
     private WorkflowService workflowService;
-
-    @BeforeEach
-    void setUp() {
-        when(taskService.createTaskQuery()).thenReturn(taskQuery);
-    }
 
     @Test
     void escalateTask_shouldEscalateSuccessfully() throws Exception {
@@ -63,10 +61,9 @@ class WorkflowServiceTest {
         Task task = mock(Task.class);
         when(task.getProcessInstanceId()).thenReturn("proc1");
 
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
-        when(runtimeService.getVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "SUPERVISOR", WorkflowConstants.VAR_ESCALATION_COUNT, 0));
+        when(variableHelper.getMergedVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "SUPERVISOR", WorkflowConstants.VAR_ESCALATION_COUNT, 0));
 
         when(historyRecorder.recordEscalationHistory(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyMap()))
             .thenReturn("historyId");
@@ -77,9 +74,7 @@ class WorkflowServiceTest {
         // Verify
         assertNotNull(result);
         assertEquals("MANAGER", result.getToLevel());
-        // verify(taskService).complete(eq(taskId), any(Map.class)); // WorkflowService changed to not pass map to complete for escalation
-        verify(taskService).complete(eq(taskId));
-        verify(runtimeService).setVariables(eq("proc1"), any(Map.class));
+        verify(appTaskService).internalCompleteTask(eq(task), any(Map.class), eq(userId));
     }
 
     @Test
@@ -94,10 +89,9 @@ class WorkflowServiceTest {
         Task task = mock(Task.class);
         when(task.getProcessInstanceId()).thenReturn("proc1");
 
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
-        when(runtimeService.getVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "MANAGER"));
+        when(variableHelper.getMergedVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "MANAGER"));
 
         when(historyRecorder.recordEscalationHistory(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyMap()))
             .thenReturn("historyId");
@@ -108,8 +102,7 @@ class WorkflowServiceTest {
         // Verify
         assertNotNull(result);
         assertEquals("SUPERVISOR", result.getToLevel());
-        verify(taskService).complete(eq(taskId));
-        verify(runtimeService).setVariables(eq("proc1"), any(Map.class));
+        verify(appTaskService).internalCompleteTask(eq(task), any(Map.class), eq(userId));
     }
 
     @Test
@@ -123,10 +116,9 @@ class WorkflowServiceTest {
         Task task = mock(Task.class);
         when(task.getProcessInstanceId()).thenReturn("proc1");
 
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
-        when(runtimeService.getVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "SUPERVISOR"));
+        when(variableHelper.getMergedVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "SUPERVISOR"));
 
         // Execute & Verify
         assertThrows(InvalidOperationException.class, () -> workflowService.escalateTask(taskId, request, userId));
@@ -143,10 +135,9 @@ class WorkflowServiceTest {
         Task task = mock(Task.class);
         when(task.getProcessInstanceId()).thenReturn("proc1");
 
-        when(taskQuery.taskId(taskId)).thenReturn(taskQuery);
-        when(taskQuery.singleResult()).thenReturn(task);
+        when(taskCommonHelper.getTaskOrThrow(taskId)).thenReturn(task);
 
-        when(runtimeService.getVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "EXECUTIVE"));
+        when(variableHelper.getMergedVariables("proc1")).thenReturn(Map.of(WorkflowConstants.VAR_CURRENT_LEVEL, "EXECUTIVE"));
 
         // Execute & Verify
         assertThrows(InvalidOperationException.class, () -> workflowService.escalateTask(taskId, request, userId));

@@ -9,20 +9,20 @@
     <sequenceFlow sourceRef="startEvent" targetRef="supervisorApproval" />
 
     <userTask id="supervisorApproval" name="Supervisor Approval" flowable:candidateGroups="SUPERVISOR">
-      <documentation>Review expense request for ${amount}</documentation>
+      <documentation>Review expense request for ${_amount}</documentation>
     </userTask>
     <sequenceFlow sourceRef="supervisorApproval" targetRef="amountCheckGateway" />
 
     <exclusiveGateway id="amountCheckGateway" />
     <sequenceFlow sourceRef="amountCheckGateway" targetRef="executiveApproval">
-      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${amount > 500}]]></conditionExpression>
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${_amount > 500}]]></conditionExpression>
     </sequenceFlow>
     <sequenceFlow sourceRef="amountCheckGateway" targetRef="endEvent">
-      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${amount <= 500}]]></conditionExpression>
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${_amount <= 500}]]></conditionExpression>
     </sequenceFlow>
 
     <userTask id="executiveApproval" name="Executive Approval" flowable:candidateGroups="EXECUTIVE">
-       <documentation>Executive review for high value expense ${amount}</documentation>
+       <documentation>Executive review for high value expense ${_amount}</documentation>
     </userTask>
     <sequenceFlow sourceRef="executiveApproval" targetRef="endEvent" />
 

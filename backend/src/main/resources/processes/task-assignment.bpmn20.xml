@@ -8,8 +8,8 @@
     <startEvent id="startEvent" />
     <sequenceFlow sourceRef="startEvent" targetRef="taskWork" />
 
-    <userTask id="taskWork" name="${title}" flowable:assignee="${assignee}" flowable:candidateGroups="USER">
-        <documentation>${description}</documentation>
+    <userTask id="taskWork" name="${_title}" flowable:assignee="${_assignee}" flowable:candidateGroups="USER">
+        <documentation>${_description}</documentation>
     </userTask>
     <sequenceFlow sourceRef="taskWork" targetRef="endEvent" />
 
