@@ -90,35 +90,28 @@ public class ProcessController {
             @Parameter(description = "Key of the process to start") @PathVariable String processKey,
             @RequestBody(required = false) StartProcessRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            String businessKey = request != null ? request.getBusinessKey() : null;
-            Map<String, Object> variables = new java.util.HashMap<>();
-            if (request != null && request.getVariables() != null) {
-                variables.putAll(request.getVariables());
-            }
-
-            // Add user info to variables
-            var userInfo = userService.getUserInfo(userDetails);
-            variables.put("employeeId", userDetails.getUsername());
-            variables.put("employeeName", userInfo.getDisplayName());
-
-            ProcessInstanceDTO instance = processService.startProcess(
-                    processKey,
-                    businessKey,
-                    variables,
-                    userDetails.getUsername()
-            );
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Process started successfully",
-                    "processInstance", instance
-            ));
-        } catch (Exception e) {
-            log.error("Error starting process {}: {}", processKey, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
+        String businessKey = request != null ? request.getBusinessKey() : null;
+        Map<String, Object> variables = new java.util.HashMap<>();
+        if (request != null && request.getVariables() != null) {
+            variables.putAll(request.getVariables());
         }
+
+        // Add user info to variables
+        var userInfo = userService.getUserInfo(userDetails);
+        variables.put("employeeId", userDetails.getUsername());
+        variables.put("employeeName", userInfo.getDisplayName());
+
+        ProcessInstanceDTO instance = processService.startProcess(
+                processKey,
+                businessKey,
+                variables,
+                userDetails.getUsername()
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Process started successfully",
+                "processInstance", instance
+        ));
     }
 
     @Operation(summary = "Get a process instance by ID")
@@ -130,12 +123,8 @@ public class ProcessController {
                     content = @Content) })
     @GetMapping("/instance/{processInstanceId}")
     public ResponseEntity<?> getProcessInstance(@Parameter(description = "ID of the process instance") @PathVariable String processInstanceId) {
-        try {
-            ProcessInstanceDTO instance = processService.getProcessInstance(processInstanceId);
-            return ResponseEntity.ok(instance);
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
+        ProcessInstanceDTO instance = processService.getProcessInstance(processInstanceId);
+        return ResponseEntity.ok(instance);
     }
 
     @Operation(summary = "Export process instance details")
@@ -187,19 +176,12 @@ public class ProcessController {
                     content = @Content) })
     @PostMapping("/deploy")
     public ResponseEntity<?> deployProcess(@Valid @RequestBody DeployProcessRequest request) {
-        try {
-            ProcessDTO deployedProcess = processService.deployProcess(request.getProcessName(), request.getBpmnXml());
+        ProcessDTO deployedProcess = processService.deployProcess(request.getProcessName(), request.getBpmnXml());
 
-            return ResponseEntity.ok(Map.of(
-                    "message", "Process deployed successfully",
-                    "process", deployedProcess
-            ));
-        } catch (Exception e) {
-            log.error("Error deploying process: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        return ResponseEntity.ok(Map.of(
+                "message", "Process deployed successfully",
+                "process", deployedProcess
+        ));
     }
 
     @Operation(summary = "Get BPMN XML for a process definition")
@@ -211,17 +193,10 @@ public class ProcessController {
                     content = @Content) })
     @GetMapping("/{processDefinitionId}/bpmn")
     public ResponseEntity<?> getProcessBpmn(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
-        try {
-            String bpmnXml = processService.getProcessDefinitionBpmn(processDefinitionId);
-            return ResponseEntity.ok(Map.of(
-                    "bpmn", bpmnXml
-            ));
-        } catch (Exception e) {
-            log.error("Error retrieving BPMN: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        String bpmnXml = processService.getProcessDefinitionBpmn(processDefinitionId);
+        return ResponseEntity.ok(Map.of(
+                "bpmn", bpmnXml
+        ));
     }
 
     @Operation(summary = "Delete a process definition")
@@ -235,17 +210,10 @@ public class ProcessController {
     public ResponseEntity<?> deleteProcess(
             @Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId,
             @RequestParam(defaultValue = "false") boolean cascade) {
-        try {
-            processService.deleteProcessDefinition(processDefinitionId, cascade);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Process definition deleted successfully"
-            ));
-        } catch (Exception e) {
-            log.error("Error deleting process: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        processService.deleteProcessDefinition(processDefinitionId, cascade);
+        return ResponseEntity.ok(Map.of(
+                "message", "Process definition deleted successfully"
+        ));
     }
 
     @Operation(summary = "Suspend a process definition")
@@ -257,12 +225,8 @@ public class ProcessController {
                     content = @Content) })
     @PutMapping("/{processDefinitionId}/suspend")
     public ResponseEntity<?> suspendProcess(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
-        try {
-            processService.suspendProcessDefinition(processDefinitionId);
-            return ResponseEntity.ok(Map.of("message", "Process definition suspended"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        processService.suspendProcessDefinition(processDefinitionId);
+        return ResponseEntity.ok(Map.of("message", "Process definition suspended"));
     }
 
     @Operation(summary = "Activate a process definition")
@@ -274,12 +238,8 @@ public class ProcessController {
                     content = @Content) })
     @PutMapping("/{processDefinitionId}/activate")
     public ResponseEntity<?> activateProcess(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
-        try {
-            processService.activateProcessDefinition(processDefinitionId);
-            return ResponseEntity.ok(Map.of("message", "Process definition activated"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        processService.activateProcessDefinition(processDefinitionId);
+        return ResponseEntity.ok(Map.of("message", "Process definition activated"));
     }
 
     @Operation(summary = "Update process definition category")
@@ -293,12 +253,8 @@ public class ProcessController {
     public ResponseEntity<?> updateCategory(
             @Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId,
             @Valid @RequestBody UpdateCategoryRequest body) {
-        try {
-            processService.updateProcessDefinitionCategory(processDefinitionId, body.getCategory());
-            return ResponseEntity.ok(Map.of("message", "Category updated"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        processService.updateProcessDefinitionCategory(processDefinitionId, body.getCategory());
+        return ResponseEntity.ok(Map.of("message", "Category updated"));
     }
 
     @Operation(summary = "Get start form definition")
@@ -310,15 +266,8 @@ public class ProcessController {
                     content = @Content) })
     @GetMapping("/{processDefinitionId}/start-form")
     public ResponseEntity<?> getStartFormDefinition(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
-        try {
-            FormDefinitionDTO formDefinition = formDefinitionService.getStartFormDefinition(processDefinitionId);
-            return ResponseEntity.ok(formDefinition);
-        } catch (Exception e) {
-            log.error("Error retrieving start form definition: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        FormDefinitionDTO formDefinition = formDefinitionService.getStartFormDefinition(processDefinitionId);
+        return ResponseEntity.ok(formDefinition);
     }
 
     @Operation(summary = "Get all form definitions for a process")
@@ -330,15 +279,8 @@ public class ProcessController {
                     content = @Content) })
     @GetMapping("/{processDefinitionId}/forms")
     public ResponseEntity<?> getAllFormDefinitions(@Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId) {
-        try {
-            var formDefinitions = formDefinitionService.getAllFormDefinitions(processDefinitionId);
-            return ResponseEntity.ok(formDefinitions);
-        } catch (Exception e) {
-            log.error("Error retrieving form definitions: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        var formDefinitions = formDefinitionService.getAllFormDefinitions(processDefinitionId);
+        return ResponseEntity.ok(formDefinitions);
     }
 
     @Operation(summary = "Get form definition for a specific element")
@@ -352,16 +294,9 @@ public class ProcessController {
     public ResponseEntity<?> getFormDefinitionForElement(
             @Parameter(description = "ID of the process definition") @PathVariable String processDefinitionId,
             @Parameter(description = "Element ID (e.g. task ID)") @PathVariable String elementId) {
-        try {
-            FormDefinitionDTO formDefinition = formDefinitionService.getFormDefinitionForElement(
-                    processDefinitionId, elementId);
-            return ResponseEntity.ok(formDefinition);
-        } catch (Exception e) {
-            log.error("Error retrieving form definition for element: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        FormDefinitionDTO formDefinition = formDefinitionService.getFormDefinitionForElement(
+                processDefinitionId, elementId);
+        return ResponseEntity.ok(formDefinition);
     }
 
     @Operation(summary = "Cancel a process instance")
@@ -378,19 +313,12 @@ public class ProcessController {
             @Parameter(description = "ID of the process instance") @PathVariable String processInstanceId,
             @RequestParam(required = false) String reason,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            boolean isAdmin = userDetails.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
-            processService.cancelProcessInstance(processInstanceId, reason, userDetails.getUsername(), isAdmin);
+        processService.cancelProcessInstance(processInstanceId, reason, userDetails.getUsername(), isAdmin);
 
-            return ResponseEntity.ok(Map.of("message", "Process instance cancelled successfully"));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Error cancelling process instance: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        return ResponseEntity.ok(Map.of("message", "Process instance cancelled successfully"));
     }
 
     @Operation(summary = "Suspend a process instance")
@@ -406,19 +334,12 @@ public class ProcessController {
     public ResponseEntity<?> suspendProcessInstance(
             @Parameter(description = "ID of the process instance") @PathVariable String processInstanceId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            boolean isAdmin = userDetails.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
-            processService.suspendProcessInstance(processInstanceId, userDetails.getUsername(), isAdmin);
+        processService.suspendProcessInstance(processInstanceId, userDetails.getUsername(), isAdmin);
 
-            return ResponseEntity.ok(Map.of("message", "Process instance suspended successfully"));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Error suspending process instance: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        return ResponseEntity.ok(Map.of("message", "Process instance suspended successfully"));
     }
 
     @Operation(summary = "Activate a process instance")
@@ -434,19 +355,12 @@ public class ProcessController {
     public ResponseEntity<?> activateProcessInstance(
             @Parameter(description = "ID of the process instance") @PathVariable String processInstanceId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            boolean isAdmin = userDetails.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
-            processService.activateProcessInstance(processInstanceId, userDetails.getUsername(), isAdmin);
+        processService.activateProcessInstance(processInstanceId, userDetails.getUsername(), isAdmin);
 
-            return ResponseEntity.ok(Map.of("message", "Process instance activated successfully"));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Error activating process instance: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        return ResponseEntity.ok(Map.of("message", "Process instance activated successfully"));
     }
 
     // Request DTOs

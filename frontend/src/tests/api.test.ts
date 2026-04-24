@@ -1417,4 +1417,63 @@ describe('fetchApi', () => {
       fetchApi('/api/invalid-bool-option', { includeNullQueryParams: 'true' as never })
     ).rejects.toMatchObject({ details: 'includeNullQueryParams must be a boolean.' });
   });
+
+  it('correctly parses 403 Forbidden error response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      text: () => Promise.resolve('{"error":"Forbidden","message":"Access denied","path":"/api/admin"}'),
+      headers: new Headers({ 'content-type': 'application/json' })
+    });
+
+    await expect(fetchApi('/api/admin')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 403,
+      message: 'Forbidden',
+      details: 'Access denied (path: /api/admin)'
+    });
+  });
+
+  it('correctly parses 401 Unauthorized error response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      text: () => Promise.resolve('{"error":"Unauthorized","message":"Full authentication is required to access this resource"}'),
+      headers: new Headers({ 'content-type': 'application/json' })
+    });
+
+    await expect(fetchApi('/api/secure')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 401,
+      message: 'Unauthorized',
+      details: 'Full authentication is required to access this resource'
+    });
+  });
+
+  it('handles 502 Bad Gateway and retries', async () => {
+    vi.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        text: () => Promise.resolve('Gateway error'),
+        headers: new Headers()
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"ok":true}'),
+        statusText: 'OK',
+        headers: new Headers({ 'content-length': '11', 'content-type': 'application/json' })
+      });
+
+    const requestPromise = fetchApi<{ ok: boolean }>('/api/retry-502');
+    await vi.runAllTimersAsync();
+    await expect(requestPromise).resolves.toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
 });

@@ -81,11 +81,7 @@ public class TaskController {
                     content = @Content) })
     @GetMapping("/{taskId}")
     public ResponseEntity<?> getTaskDetails(@Parameter(description = "ID of the task to be obtained") @PathVariable String taskId) {
-        try {
-            return ResponseEntity.ok(taskService.getTaskDetails(taskId));
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(taskService.getTaskDetails(taskId));
     }
 
     @Operation(summary = "Delegate (reassign) a task to another user")
@@ -100,23 +96,17 @@ public class TaskController {
             @Parameter(description = "ID of the task to be delegated") @PathVariable String taskId,
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            String targetUserId = request.get("targetUserId");
-            if (targetUserId == null || targetUserId.isEmpty()) {
-                throw new IllegalArgumentException("targetUserId is required");
-            }
-
-            taskService.delegateTask(taskId, userDetails.getUsername(), targetUserId);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task delegated successfully",
-                    "taskId", taskId,
-                    "assignee", targetUserId
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
+        String targetUserId = request.get("targetUserId");
+        if (targetUserId == null || targetUserId.isEmpty()) {
+            throw new IllegalArgumentException("targetUserId is required");
         }
+
+        taskService.delegateTask(taskId, userDetails.getUsername(), targetUserId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Task delegated successfully",
+                "taskId", taskId,
+                "assignee", targetUserId
+        ));
     }
 
     @Operation(summary = "Claim a task")
@@ -130,17 +120,11 @@ public class TaskController {
     public ResponseEntity<?> claimTask(
             @Parameter(description = "ID of the task to be claimed") @PathVariable String taskId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            taskService.claimTask(taskId, userDetails.getUsername());
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task claimed successfully",
-                    "taskId", taskId
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        taskService.claimTask(taskId, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "message", "Task claimed successfully",
+                "taskId", taskId
+        ));
     }
 
     @Operation(summary = "Unclaim a task (release assignment)")
@@ -153,17 +137,11 @@ public class TaskController {
     @PostMapping("/{taskId}/unclaim")
     public ResponseEntity<?> unclaimTask(
             @Parameter(description = "ID of the task to be unclaimed") @PathVariable String taskId) {
-        try {
-            taskService.unclaimTask(taskId);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task unclaimed successfully",
-                    "taskId", taskId
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        taskService.unclaimTask(taskId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Task unclaimed successfully",
+                "taskId", taskId
+        ));
     }
 
     @Operation(summary = "Complete a task")
@@ -178,23 +156,16 @@ public class TaskController {
             @Parameter(description = "ID of the task to be completed") @PathVariable String taskId,
             @Valid @RequestBody(required = false) CompleteTaskRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            Map<String, Object> variables = new java.util.HashMap<>();
-            if (request != null && request.getVariables() != null) {
-                variables.putAll(request.getVariables());
-            }
-            taskService.completeTask(taskId, variables, userDetails.getUsername());
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Task completed successfully",
-                    "taskId", taskId
-            ));
-        } catch (Exception e) {
-            log.error("Error completing task {}: {}", taskId, e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
+        Map<String, Object> variables = new java.util.HashMap<>();
+        if (request != null && request.getVariables() != null) {
+            variables.putAll(request.getVariables());
         }
+        taskService.completeTask(taskId, variables, userDetails.getUsername());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Task completed successfully",
+                "taskId", taskId
+        ));
     }
 
     @Operation(summary = "Get the form definition for a task")
@@ -206,27 +177,20 @@ public class TaskController {
                     content = @Content) })
     @GetMapping("/{taskId}/form")
     public ResponseEntity<?> getTaskFormDefinition(@Parameter(description = "ID of the task to get the form for") @PathVariable String taskId) {
-        try {
-            // Get task-specific form definition
-            FormDefinitionDTO taskFormDefinition = formDefinitionService.getFormDefinitionForTask(taskId);
+        // Get task-specific form definition
+        FormDefinitionDTO taskFormDefinition = formDefinitionService.getFormDefinitionForTask(taskId);
 
-            // Get the process definition ID from the task
-            String processDefinitionId = taskService.getProcessDefinitionIdForTask(taskId);
+        // Get the process definition ID from the task
+        String processDefinitionId = taskService.getProcessDefinitionIdForTask(taskId);
 
-            // Get process-level form config (field library + condition rules)
-            com.demo.bpm.dto.ProcessFormConfigDTO processConfig =
-                formDefinitionService.getProcessFormConfig(processDefinitionId);
+        // Get process-level form config (field library + condition rules)
+        com.demo.bpm.dto.ProcessFormConfigDTO processConfig =
+            formDefinitionService.getProcessFormConfig(processDefinitionId);
 
-            // Return both task form and process config
-            return ResponseEntity.ok(Map.of(
-                    "taskForm", taskFormDefinition,
-                    "processConfig", processConfig
-            ));
-        } catch (Exception e) {
-            log.error("Error retrieving task form definition: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
+        // Return both task form and process config
+        return ResponseEntity.ok(Map.of(
+                "taskForm", taskFormDefinition,
+                "processConfig", processConfig
+        ));
     }
 }

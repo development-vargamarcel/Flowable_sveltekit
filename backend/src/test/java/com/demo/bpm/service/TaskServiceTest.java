@@ -239,4 +239,64 @@ class TaskServiceTest {
 
         verify(flowableTaskService).unclaim(taskId);
     }
+
+    @Test
+    void internalCompleteTask_shouldFilterSystemVariablesAndPersistBusinessData() {
+        // Setup
+        String taskId = "task1";
+        String userId = "user1";
+        String procInstId = "pi1";
+        String procDefId = "pd1";
+        String procDefKey = "expense-approval";
+
+        Map<String, Object> inputVars = new java.util.HashMap<>();
+        inputVars.put("_decision", "approve");
+        inputVars.put("amount", 500.0);
+
+        Task task = mock(Task.class);
+        when(task.getId()).thenReturn(taskId);
+        when(task.getAssignee()).thenReturn(userId);
+        when(task.getProcessInstanceId()).thenReturn(procInstId);
+        when(task.getProcessDefinitionId()).thenReturn(procDefId);
+
+        ProcessInstance pi = mock(ProcessInstance.class);
+        when(pi.getBusinessKey()).thenReturn("BK-123");
+        ProcessInstanceQuery piQuery = mock(ProcessInstanceQuery.class);
+        when(runtimeService.createProcessInstanceQuery()).thenReturn(piQuery);
+        when(piQuery.processInstanceId(procInstId)).thenReturn(piQuery);
+        when(piQuery.singleResult()).thenReturn(pi);
+
+        ProcessDefinition pd = mock(ProcessDefinition.class);
+        when(pd.getKey()).thenReturn(procDefKey);
+        when(pd.getName()).thenReturn("Expense Approval");
+        ProcessDefinitionQuery pdQuery = mock(ProcessDefinitionQuery.class);
+        when(repositoryService.createProcessDefinitionQuery()).thenReturn(pdQuery);
+        when(pdQuery.processDefinitionId(procDefId)).thenReturn(pdQuery);
+        when(pdQuery.singleResult()).thenReturn(pd);
+
+        when(businessTableService.shouldPersistOnTaskComplete(procDefKey)).thenReturn(true);
+        when(processConfigRepository.findByProcessDefinitionKey(procDefKey)).thenReturn(java.util.Optional.empty());
+
+        // Execute
+        taskService.internalCompleteTask(task, inputVars, userId);
+
+        // Verify system variables filtered for Flowable
+        verify(flowableTaskService).complete(eq(taskId), argThat((Map<String, Object> vars) ->
+            vars.containsKey("_decision") &&
+            vars.containsKey("_completedBy") &&
+            vars.containsKey("_completedAt") &&
+            !vars.containsKey("amount")
+        ));
+
+        // Verify all variables persisted to business table
+        verify(businessTableService).saveAllData(
+            eq(procInstId),
+            eq("BK-123"),
+            eq(procDefKey),
+            eq("Expense Approval"),
+            isNull(),
+            argThat(vars -> vars.containsKey("amount") && vars.containsKey("_decision")),
+            eq(userId)
+        );
+    }
 }
