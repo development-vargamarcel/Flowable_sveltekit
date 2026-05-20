@@ -20,6 +20,10 @@ This guide covers how to set up and run the application locally.
    - `SPRING_DATASOURCE_URL`
    - `SPRING_MAIL_*` (for email notifications)
 
+## Backend Source of Truth
+
+> **Single source of truth:** Use the Spring Boot backend in `backend/` for all local development, testing, and production workflows. Mock backends are not part of the canonical runtime path.
+
 ## Running with Docker Compose (Recommended)
 
 To run the full stack (Backend + Frontend):
