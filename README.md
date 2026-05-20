@@ -6,6 +6,10 @@ A production-ready Business Process Management (BPM) demo application featuring:
 - **Frontend**: SvelteKit 2.x + Svelte 5 (runes mode) + Tailwind CSS
 - **Deployment**: Docker + Railway
 
+## Backend Source of Truth
+
+> **Single source of truth:** The canonical backend implementation is the Spring Boot service under `backend/src/main`. Any mock backends or stubs are non-production tooling only.
+
 ## Documentation
 
 Detailed documentation is available in the `guides/` directory:
