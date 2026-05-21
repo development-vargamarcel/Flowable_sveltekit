@@ -83,6 +83,12 @@ See [Workflows Guide](guides/workflows.md) for detailed diagrams and logic.
 | executive1  | password | Executive  | Final approval for high-value items       |
 | admin       | admin    | Admin      | Full access                               |
 
+
+## Contributor Notes
+
+- Store local debug output and ad-hoc transcripts in a gitignored location (for example `tmp/` at repo root or your system temp directory).
+- Do **not** commit local runtime artifacts such as `frontend/build_output.txt`, `frontend/frontend_log.txt`, or `cookies.txt`.
+
 ## Quick Start
 
 ### Option 1: Docker Compose (Recommended)
