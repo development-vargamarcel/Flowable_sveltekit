@@ -30,3 +30,12 @@ Thumbs.db
 data/
 *.db
 *.trace.db
+
+# Local debug/transient artifacts
+frontend/build_output.txt
+frontend/frontend_log.txt
+cookies.txt
+*.cookies
+*.session
+*.session-*
+*.tmp.log

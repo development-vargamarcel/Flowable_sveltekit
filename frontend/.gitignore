@@ -21,3 +21,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 vite.config.ts.timestamp-*.mjs
+
+# Local debug/transient artifacts
+build_output.txt
+frontend_log.txt
+*.tmp.log
+*.cookies
+*.session
