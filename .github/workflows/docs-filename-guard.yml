@@ -1,0 +1,38 @@
+name: Docs Filename Guard
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  guard-case-duplicates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail on case-only duplicate planning/usage docs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          targets = [
+            'PLAN.md',
+            'plan.md',
+            'usage.md',
+            'UsageAndDocumentationAndExamples.md',
+            'examples.md',
+            'notes.md',
+            'SPRINT1_IMPLEMENTATION.md',
+          ]
+          existing = [p.name for p in Path('.').iterdir() if p.is_file() and p.name in targets]
+          lowered = {}
+          for name in existing:
+            key = name.lower()
+            lowered.setdefault(key, []).append(name)
+          conflicts = {k:v for k,v in lowered.items() if len(v) > 1}
+          if conflicts:
+            print('Case-only duplicate docs detected:')
+            for _, names in conflicts.items():
+              print(' - ' + ', '.join(names))
+            raise SystemExit(1)
+          print('No case-only duplicates among guarded documentation files.')
+          PY

@@ -14,6 +14,16 @@ A production-ready Business Process Management (BPM) demo application featuring:
 
 Detailed documentation is available in the `guides/` directory:
 
+
+## Documentation map
+
+For planning and operational docs, use these canonical files:
+
+- [PLAN.md](PLAN.md) — active roadmap and prioritized engineering plan.
+- [UsageAndDocumentationAndExamples.md](UsageAndDocumentationAndExamples.md) — setup, usage, validation, and operational controls.
+- [examples.md](examples.md) — quick copy-ready command/workflow examples.
+- [notes.md](notes.md) — historical implementation notes and handoff context.
+
 - [Setup Guide](guides/setup.md)
 - [Architecture](guides/architecture.md)
 - [Workflows](guides/workflows.md)
