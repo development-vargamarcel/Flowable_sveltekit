@@ -15,3 +15,14 @@
 1. Build i18n-aware formatting utilities so currencies/dates are locale-configurable.
 2. Add tests for `exportToCSV` with DOM mocking to verify download attributes and BOM option behavior.
 3. Promote the queued plan items in `PLAN.md` into milestone tickets with owners and due dates.
+
+
+## Sprint 1 historical summary
+
+The removed `SPRINT1_IMPLEMENTATION.md` is preserved here in condensed form:
+- Delivered dashboard skeleton loading UX to improve perceived performance.
+- Replaced insecure `new Function()` expression execution paths with safe evaluator wrappers in dynamic form/grid components.
+- Documented deferred backend optimization work (query parallelization and indexing) for later sprints.
+- Recorded follow-up security/performance testing recommendations and future sprint priorities.
+
+Implementation date recorded in original sprint log: **2026-01-29**.

@@ -62,3 +62,14 @@
 
 - [ ] **20. Create deployment readiness checklist with rollback playbook.**  
   **Notes:** Queued; depends on infra and release ownership review.
+
+## Legacy completion record (v1.8.3 hardening)
+
+The prior `plan.md` tracked a completed v1.8.3 hardening pass. Its unique outcomes are preserved here:
+
+- Implemented shared frontend unknown-error normalization utility and tests.
+- Refactored process/document routes to remove `any`-typed catches and improve loading/empty/error UX.
+- Hardened Sentry Vite upload behavior to only run when required credentials are present.
+- Added optional browser-console smoke validation hooks in frontend verification scripts.
+- Completed release alignment tasks (version bump and changelog update) for 1.8.3.
+

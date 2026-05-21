@@ -157,3 +157,15 @@ make doctor-json
 make verify-browser-smoke
 make verify-strict
 ```
+
+
+---
+
+## Documentation maintenance workflow
+
+After each implementation change:
+1. Update this canonical usage guide with any behavior, setup, or validation changes.
+2. Update `examples.md` with at least one practical command or workflow example.
+3. Update `PLAN.md` if roadmap status or priorities changed.
+4. Update `notes.md` if implementation/historical rationale should be preserved.
+5. Increment the repository version following semantic versioning.
