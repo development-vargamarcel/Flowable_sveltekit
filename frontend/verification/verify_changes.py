@@ -1,3 +1,6 @@
+# DEPRECATED: Superseded by the canonical verification flow in scripts/verify-all.sh.
+# Remove this script after migration tasks that still depend on it are updated.
+
 from playwright.sync_api import sync_playwright, expect
 
 def run(playwright):

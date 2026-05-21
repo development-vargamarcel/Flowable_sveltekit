@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# DEPRECATED: Use ./scripts/verify-all.sh automation instead of invoking this script directly.
+# This shim is retained during migration to a single canonical verification entrypoint.
+
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 ensure_repo_root
