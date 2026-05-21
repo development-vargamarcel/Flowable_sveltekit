@@ -1,78 +1,26 @@
 /**
- * Validation Module - Zod-based form validation
+ * Public validation API.
  *
- * This module provides:
- * - Zod schemas for field, grid, and document validation
- * - Dynamic validation that creates schemas from field definitions
- * - A Svelte 5 runes-based validation hook
- *
- * All schemas work both client-side and server-side in SvelteKit.
+ * Keep this barrel intentionally small: only export symbols needed by external
+ * consumers. Internal modules inside `lib/validation` should import directly
+ * from sibling files (e.g. `./schemas`, `./dynamic-validator`).
  */
 
-// Export all schemas and types
 export {
-  // Field validation
-  fieldStateSchema,
-  fieldConstraintsSchema,
-  fieldValidationSchema,
-  fieldOptionSchema,
-  fieldTypeEnum,
-  fieldDefinitionSchema,
-
-  // Grid validation
-  gridStateSchema,
-  gridColumnSchema,
-  gridDefinitionSchema,
-
-  // Document type
+  // Top-level schema entrypoints intended for app-level callers
   documentTypeSchema,
-
-  // Condition rules
-  conditionTargetSchema,
-  conditionEffectEnum,
-  conditionRuleSchema,
-
-  // Process form configuration
   processFormConfigSchema,
-
-  // Validation results
-  validationErrorSchema,
   validationResultSchema,
-
-  // Computed states
-  computedFieldStateSchema,
-  computedGridStateSchema,
-
-  // Defaults
-  defaultFieldValidation,
-  defaultGridValidation,
-
-  // Types
-  type FieldState,
-  type FieldConstraints,
-  type FieldValidation,
-  type FieldOption,
-  type FieldType,
-  type FieldDefinition,
-  type GridState,
-  type GridColumn,
-  type GridDefinition,
+  validationErrorSchema,
+  // Primary public types
   type DocumentType,
-  type ConditionTarget,
-  type ConditionEffect,
-  type ConditionRule,
   type ProcessFormConfig,
-  type ValidationError,
   type ValidationResult,
-  type ComputedFieldState,
-  type ComputedGridState
+  type ValidationError
 } from './schemas';
 
-// Export dynamic validator functions
 export {
-  createFieldValueSchema,
-  createGridRowSchema,
-  createGridSchema,
+  // Dynamic validation API intended for app-level callers
   createDocumentFormSchema,
   validateFormData,
   validateFieldValue,
@@ -81,6 +29,3 @@ export {
   createServerSchema,
   type FormValidationResult
 } from './dynamic-validator';
-
-// Export the Svelte 5 validation hook
-export { useFormValidation } from './useFormValidation.svelte';
