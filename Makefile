@@ -44,10 +44,10 @@ doctor-markdown:
 	BPM_RUNNER_SUMMARY_FORMAT=markdown BPM_RUNNER_LOG_TO_FILE=1 ./scripts/doctor.sh
 
 verify-frontend:
-	./scripts/verify-frontend.sh
+	./scripts/verify-all.sh frontend
 
 verify-backend:
-	./scripts/verify-backend.sh
+	./scripts/verify-all.sh backend
 
 verify-fast:
 	cd frontend && npm run test:ci
@@ -75,7 +75,7 @@ verify-strict:
 	BPM_FRONTEND_ENABLE_COVERAGE=1 BPM_BACKEND_ENABLE_VERIFY=1 ./scripts/verify-all.sh
 
 verify-browser-smoke:
-	BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 ./scripts/verify-frontend.sh
+	BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 ./scripts/verify-all.sh frontend
 
 test-frontend:
 	cd frontend && npm run test:ci
@@ -84,7 +84,7 @@ test-backend:
 	cd backend && ./mvnw -B test
 
 test-automation:
-	./scripts/test-automation.sh
+	./scripts/verify-all.sh automation
 
 check-lockfiles:
 	@test -f frontend/package-lock.json || (echo "Missing frontend/package-lock.json" && exit 1)

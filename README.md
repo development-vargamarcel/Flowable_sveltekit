@@ -141,16 +141,13 @@ The application uses an `.env` file for configuration. Copy `.env.example` to `.
 **Backend Tests:**
 
 ```bash
-cd backend
-./mvnw test
+./scripts/verify-all.sh backend
 ```
 
 **Frontend Verification:**
 
 ```bash
-cd frontend
-npm run check
-npm run test:unit
+./scripts/verify-all.sh frontend
 ```
 
 ### Repository Verification Helpers
@@ -160,7 +157,10 @@ Run consistent local checks with the repository scripts:
 ```bash
 ./scripts/bootstrap.sh
 ./scripts/doctor.sh
-./scripts/verify-all.sh
+./scripts/verify-all.sh            # default full-stack verification
+./scripts/verify-all.sh frontend   # frontend-only checks
+./scripts/verify-all.sh backend    # backend-only checks
+./scripts/verify-all.sh automation # automation/script smoke checks
 ```
 
 These scripts mirror CI behavior and reduce local/CI drift.
