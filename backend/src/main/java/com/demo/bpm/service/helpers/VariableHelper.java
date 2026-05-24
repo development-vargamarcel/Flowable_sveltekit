@@ -55,12 +55,20 @@ public class VariableHelper {
 
                 // Add document fields
                 if (document.getFields() != null) {
-                    mergedVars.putAll(document.getFields());
+                    document.getFields().forEach((key, value) -> {
+                        if (key != null && value != null) {
+                            mergedVars.put(key, value);
+                        }
+                    });
                 }
 
                 // Add grid data
                 if (document.getGrids() != null) {
-                    mergedVars.putAll(document.getGrids());
+                    document.getGrids().forEach((key, value) -> {
+                        if (key != null && value != null) {
+                            mergedVars.put(key, value);
+                        }
+                    });
                 }
             }
         } catch (Exception e) {

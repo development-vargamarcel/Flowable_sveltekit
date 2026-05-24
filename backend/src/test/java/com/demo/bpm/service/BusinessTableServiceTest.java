@@ -13,10 +13,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import com.demo.bpm.entity.GridRow;
+import com.demo.bpm.repository.GridRowRepository;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -109,5 +108,53 @@ class BusinessTableServiceTest {
 
         verify(processConfigRepository).save(config);
         assertTrue(config.getPersistOnTaskComplete());
+    }
+
+    @Test
+    void saveGridRows_shouldPersistRows() {
+        Document document = new Document();
+        document.setId(1L);
+        when(documentRepository.findByProcessInstanceIdAndType("pi1", "main")).thenReturn(Optional.of(document));
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        Map<String, Object> row1 = new HashMap<>();
+        row1.put("item", "A");
+        rows.add(row1);
+
+        ColumnMapping mapping = ColumnMapping.builder()
+                .fieldName("item")
+                .columnName("varchar_1")
+                .fieldType(ColumnMapping.FieldType.VARCHAR)
+                .build();
+
+        when(columnMappingService.determineFieldType("A")).thenReturn(ColumnMapping.FieldType.VARCHAR);
+        when(columnMappingService.getOrCreateGridMapping("proc1", "main", "grid1", "item", ColumnMapping.FieldType.VARCHAR))
+                .thenReturn(mapping);
+        when(columnMappingService.convertValueForStorage("A", ColumnMapping.FieldType.VARCHAR)).thenReturn("A");
+
+        businessTableService.saveGridRows("pi1", "proc1", "grid1", rows);
+
+        verify(gridRowRepository).deleteByDocumentIdAndGridName(1L, "grid1");
+        verify(gridRowRepository, times(1)).save(any(GridRow.class));
+    }
+
+    @Test
+    void saveAllData_shouldCallBothDocumentAndGridSave() {
+        // We use spy to verify calls to other methods in the same service
+        BusinessTableService spyService = spy(businessTableService);
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("field1", "val1");
+        List<Map<String, Object>> gridData = new ArrayList<>();
+        gridData.add(Map.of("col1", "cell1"));
+        variables.put("grid1", gridData);
+
+        doReturn(null).when(spyService).saveDocument(anyString(), anyString(), anyString(), anyString(), anyString(), anyMap(), anyString());
+        doReturn(Collections.emptyList()).when(spyService).saveGridRows(anyString(), anyString(), anyString(), anyString(), anyList());
+
+        spyService.saveAllData("pi1", "bk1", "proc1", "ProcName", "main", variables, "user1");
+
+        verify(spyService).saveDocument(eq("pi1"), eq("bk1"), eq("proc1"), eq("ProcName"), eq("main"), anyMap(), eq("user1"));
+        verify(spyService).saveGridRows(eq("pi1"), eq("proc1"), eq("main"), eq("grid1"), eq(gridData));
     }
 }

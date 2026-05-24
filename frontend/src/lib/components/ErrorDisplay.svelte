@@ -58,7 +58,7 @@
 				{#if onRetry}
 					<button
 						onclick={onRetry}
-						class="px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-sm transition-colors"
+						class="px-3 py-1 bg-red-600 text-white hover:bg-red-700 rounded text-sm transition-colors font-medium shadow-sm"
 					>
 						Retry
 					</button>

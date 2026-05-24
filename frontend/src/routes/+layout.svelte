@@ -13,6 +13,19 @@
 
 	const { children } = $props();
 
+	let renderingError = $state<Error | null>(null);
+
+	// Basic Error Boundary mechanism for Svelte 5
+	// Note: In Svelte 5, we can use the 'onerror' hook at the root
+	$effect(() => {
+		const handleError = (error: Error) => {
+			console.error('Unhandled rendering error:', error);
+			renderingError = error;
+		};
+		window.addEventListener('error', (e) => handleError(e.error));
+		window.addEventListener('unhandledrejection', (e) => handleError(e.reason));
+	});
+
 	// Public routes that don't require authentication
 	const publicRoutes = ['/login'];
 
@@ -73,7 +86,23 @@
 			<Breadcrumbs />
 		{/if}
 		<main class="flex-1">
-			{@render children()}
+			{#if renderingError}
+				<div class="p-8 max-w-4xl mx-auto">
+					<div class="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg shadow-sm">
+						<h1 class="text-xl font-bold mb-2">Something went wrong</h1>
+						<p class="mb-4">The application encountered an unexpected error.</p>
+						<pre class="bg-red-100 p-4 rounded text-sm overflow-auto max-h-60 mb-6 font-mono">{renderingError.message}</pre>
+						<button
+							onclick={() => window.location.reload()}
+							class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
+						>
+							Reload Application
+						</button>
+					</div>
+				</div>
+			{:else}
+				{@render children()}
+			{/if}
 		</main>
 	{/if}
 </div>
