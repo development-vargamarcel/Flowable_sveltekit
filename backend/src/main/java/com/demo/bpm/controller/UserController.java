@@ -23,7 +23,7 @@ public class UserController {
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<UserDTO> updateProfile(@RequestBody UpdateProfileRequest request, Authentication authentication) {
+    public ResponseEntity<UserDTO> updateProfile(@jakarta.validation.Valid @RequestBody UpdateProfileRequest request, Authentication authentication) {
         String userId = authentication.getName();
         log.info("Updating profile for user '{}'", userId);
         return ResponseEntity.ok(userService.updateProfile(userId, request));

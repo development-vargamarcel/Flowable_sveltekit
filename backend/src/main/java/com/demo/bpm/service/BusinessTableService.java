@@ -358,6 +358,13 @@ public class BusinessTableService {
                             String processDefKey, String processDefName,
                             String documentType, Map<String, Object> variables, String userId) {
 
+        if (processInstanceId == null || processInstanceId.isBlank()) {
+            throw new IllegalArgumentException("processInstanceId is required for saving business data");
+        }
+        if (processDefKey == null || processDefKey.isBlank()) {
+            throw new IllegalArgumentException("processDefKey is required for saving business data");
+        }
+
         String docType = documentType != null ? documentType : DEFAULT_DOCUMENT_TYPE;
 
         // Extract grid data from variables
