@@ -1,6 +1,6 @@
-/* eslint-disable no-console */
-import type { User } from '$lib/types';
 import { api } from '$lib/api/client';
+import { logger } from '$lib/utils/logger';
+import type { User } from '$lib/types';
 
 // Svelte 5 runes-based auth store
 class AuthStore {
@@ -29,7 +29,7 @@ class AuthStore {
   }
 
   setUser(user: User | null) {
-    console.log('[AuthStore] Setting user:', user?.username);
+    logger.debug('Auth store user updated', { username: user?.username });
     this.user = user;
     this.loading = false;
   }
@@ -39,14 +39,14 @@ class AuthStore {
   }
 
   clear() {
-    console.log('[AuthStore] Clearing session');
+    logger.debug('Auth store session cleared');
     this.user = null;
     this.loading = false;
   }
 
   // Add login method here to fix types
   async login(username: string, password: string) {
-    console.log('[AuthStore] Logging in user:', username);
+    logger.debug('Auth store login started', { username });
     this.setLoading(true);
     try {
       const response = await api.login({ username, password });
@@ -59,7 +59,7 @@ class AuthStore {
 
   // Add logout method here to fix types
   async logout() {
-    console.log('[AuthStore] Logging out');
+    logger.debug('Auth store logout started');
     this.setLoading(true);
     try {
       await api.logout();

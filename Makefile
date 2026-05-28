@@ -88,8 +88,7 @@ test-automation:
 
 check-lockfiles:
 	@test -f frontend/package-lock.json || (echo "Missing frontend/package-lock.json" && exit 1)
-	@test -f package-lock.json || (echo "Missing root package-lock.json" && exit 1)
-	@echo "Lockfile check passed"
+	@echo "Frontend lockfile check passed"
 
 clean:
 	rm -rf frontend/.svelte-kit frontend/build frontend/coverage frontend/test-results .automation

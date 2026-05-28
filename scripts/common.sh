@@ -532,7 +532,6 @@ ensure_standard_dirs() {
 }
 
 check_lockfiles() {
-  require_file "$ROOT_DIR/package-lock.json"
   require_file "$BPM_FRONTEND_DIR/package-lock.json"
 }
 

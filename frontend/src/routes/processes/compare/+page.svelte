@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { logger } from '$lib/utils/logger';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api/client';
@@ -49,7 +50,7 @@
 
       initializeViewer();
     } catch (err) {
-      console.error(err);
+      logger.error('Failed to load BPMN definitions for comparison', { error: err });
       error = 'Failed to load BPMN definitions.';
     } finally {
       isLoading = false;
@@ -93,7 +94,12 @@
                 const changes = diff(viewer.getDefinitions(), newDefinitions);
 
                 // Debug log
-                console.log('Diff result:', changes);
+                logger.debug('Process comparison diff completed', {
+                  added: Object.keys(changes._added || {}).length,
+                  removed: Object.keys(changes._removed || {}).length,
+                  changed: Object.keys(changes._changed || {}).length,
+                  layoutChanged: Object.keys(changes._layoutChanged || {}).length
+                });
 
                 // Calculate stats
                 added = Object.keys(changes._added || {}).length;
@@ -102,7 +108,7 @@
                 layoutChanged = Object.keys(changes._layoutChanged || {}).length;
 
              } catch (e) {
-                console.error('Diff calculation failed', e);
+                logger.error('Diff calculation failed', { error: e });
                 // Fallback or specific handling
              }
         });

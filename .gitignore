@@ -12,6 +12,7 @@ frontend/.env
 frontend/.env.*
 frontend/playwright-report/
 frontend/test-results/
+test-results/
 
 # IDE
 .idea/

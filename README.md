@@ -14,13 +14,12 @@ A production-ready Business Process Management (BPM) demo application featuring:
 
 Detailed documentation is available in the `guides/` directory:
 
-
 ## Documentation map
 
 For planning and operational docs, use these canonical files:
 
 - [PLAN.md](PLAN.md) — active roadmap and prioritized engineering plan.
-- [UsageAndDocumentationAndExamples.md](UsageAndDocumentationAndExamples.md) — setup, usage, validation, and operational controls.
+- [UsageAndDocumentationAndExamples.md](UsageAndDocumentationAndExamples.md) — extended setup, usage, validation, and operational controls.
 - [examples.md](examples.md) — quick copy-ready command/workflow examples.
 - [notes.md](notes.md) — historical implementation notes and handoff context.
 
@@ -29,6 +28,7 @@ For planning and operational docs, use these canonical files:
 - [Workflows](guides/workflows.md)
 - [API Reference](guides/api.md)
 - [Frontend Components](guides/frontend-components.md)
+- [Verification Workflow](guides/verification.md)
 
 ## Features
 
@@ -83,7 +83,6 @@ See [Workflows Guide](guides/workflows.md) for detailed diagrams and logic.
 | executive1  | password | Executive  | Final approval for high-value items       |
 | admin       | admin    | Admin      | Full access                               |
 
-
 ## Contributor Notes
 
 - Store local debug output and ad-hoc transcripts in a gitignored location (for example `tmp/` at repo root or your system temp directory).
@@ -104,7 +103,7 @@ docker-compose up --build
 
 ### Option 2: Manual Development
 
-**Backend (requires Java 17+, Maven):**
+**Backend (requires Java 17+, Maven; CI validates with JDK 17):**
 
 ```bash
 cd backend

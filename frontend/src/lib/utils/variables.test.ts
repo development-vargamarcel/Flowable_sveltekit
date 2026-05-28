@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { getVariableDisplay, truncateText, normalizeVariableLabel, normalizeVariableValue } from './variables';
+import {
+  getVariableDisplay,
+  truncateText,
+  normalizeVariableLabel,
+  normalizeVariableValue
+} from './variables';
 
 describe('truncateText', () => {
   it('truncates long text', () => {

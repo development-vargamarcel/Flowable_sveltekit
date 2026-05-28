@@ -15,7 +15,7 @@ yarn.lock
 *.min.js
 *.min.css
 
-# Svelte files - temporarily excluded due to Svelte 5 runes compatibility issue
-# ESLint handles Svelte formatting via eslint-plugin-svelte
-# See: https://github.com/sveltejs/prettier-plugin-svelte/issues
+# Svelte files - intentionally excluded after the 2026-05-28 cleanup review because
+# repository components still depend on Svelte 5 runes patterns that need careful
+# formatter migration. ESLint and svelte-check remain the validation gates.
 *.svelte

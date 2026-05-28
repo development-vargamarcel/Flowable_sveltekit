@@ -70,9 +70,8 @@ function outputLog(entry: LogEntry): void {
 
   switch (entry.level) {
     case 'debug':
-      // Use console.log for debug to avoid browser-specific behavior
       // eslint-disable-next-line no-console
-      console.log(formatted);
+      console.debug(formatted);
       break;
     case 'info':
       // eslint-disable-next-line no-console

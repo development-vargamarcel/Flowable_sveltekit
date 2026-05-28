@@ -8,10 +8,11 @@ Welcome to the documentation for the Flowable BPM + SvelteKit application.
 - [Architecture](./architecture.md): Overview of the backend and frontend architecture, including Flowable integration.
 - [Workflows](./workflows.md): Detailed explanation of the available BPMN workflows (Expense, Leave, Task).
 - [API Reference](./api.md): Key API endpoints and usage.
-- [Verification Workflow](./verification.md): Canonical verification entrypoint and specialized subcommands.
+- [Verification Workflow](./verification.md): Canonical verification entrypoint, cleanup-safe verification matrix, and specialized subcommands.
 
 ## Documentation Log
 
+- **2026-05-28**: Removed deprecated verification artifacts and added a cleanup-safe verification matrix.
 - **2025-01-14**: Added dashboard usability notes covering search, escalated-only focus, and CSV export for reporting workflows.
 - **2025-01-15**: Documented dashboard shareable links and filter persistence behavior.
 - **2025-01-19**: Added auto-refresh controls for the dashboard and expanded e2e coverage for the refresh toggle.
