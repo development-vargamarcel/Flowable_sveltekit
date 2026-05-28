@@ -71,11 +71,7 @@ validate_npm_lock_consistency() {
 }
 
 print_runtime_guidance() {
-  if [ -d "/usr/lib/jvm/java-21-openjdk-amd64" ]; then
-    log_info "Preferred backend JDK: /usr/lib/jvm/java-21-openjdk-amd64"
-  else
-    log_warn "Preferred backend JDK not detected; continuing with active JAVA_HOME/runtime"
-  fi
+  log_info "Backend Java compatibility target: Java 17+ (CI validates with JDK 17)."
 
   if [ "$BPM_RUNNER_SUMMARY_FORMAT" = "json" ]; then
     log_info "JSON summary format enabled; artifacts will be saved to: $BPM_RUNNER_ARTIFACTS_DIR"

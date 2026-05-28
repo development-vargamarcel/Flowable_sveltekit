@@ -1,6 +1,6 @@
 <script lang="ts">
-	/* eslint-disable no-console */
 	import { api } from '$lib/api/client';
+	import { logger } from '$lib/utils/logger';
 	import type { DocumentDTO } from '$lib/types';
 	import { FileText, Download } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
@@ -15,15 +15,18 @@
 	let loading = $state(false);
 
 	async function loadDocuments() {
-		console.log('[ProcessDocuments] Loading documents for process:', processInstanceId);
+		logger.debug('Loading process documents', { processInstanceId });
 		loading = true;
 		try {
 			// Fetch documents - handling pagination by requesting a larger size or just first page for now
 			const response = await api.getDocuments(processInstanceId, 0, 50);
-			console.log('[ProcessDocuments] Loaded documents:', response.content.length);
+			logger.debug('Loaded process documents', {
+				processInstanceId,
+				count: response.content.length
+			});
 			documents = response.content;
 		} catch (error) {
-			console.error('Failed to load documents:', error);
+			logger.error('Failed to load process documents', { processInstanceId, error });
 			toast.error('Failed to load documents');
 		} finally {
 			loading = false;

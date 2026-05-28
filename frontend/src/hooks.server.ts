@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/sveltekit';
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
+import { logger } from '$lib/utils/logger';
 
 // Initialize Sentry for server-side error tracking
 // Set PUBLIC_SENTRY_DSN environment variable to enable Sentry
@@ -33,7 +34,10 @@ const isDev = process.env.NODE_ENV === 'development';
 const isNetlify = !!process.env.NETLIFY;
 
 // Log backend URL at startup (helpful for debugging)
-console.log(`[Hooks] Backend URL configured: ${BACKEND_URL}, isNetlify: ${isNetlify}`);
+logger.info('Backend URL configured for SvelteKit server hooks', {
+  backendUrl: BACKEND_URL,
+  isNetlify
+});
 
 // Maximum cookie header size before we consider it too large (16KB is a safe limit)
 const MAX_COOKIE_SIZE = 16 * 1024;
@@ -99,9 +103,9 @@ const customHandle: Handle = async ({ event, resolve }) => {
   // This prevents the "Request headers too large" error
   const cookieHeader = event.request.headers.get('cookie') || '';
   if (cookieHeader.length > MAX_COOKIE_SIZE) {
-    console.warn(
-      `[Hooks] Cookie header too large (${cookieHeader.length} bytes), redirecting to clear cookies`
-    );
+    logger.warn('Cookie header too large; redirecting to clear cookies', {
+      cookieBytes: cookieHeader.length
+    });
     // Don't redirect for clear-cookies page itself to avoid infinite loop
     if (event.url.pathname !== '/clear-cookies') {
       return buildClearCookiesRedirect();
@@ -114,7 +118,11 @@ const customHandle: Handle = async ({ event, resolve }) => {
     const method = event.request.method;
 
     if (isDev) {
-      console.log(`[Proxy] ${method} ${event.url.pathname} -> ${backendUrl}`);
+      logger.debug('Proxying API request to backend', {
+        method,
+        path: event.url.pathname,
+        backendUrl
+      });
     }
 
     try {
@@ -124,10 +132,12 @@ const customHandle: Handle = async ({ event, resolve }) => {
         try {
           requestBody = await event.request.text();
           if (isDev && requestBody) {
-            console.log(`[Proxy] Request body:`, requestBody.substring(0, 200));
+            logger.debug('Proxy request body preview', {
+              bodyPreview: requestBody.substring(0, 200)
+            });
           }
         } catch (bodyError) {
-          console.error('[Proxy] Failed to read request body:', bodyError);
+          logger.error('Failed to read proxy request body', { error: bodyError });
           return buildErrorResponse(
             'Failed to read request body',
             'The request body could not be read',
@@ -164,9 +174,12 @@ const customHandle: Handle = async ({ event, resolve }) => {
       });
 
       if (isDev) {
-        console.log(
-          `[Proxy] ${method} ${event.url.pathname} -> ${response.status} ${response.statusText}`
-        );
+        logger.debug('Backend proxy response received', {
+          method,
+          path: event.url.pathname,
+          status: response.status,
+          statusText: response.statusText
+        });
       }
 
       // Forward the response back to the client
@@ -182,7 +195,9 @@ const customHandle: Handle = async ({ event, resolve }) => {
       if (!response.ok && isDev) {
         try {
           const text = await response.text();
-          console.log(`[Proxy] Error response body:`, text.substring(0, 500));
+          logger.debug('Backend proxy error response body preview', {
+            bodyPreview: text.substring(0, 500)
+          });
           // Return the response with the read body
           return new Response(text, {
             status: response.status,
@@ -200,7 +215,7 @@ const customHandle: Handle = async ({ event, resolve }) => {
         headers: responseHeaders
       });
     } catch (error) {
-      console.error('[Proxy] API proxy error:', error);
+      logger.error('API proxy error', { error });
 
       // Provide detailed error messages based on error type
       let errorTitle = 'Backend unavailable';

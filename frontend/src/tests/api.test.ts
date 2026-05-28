@@ -1423,7 +1423,8 @@ describe('fetchApi', () => {
       ok: false,
       status: 403,
       statusText: 'Forbidden',
-      text: () => Promise.resolve('{"error":"Forbidden","message":"Access denied","path":"/api/admin"}'),
+      text: () =>
+        Promise.resolve('{"error":"Forbidden","message":"Access denied","path":"/api/admin"}'),
       headers: new Headers({ 'content-type': 'application/json' })
     });
 
@@ -1440,7 +1441,10 @@ describe('fetchApi', () => {
       ok: false,
       status: 401,
       statusText: 'Unauthorized',
-      text: () => Promise.resolve('{"error":"Unauthorized","message":"Full authentication is required to access this resource"}'),
+      text: () =>
+        Promise.resolve(
+          '{"error":"Unauthorized","message":"Full authentication is required to access this resource"}'
+        ),
       headers: new Headers({ 'content-type': 'application/json' })
     });
 

@@ -1,6 +1,7 @@
 # Usage, Documentation, and Examples (Release 1.8.3)
 
 ## Version alignment
+
 - **Frontend:** `1.8.3`
 - **Backend:** `1.8.3`
 - **Repository release:** `1.8.3` (**patch**) for frontend robustness, safer typing, and stronger browser/runtime verification automation.
@@ -10,11 +11,13 @@
 ## Setup instructions
 
 ### Prerequisites
+
 - Node.js 20+
 - npm 10+
-- Java 17+ (Java 21 preferred by verification scripts)
+- Java 17+ (CI and verification scripts target Java 17 compatibility)
 
 ### One-time bootstrap
+
 ```bash
 ./scripts/bootstrap.sh
 ```
@@ -22,6 +25,7 @@
 This installs frontend dependencies (`npm ci`) and warms backend Maven dependencies for offline usage.
 
 ### Manual setup (alternative)
+
 ```bash
 cd frontend && npm ci
 cd ../backend && ./mvnw -B -q -DskipTests dependency:go-offline
@@ -32,6 +36,7 @@ cd ../backend && ./mvnw -B -q -DskipTests dependency:go-offline
 ## Usage instructions
 
 ### Start local development
+
 ```bash
 # terminal 1
 cd backend && ./mvnw spring-boot:run
@@ -41,6 +46,7 @@ cd frontend && npm run dev
 ```
 
 ### Access key routes
+
 - Dashboard: `/dashboard`
 - Process instances: `/process-instances`
 - Document type list: `/document-definitions/types`
@@ -51,31 +57,37 @@ cd frontend && npm run dev
 ## Testing and validation steps
 
 ### Core full-stack validation
+
 ```bash
 ./scripts/verify-all.sh
 ```
 
 ### Frontend-only validation
+
 ```bash
-./scripts/verify-frontend.sh
+./scripts/verify-all.sh frontend
 ```
 
 ### Backend-only validation
+
 ```bash
-./scripts/verify-backend.sh
+./scripts/verify-all.sh backend
 ```
 
 ### Strict validation profile
+
 ```bash
 BPM_FRONTEND_ENABLE_COVERAGE=1 BPM_BACKEND_ENABLE_VERIFY=1 ./scripts/verify-all.sh
 ```
 
 ### Browser console smoke validation (new)
+
 ```bash
-BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 ./scripts/verify-frontend.sh
+BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 ./scripts/verify-all.sh frontend
 ```
 
 ### Automation script smoke tests
+
 ```bash
 ./scripts/test-automation.sh
 ```
@@ -95,6 +107,7 @@ BPM_FRONTEND_ENABLE_BROWSER_SMOKE=1 ./scripts/verify-frontend.sh
 ## Environment controls
 
 ### Runner controls
+
 ```bash
 BPM_RUNNER_LOG_LEVEL=info
 BPM_RUNNER_NO_COLOR=0
@@ -107,6 +120,7 @@ BPM_RUNNER_ARTIFACTS_DIR=.automation
 ```
 
 ### Frontend controls
+
 ```bash
 BPM_FRONTEND_SKIP_FORMAT=0
 BPM_FRONTEND_SKIP_LINT=0
@@ -119,6 +133,7 @@ BPM_FRONTEND_LINT_MAX_WARNINGS=-1
 ```
 
 ### Backend controls
+
 ```bash
 BPM_BACKEND_SKIP_TESTS=0
 BPM_BACKEND_SKIP_PACKAGE=0
@@ -130,17 +145,20 @@ BPM_BACKEND_ENABLE_VERIFY=0
 ## Copy-ready examples
 
 ### Simple example: quick health check
+
 ```bash
 ./scripts/doctor.sh
-./scripts/verify-frontend.sh
+./scripts/verify-all.sh frontend
 ```
 
 ### Simple example: targeted browser safety check
+
 ```bash
 cd frontend && npm run test:browser-console
 ```
 
 ### Complete example: CI-like, strict, artifacted run
+
 ```bash
 BPM_RUNNER_SUMMARY_FORMAT=json \
 BPM_RUNNER_LOG_TO_FILE=1 \
@@ -151,6 +169,7 @@ BPM_BACKEND_ENABLE_VERIFY=1 \
 ```
 
 ### Complete example: Makefile workflow
+
 ```bash
 make bootstrap
 make doctor-json
@@ -158,12 +177,12 @@ make verify-browser-smoke
 make verify-strict
 ```
 
-
 ---
 
 ## Documentation maintenance workflow
 
 After each implementation change:
+
 1. Update this canonical usage guide with any behavior, setup, or validation changes.
 2. Update `examples.md` with at least one practical command or workflow example.
 3. Update `PLAN.md` if roadmap status or priorities changed.

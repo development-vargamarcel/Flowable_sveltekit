@@ -19,14 +19,10 @@ validate_toggle "$BPM_BACKEND_ENABLE_VERIFY" "BPM_BACKEND_ENABLE_VERIFY"
 start="$(start_timer)"
 cd "$BPM_BACKEND_DIR"
 
-configure_java_home() {
-  if [ -d "/usr/lib/jvm/java-21-openjdk-amd64" ]; then
-    export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-amd64"
-    export PATH="$JAVA_HOME/bin:$PATH"
-    log_info "Using JAVA_HOME=$JAVA_HOME"
-  else
-    log_warn "Java 21 path not found. Falling back to active Java runtime."
-  fi
+configure_java_runtime() {
+  local java_version
+  java_version="$(java -version 2>&1 | head -n 1 || true)"
+  log_info "Using active Java runtime: ${java_version:-unknown}. Backend source/target compatibility is Java 17."
 }
 
 backend_tests() { ./mvnw -B test; }
@@ -34,7 +30,7 @@ backend_package() { ./mvnw -B -DskipTests package; }
 backend_verify() { ./mvnw -B -DskipTests verify; }
 
 log_section "Backend verification"
-run_step "Configure backend Java runtime" configure_java_home
+run_step "Confirm backend Java runtime" configure_java_runtime
 
 if [ "$BPM_BACKEND_SKIP_TESTS" = "0" ]; then
   run_step "Backend Maven test suite" backend_tests

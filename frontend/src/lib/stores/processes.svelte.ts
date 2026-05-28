@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+import { logger } from '$lib/utils/logger';
 import type { ProcessDefinition, ProcessInstance, Dashboard, Page } from '$lib/types';
 
 class ProcessStore {
@@ -70,17 +70,17 @@ class ProcessStore {
     fallbackError: string;
   }): Promise<T> {
     if (!forceRefresh && hasValue(currentValue) && this.isCacheValid(getLastFetched())) {
-      console.log(`[ProcessStore] Using cached ${label}`);
+      logger.debug('Process store cache hit', { label });
       return currentValue;
     }
 
     const existingRequest = getRequest();
     if (existingRequest) {
-      console.log(`[ProcessStore] ${label} load already in progress`);
+      logger.debug('Process store request already in progress', { label });
       return existingRequest;
     }
 
-    console.log(`[ProcessStore] Loading ${label}`);
+    logger.debug('Process store loading data', { label });
     setLoading(true);
     setError(null);
 
@@ -91,7 +91,7 @@ class ProcessStore {
         setLastFetched(Date.now());
         return data;
       } catch (err) {
-        console.error(`[ProcessStore] Failed to load ${label}:`, err);
+        logger.error('Process store load failed', { label, error: err });
         setError(this.normalizeError(err, fallbackError));
         throw err;
       } finally {
@@ -206,7 +206,7 @@ class ProcessStore {
   }
 
   invalidateAll() {
-    console.log('[ProcessStore] Invalidating all caches');
+    logger.debug('Process store invalidating all caches');
     this.definitionsLastFetched = null;
     this.myInstancesLastFetched = null;
     this.dashboardLastFetched = null;
