@@ -1,9 +1,10 @@
 import { test, expect } from './fixtures';
-import { invalidCredentials, login, logout } from './support/auth';
+import { invalidCredentials, login, logout, waitForAppReady } from './support/auth';
 
 test('shows an error message for invalid credentials', async ({ page, log }) => {
   await test.step('Attempt invalid login', async () => {
     await page.goto('/login');
+    await waitForAppReady(page);
     await page.getByLabel('Username').fill(invalidCredentials.username);
     await page.getByLabel('Password').fill(invalidCredentials.password);
     log.info('Submitting invalid credentials.');
@@ -11,7 +12,7 @@ test('shows an error message for invalid credentials', async ({ page, log }) => 
   });
 
   await test.step('Verify error alert', async () => {
-    const errorAlert = page.locator('.bg-red-50');
+    const errorAlert = page.getByRole('alert');
     await expect(errorAlert).toBeVisible();
     await expect(errorAlert).toContainText(/login failed/i);
     await expect(errorAlert).toContainText(

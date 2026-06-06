@@ -1,25 +1,23 @@
 import { test, expect } from './fixtures';
 import { login } from './support/auth';
+import { navigateByMenu } from './support/navigation';
 
 test.describe('Page smoke checks', () => {
   test('tasks page renders core heading', async ({ page, log }) => {
     await login(page, log);
-    await page.getByRole('link', { name: 'Tasks' }).click();
-    await page.waitForURL('/tasks');
+    await navigateByMenu(page, 'Tasks', '/tasks');
     await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
   });
 
   test('processes page renders core heading', async ({ page, log }) => {
     await login(page, log);
-    await page.getByRole('link', { name: 'Processes' }).click();
-    await page.waitForURL('/processes');
+    await navigateByMenu(page, 'Processes', '/processes');
     await expect(page.getByRole('heading', { name: 'Start a New Process' })).toBeVisible();
   });
 
   test('database page renders core heading', async ({ page, log }) => {
     await login(page, log);
-    await page.getByRole('link', { name: 'Database' }).click();
-    await page.waitForURL('/database');
+    await navigateByMenu(page, 'Database', '/database');
     await expect(page.getByRole('heading', { name: 'Database Table Viewer' })).toBeVisible();
   });
 });

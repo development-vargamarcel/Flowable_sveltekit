@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import { login } from './support/auth';
 import { captureScreenshot } from './support/attachments';
+import { navigateByMenu } from './support/navigation';
 
 const DASHBOARD_WAIT_MS = 80000;
 const EXTRA_WAIT_MS = 60000;
@@ -15,8 +16,7 @@ test('login and monitor dashboard load', async ({ page, log }, testInfo) => {
 
   await test.step('Navigate to dashboard', async () => {
     log.info('Navigating to dashboard.');
-    await page.getByRole('link', { name: 'Dashboard' }).click();
-    await page.waitForURL('/dashboard');
+    await navigateByMenu(page, 'Dashboard', '/dashboard');
     await expect(page.getByRole('heading', { name: 'Workflow Dashboard' })).toBeVisible();
   });
 
@@ -64,17 +64,17 @@ test('login and monitor dashboard load', async ({ page, log }, testInfo) => {
       await expect(page.getByRole('combobox', { name: 'Filter by status' })).toBeVisible();
       await expect(page.getByRole('combobox', { name: 'Sort processes' })).toBeVisible();
       await expect(page.getByLabel('Escalated only')).toBeVisible();
-      await expect(page.getByLabel('Auto refresh')).toBeVisible();
+      await expect(page.getByRole('checkbox', { name: 'Auto refresh' })).toBeVisible();
       await expect(page.getByRole('combobox', { name: 'Auto refresh interval' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Copy link' })).toBeVisible();
     });
     await test.step('Verify per-page summary stats', async () => {
-      await expect(page.getByText(/Showing \\d+ of/)).toBeVisible();
+      await expect(page.getByText(/Showing \d+ of/)).toBeVisible();
       await expect(page.getByText(/escalated/)).toBeVisible();
     });
     await test.step('Verify auto refresh toggles', async () => {
-      const autoRefreshToggle = page.getByLabel('Auto refresh');
+      const autoRefreshToggle = page.getByRole('checkbox', { name: 'Auto refresh' });
       await autoRefreshToggle.check();
       await expect(autoRefreshToggle).toBeChecked();
 

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { api, ApiError } from '$lib/api/client';
+	import { api } from '$lib/api/client';
+	import { ApiError } from '$lib/api/core';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { checkBackendHealth, clearAllCookies, getCookieDiagnostics, isHeaderTooLargeError } from '$lib/utils/session-utils';
+	import { clearAllCookies, getCookieDiagnostics, isHeaderTooLargeError } from '$lib/utils/session-utils';
 
 	let username = $state('');
 	let password = $state('');
@@ -13,7 +14,7 @@
 	let isRegistering = $state(false);
 	let regSuccess = $state(false);
 
-	let error = $state('');
+	let formError = $state('');
 	let errorDetails = $state('');
 	let errorStatus = $state(0);
 	let fieldErrors = $state<Record<string, string>>({});
@@ -22,11 +23,10 @@
 	let clearingCookies = $state(false);
 	let cookieDiagnostics = $state('');
 	let backendReady = $state(false);
-	const checkingBackend = $state(false);
 
 	function toggleMode() {
 		isRegistering = !isRegistering;
-		error = '';
+		formError = '';
 		errorDetails = '';
 		fieldErrors = {};
 		regSuccess = false;
@@ -54,7 +54,7 @@
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
 		loading = true;
-		error = '';
+		formError = '';
 		errorDetails = '';
 		errorStatus = 0;
 		fieldErrors = {};
@@ -74,42 +74,46 @@
 				regSuccess = true;
 				isRegistering = false;
 				// Optional: clear form or keep username filled
-				error = "";
+				formError = "";
 			} else {
 				await authStore.login(username, password);
 				goto('/');
 			}
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error(isRegistering ? 'Registration error:' : 'Login error:', e);
 
-			if (e instanceof ApiError) {
-				errorStatus = e.status;
-				if (e.status === 400 && e.fieldErrors) {
-					fieldErrors = e.fieldErrors;
-					error = 'Please check the fields below.';
-				} else if (e.status === 401) {
-					error = 'Invalid credentials. Please try again.';
-				} else if (e.status >= 500) {
-					error = 'Server error. Please try again later.';
-					errorDetails = e.message;
+			const apiError = e instanceof ApiError || (typeof e === 'object' && e !== null && 'status' in e)
+				? (e as ApiError)
+				: null;
+
+			if (apiError) {
+				errorStatus = apiError.status;
+				if (apiError.status === 400 && apiError.fieldErrors) {
+					fieldErrors = apiError.fieldErrors;
+					formError = 'Please check the fields below.';
+				} else if (apiError.status === 401) {
+					formError = 'Invalid credentials. Please try again.';
+				} else if (apiError.status >= 500) {
+					formError = 'Server error. Please try again later.';
+					errorDetails = apiError.message;
 				} else {
-					error = e.message || 'Login failed.';
-					if (e.details) {
-						errorDetails = e.details;
+					formError = apiError.message || 'Login failed.';
+					if (apiError.details) {
+						errorDetails = apiError.details;
 					}
 				}
 
 				// Check for header too large errors in 400/431/502/520 responses
-				const isHeaderError = isHeaderTooLargeError(error, errorDetails, JSON.stringify(e));
+				const isHeaderError = isHeaderTooLargeError(formError, errorDetails, JSON.stringify(apiError));
 
-				if (isHeaderError || e.status === 431 || (e.status === 400 && error.toLowerCase().includes('header'))) {
-					error = 'Your browser sent too many cookies (Header Too Large).';
+				if (isHeaderError || apiError.status === 431 || (apiError.status === 400 && formError.toLowerCase().includes('header'))) {
+					formError = 'Your browser sent too many cookies (Header Too Large).';
 					errorDetails = 'This often happens when many session cookies accumulate. Please click the button below to clear them.';
 					cookieDiagnostics = getCookieDiagnostics();
 				}
 			} else {
-				error = 'An unexpected error occurred.';
-				errorDetails = e.message || String(e);
+				formError = 'An unexpected error occurred.';
+				errorDetails = e instanceof Error ? e.message : String(e);
 			}
 		} finally {
 			loading = false;
@@ -152,8 +156,8 @@
 				</div>
 			{/if}
 
-			{#if error}
-				<div class="rounded-md bg-red-50 p-4">
+			{#if formError}
+				<div class="rounded-md bg-red-50 p-4" role="alert" aria-live="assertive">
 					<div class="flex">
 						<div class="flex-shrink-0">
 							<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -163,7 +167,7 @@
 						<div class="ml-3">
 							<h3 class="text-sm font-medium text-red-800">{isRegistering ? 'Registration Failed' : 'Login Failed'}</h3>
 							<div class="mt-2 text-sm text-red-700">
-								<p>{error}</p>
+								<p>{formError}</p>
 								{#if errorDetails}
 									<p class="mt-1 text-xs opacity-75">{errorDetails}</p>
 								{/if}
@@ -172,7 +176,7 @@
 								{/if}
 							</div>
 
-							{#if cookieDiagnostics || error.includes('cookie') || error.includes('header')}
+							{#if cookieDiagnostics || formError.includes('cookie') || formError.includes('header')}
 								<div class="mt-4">
 									<div class="rounded bg-red-100 p-2 text-xs font-mono text-red-800 break-all mb-2">
 										{cookieDiagnostics || getCookieDiagnostics()}

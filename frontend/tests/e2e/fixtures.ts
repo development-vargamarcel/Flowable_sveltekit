@@ -13,7 +13,7 @@ type Fixtures = {
 };
 
 export const test = base.extend<Fixtures>({
-  log: async (_unused, use, testInfo) => {
+  log: async ({ page: _page }, use, testInfo) => {
     const logger = createTestLogger(testInfo);
     if (shouldCaptureLogs()) {
       const metadata = {

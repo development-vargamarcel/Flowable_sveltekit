@@ -28,6 +28,7 @@
 
 	// Public routes that don't require authentication
 	const publicRoutes = ['/login'];
+	const isPublicRoute = $derived(publicRoutes.includes($page.url.pathname));
 
 	onMount(async () => {
 		// Initialize dark mode
@@ -44,6 +45,7 @@
 		// to prevent unnecessary backend calls and noisy browser console errors.
 		if (publicRoutes.includes(window.location.pathname)) {
 			authStore.setUser(null);
+			document.documentElement.dataset.appReady = 'true';
 			return;
 		}
 
@@ -52,6 +54,8 @@
 			authStore.setUser(user);
 		} catch {
 			authStore.setUser(null);
+		} finally {
+			document.documentElement.dataset.appReady = 'true';
 		}
 	});
 
@@ -73,7 +77,7 @@
 <BackendStartingBanner />
 
 <div class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-	{#if authStore.loading}
+	{#if authStore.loading && !isPublicRoute}
 		<div class="flex-1 flex items-center justify-center">
 			<div class="text-center">
 				<div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>

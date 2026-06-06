@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { login } from './support/auth';
+import { navigateByMenu } from './support/navigation';
 
 test('login and view dashboard', async ({ page, log }) => {
   await test.step('Login', async () => {
@@ -7,8 +8,7 @@ test('login and view dashboard', async ({ page, log }) => {
   });
 
   await test.step('Navigate to dashboard', async () => {
-    await page.getByRole('link', { name: 'Dashboard' }).click();
-    await page.waitForURL('/dashboard');
+    await navigateByMenu(page, 'Dashboard', '/dashboard');
   });
 
   await test.step('Verify dashboard content', async () => {
