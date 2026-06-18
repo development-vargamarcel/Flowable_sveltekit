@@ -26,7 +26,6 @@
 	const hasErrors = $derived(errorEntries.length > 0);
 
 	let containerRef: HTMLDivElement | undefined = $state();
-	let focusedIndex = $state(0);
 
 	// Auto-focus first error when errors appear
 	$effect(() => {
@@ -88,7 +87,6 @@
 		}
 
 		if (newIndex !== index) {
-			focusedIndex = newIndex;
 			const targetButton = buttons[newIndex];
 			if (targetButton instanceof HTMLElement) {
 				targetButton.focus();

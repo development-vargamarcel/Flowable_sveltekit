@@ -1,7 +1,6 @@
 <script lang="ts">
-	import type { GridColumn, ProcessFieldLibrary, FormField, GridDefinition } from '$lib/types';
+	import type { GridColumn, ProcessFieldLibrary } from '$lib/types';
 	import Modal from '../Modal.svelte';
-    import CodeEditor from '../CodeEditor.svelte';
 
 	interface Props {
 		column: GridColumn | null;
@@ -11,7 +10,7 @@
 		open: boolean;
 	}
 
-	const { column, library, onSave, onClose, open }: Props = $props();
+	const { column, library: _library, onSave, onClose, open }: Props = $props();
 
 	let columnForm = $state({
 		id: '',
@@ -49,36 +48,6 @@
 
 	function generateId(prefix: string): string {
 		return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-	}
-
-    function getCodeSuggestions() {
-		const suggestions: Array<{ label: string; value: string; type: 'field' | 'grid' | 'column' | 'variable' | 'function'; description?: string }> = [];
-
-		suggestions.push(
-			{ label: 'value', value: 'value', type: 'variable', description: 'Current field value' },
-			{ label: 'form', value: 'form', type: 'variable', description: 'All form fields' },
-			{ label: 'grids', value: 'grids', type: 'variable', description: 'All grids data' },
-			{ label: 'row', value: 'row', type: 'variable', description: 'Current grid row' }
-		);
-
-		library.fields.forEach((f: FormField) => {
-			suggestions.push({ label: `form.${f.name}`, value: `form.${f.name}`, type: 'field', description: f.label });
-		});
-
-		library.grids.forEach((g: GridDefinition) => {
-			suggestions.push({ label: `grids.${g.name}`, value: `grids.${g.name}`, type: 'grid', description: g.label });
-			suggestions.push({ label: `grids.${g.name}.selectedRow`, value: `grids.${g.name}.selectedRow`, type: 'grid', description: 'Selected row' });
-			suggestions.push({ label: `grids.${g.name}.selectedRows`, value: `grids.${g.name}.selectedRows`, type: 'grid', description: 'Selected rows (array)' });
-			suggestions.push({ label: `grids.${g.name}.selectedRows.length`, value: `grids.${g.name}.selectedRows.length`, type: 'grid', description: 'Count of selected' });
-			suggestions.push({ label: `grids.${g.name}.rows`, value: `grids.${g.name}.rows`, type: 'grid', description: 'All rows' });
-			suggestions.push({ label: `grids.${g.name}.sum`, value: `grids.${g.name}.sum('')`, type: 'function', description: 'Sum column' });
-
-			g.columns.forEach((c: GridColumn) => {
-				suggestions.push({ label: `row.${c.name}`, value: `row.${c.name}`, type: 'column', description: `${g.label} - ${c.label}` });
-			});
-		});
-
-		return suggestions;
 	}
 
 	$effect(() => {
