@@ -7,12 +7,11 @@
   import BpmnModeler from 'bpmn-js/lib/Modeler';
   import 'bpmn-js/dist/assets/diagram-js.css';
   import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
-  // @ts-ignore
+  // @ts-expect-error missing bundled declarations for bpmn-js-token-simulation
   import TokenSimulationModule from 'bpmn-js-token-simulation';
   import 'bpmn-js-token-simulation/assets/css/bpmn-js-token-simulation.css';
   import { flowableModdle } from '$lib/utils/flowable-moddle';
   import {
-    demoProcesses,
     getDemoProcessesByCategory,
     type DemoProcess
   } from '$lib/utils/demo-processes';
@@ -332,7 +331,6 @@
 
   // Sync state
   let isDocTypeSynced = $state(true);
-  let syncCheckLoading = $state(false);
 
   // Expression Tester State
   let showExpressionTester = $state(false);
@@ -1095,7 +1093,6 @@
         return;
     }
 
-    syncCheckLoading = true;
     try {
         const docType = await api.getDocumentType(elementProperties.documentType);
         if (!docType || !docType.schemaJson) {
@@ -1130,8 +1127,6 @@
         isDocTypeSynced = synced;
     } catch (e) {
         console.error('Failed to check sync status', e);
-    } finally {
-        syncCheckLoading = false;
     }
   }
 
@@ -3162,7 +3157,7 @@
                           value={elementProperties.collection}
                           oninput={(e) =>
                             updateElementProperty('collection', e.currentTarget.value)}
-                          placeholder={'\${assigneeList}'}
+                          placeholder={'${assigneeList}'}
                           class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
                         />
                       </div>
@@ -3192,7 +3187,7 @@
                           value={elementProperties.completionCondition}
                           oninput={(e) =>
                             updateElementProperty('completionCondition', e.currentTarget.value)}
-                          placeholder={'\${nrOfCompletedInstances >= 2}'}
+                          placeholder={'${nrOfCompletedInstances >= 2}'}
                           class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
                         />
                       </div>
@@ -3961,7 +3956,7 @@
                         id="field-visibility-{index}"
                         type="text"
                         bind:value={field.visibilityExpression}
-                        placeholder={'\${showField == true}'}
+                        placeholder={'${showField == true}'}
                         class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm font-mono focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
@@ -5222,7 +5217,7 @@ execution.setVariable('total', total)`
                       <textarea
                         id="expression-to-test"
                         bind:value={testExpression}
-                        placeholder={'\${amount > 500}'}
+                        placeholder={'${amount > 500}'}
                         rows="3"
                         class="w-full rounded border border-gray-300 p-2 font-mono text-sm focus:border-blue-500 focus:outline-none"
                       ></textarea>

@@ -5,7 +5,7 @@
   import { api } from '$lib/api/client';
 
   import BpmnViewer from 'bpmn-js/lib/Viewer';
-  // @ts-ignore
+  // @ts-expect-error missing bundled declarations for bpmn-js-differ
   import { diff } from 'bpmn-js-differ';
 
   let leftId = $state('');
@@ -22,7 +22,6 @@
   let added = $state(0);
   let removed = $state(0);
   let changed = $state(0);
-  let layoutChanged = $state(0);
 
   onMount(async () => {
     leftId = $page.url.searchParams.get('left') || '';
@@ -105,7 +104,6 @@
                 added = Object.keys(changes._added || {}).length;
                 removed = Object.keys(changes._removed || {}).length;
                 changed = Object.keys(changes._changed || {}).length;
-                layoutChanged = Object.keys(changes._layoutChanged || {}).length;
 
              } catch (e) {
                 logger.error('Diff calculation failed', { error: e });
