@@ -4,13 +4,10 @@
   import { goto } from '$app/navigation';
   import { api } from '$lib/api/client';
   import { processStore } from '$lib/stores/processes.svelte';
-  import BpmnModeler from 'bpmn-js/lib/Modeler';
+  import type BpmnModeler from 'bpmn-js/lib/Modeler';
   import 'bpmn-js/dist/assets/diagram-js.css';
   import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
-  // @ts-expect-error missing bundled declarations for bpmn-js-token-simulation
-  import TokenSimulationModule from 'bpmn-js-token-simulation';
   import 'bpmn-js-token-simulation/assets/css/bpmn-js-token-simulation.css';
-  import { flowableModdle } from '$lib/utils/flowable-moddle';
   import {
     getDemoProcessesByCategory,
     type DemoProcess
@@ -18,6 +15,20 @@
   import type { ProcessFieldLibrary, FieldConditionRule, FormField, FormGrid } from '$lib/types';
   import FieldLibraryPanel from '$lib/components/FieldLibraryPanel.svelte';
   import ConditionRuleList from '$lib/components/ConditionRuleList.svelte';
+  import { createDesignerModeler, validateBpmnModeler } from '$lib/designer/modeler';
+  import {
+    defaultElementProperties,
+    parseProcessVariablesFromElements,
+    serializeElementProperties
+  } from '$lib/designer/element-properties';
+  import {
+    createFormField,
+    createGrid,
+    createGridColumn,
+    serializeFormFields,
+    validateFormFields as validateFormFieldsData,
+    validateFormGrids as validateFormGridsData
+  } from '$lib/designer/form-builders';
 
   // Core modeler state
   let modelerContainer: HTMLDivElement;
@@ -82,41 +93,7 @@
     timeDate: string;
     timeDuration: string;
     timeCycle: string;
-  }>({
-    id: '',
-    name: '',
-    type: '',
-    assignee: '',
-    candidateGroups: '',
-    candidateUsers: '',
-    formKey: '',
-    documentation: '',
-    scriptFormat: 'javascript',
-    script: '',
-    conditionExpression: '',
-    dueDate: '',
-    priority: '',
-    category: '',
-    asyncBefore: false,
-    asyncAfter: false,
-    exclusive: true,
-    skipExpression: '',
-    implementation: 'class',
-    expression: '',
-    delegateExpression: '',
-    resultVariable: '',
-    class: '',
-    multiInstanceType: 'none',
-    loopCardinality: '',
-    collection: '',
-    elementVariable: '',
-
-    completionCondition: '',
-    documentType: '',
-    timeDate: '',
-    timeDuration: '',
-    timeCycle: ''
-  });
+  }>({ ...defaultElementProperties() });
 
   // Form Builder State - Enhanced with grid support
   let showFormBuilder = $state(false);
@@ -567,16 +544,7 @@
     const processDefId = $page.url.searchParams.get('processDefinitionId');
 
     // Initialize the BPMN modeler with enhanced configuration
-    modeler = new BpmnModeler({
-      container: modelerContainer,
-      keyboard: {
-        bindTo: document
-      },
-      additionalModules: [TokenSimulationModule],
-      moddleExtensions: {
-        flowable: flowableModdle
-      }
-    });
+    modeler = createDesignerModeler(modelerContainer) as BpmnModeler;
 
     // Set up selection change handler for properties panel
     const eventBus = modeler.get('eventBus') as any;
@@ -729,109 +697,14 @@
       return;
     }
 
-    const businessObject = element.businessObject;
-
-    // Create a new properties object with all values from the business object
-    const newProps = {
-      id: businessObject.id || '',
-      name: businessObject.name || '',
-      type: element.type,
-      assignee: businessObject.get('flowable:assignee') || '',
-      candidateGroups: businessObject.get('flowable:candidateGroups') || '',
-      candidateUsers: businessObject.get('flowable:candidateUsers') || '',
-      formKey: businessObject.get('flowable:formKey') || '',
-      documentation: businessObject.documentation?.[0]?.text || '',
-      scriptFormat: businessObject.scriptFormat || 'javascript',
-      script: businessObject.script?.body || businessObject.script || '',
-      conditionExpression: businessObject.conditionExpression?.body || '',
-      dueDate: businessObject.get('flowable:dueDate') || '',
-      priority: businessObject.get('flowable:priority') || '',
-      category: businessObject.get('flowable:category') || '',
-      asyncBefore:
-        businessObject.get('flowable:asyncBefore') === 'true' ||
-        businessObject.get('flowable:asyncBefore') === true,
-      asyncAfter:
-        businessObject.get('flowable:asyncAfter') === 'true' ||
-        businessObject.get('flowable:asyncAfter') === true,
-      exclusive: businessObject.get('flowable:exclusive') !== 'false',
-      skipExpression: businessObject.get('flowable:skipExpression') || '',
-      implementation: businessObject.get('flowable:class')
-        ? 'class'
-        : businessObject.get('flowable:delegateExpression')
-          ? 'delegateExpression'
-          : businessObject.get('flowable:expression')
-            ? 'expression'
-            : 'class',
-      expression: businessObject.get('flowable:expression') || '',
-      delegateExpression: businessObject.get('flowable:delegateExpression') || '',
-      resultVariable: businessObject.get('flowable:resultVariable') || '',
-      class: businessObject.get('flowable:class') || '',
-      multiInstanceType: getMultiInstanceType(businessObject),
-      loopCardinality: getLoopCardinality(businessObject),
-      collection: getCollection(businessObject),
-      elementVariable: getElementVariable(businessObject),
-
-      completionCondition: getCompletionCondition(businessObject),
-
-      documentType: businessObject.get('flowable:documentType') || '',
-      timeDate: getTimerDefinition(businessObject, 'timeDate'),
-      timeDuration: getTimerDefinition(businessObject, 'timeDuration'),
-      timeCycle: getTimerDefinition(businessObject, 'timeCycle')
-    };
-
-    // Update the state
+    const newProps = serializeElementProperties(element);
     elementProperties = newProps;
+    loadFormFields(element.businessObject);
 
-    // Load form fields if present
-    loadFormFields(businessObject);
-
-    // Load script for script tasks
     if (element.type === 'bpmn:ScriptTask') {
       scriptCode = newProps.script;
       scriptFormat = newProps.scriptFormat;
     }
-  }
-
-  function getMultiInstanceType(businessObject: any): string {
-    const loopCharacteristics = businessObject.loopCharacteristics;
-    if (!loopCharacteristics) return 'none';
-    if (loopCharacteristics.$type === 'bpmn:MultiInstanceLoopCharacteristics') {
-      return loopCharacteristics.isSequential ? 'sequential' : 'parallel';
-    }
-    return 'none';
-  }
-
-  function getLoopCardinality(businessObject: any): string {
-    const loopCharacteristics = businessObject.loopCharacteristics;
-    if (!loopCharacteristics) return '';
-    return loopCharacteristics.loopCardinality?.body || '';
-  }
-
-  function getCollection(businessObject: any): string {
-    const loopCharacteristics = businessObject.loopCharacteristics;
-    if (!loopCharacteristics) return '';
-    return loopCharacteristics.get('flowable:collection') || '';
-  }
-
-  function getElementVariable(businessObject: any): string {
-    const loopCharacteristics = businessObject.loopCharacteristics;
-    if (!loopCharacteristics) return '';
-    return loopCharacteristics.get('flowable:elementVariable') || '';
-  }
-
-  function getCompletionCondition(businessObject: any): string {
-    const loopCharacteristics = businessObject.loopCharacteristics;
-    if (!loopCharacteristics) return '';
-    return loopCharacteristics.completionCondition?.body || '';
-  }
-
-  function getTimerDefinition(businessObject: any, type: string): string {
-    const eventDefinitions = businessObject.eventDefinitions;
-    if (eventDefinitions && eventDefinitions[0] && eventDefinitions[0].$type === 'bpmn:TimerEventDefinition') {
-      const timerDef = eventDefinitions[0];
-      return timerDef[type]?.body || '';
-    }
-    return '';
   }
 
   function loadFormFields(businessObject: any) {
@@ -930,40 +803,7 @@
   }
 
   function resetElementProperties() {
-    elementProperties = {
-      id: '',
-      name: '',
-      type: '',
-      assignee: '',
-      candidateGroups: '',
-      candidateUsers: '',
-      formKey: '',
-      documentation: '',
-      scriptFormat: 'javascript',
-      script: '',
-      conditionExpression: '',
-      dueDate: '',
-      priority: '',
-      category: '',
-      asyncBefore: false,
-      asyncAfter: false,
-      exclusive: true,
-      skipExpression: '',
-      implementation: 'class',
-      expression: '',
-      delegateExpression: '',
-      resultVariable: '',
-      class: '',
-      multiInstanceType: 'none',
-      loopCardinality: '',
-      collection: '',
-      elementVariable: '',
-      completionCondition: '',
-      documentType: '',
-      timeDate: '',
-      timeDuration: '',
-      timeCycle: ''
-    };
+    elementProperties = defaultElementProperties();
     formFields = [];
     formGrids = [];
     scriptCode = '';
@@ -1016,10 +856,7 @@
         }));
 
         // Save form fields to BPMN
-        const fieldsToSave = formFields.map((field, index) => ({
-          ...field,
-          ...(index === 0 ? { _gridConfig: { columns: formGridColumns, gap: formGridGap } } : {})
-        }));
+        const fieldsToSave = serializeFormFields(formFields, { columns: formGridColumns, gap: formGridGap });
 
         updateElementProperty('flowable:formFields', JSON.stringify(fieldsToSave));
 
@@ -1193,10 +1030,7 @@
 
         formFields = [...newFields, ...preservedManualFields];
 
-        const fieldsToSave = formFields.map((field, index) => ({
-          ...field,
-          ...(index === 0 ? { _gridConfig: { columns: formGridColumns, gap: formGridGap } } : {})
-        }));
+        const fieldsToSave = serializeFormFields(formFields, { columns: formGridColumns, gap: formGridGap });
 
         updateElementProperty('flowable:formFields', JSON.stringify(fieldsToSave));
 
@@ -1399,8 +1233,6 @@
 
     const modeling = modeler.get('modeling') as any;
     const moddle = modeler.get('moddle') as any;
-    const businessObject = selectedElement.businessObject;
-
     if (type === 'none') {
       modeling.updateProperties(selectedElement, { loopCharacteristics: undefined });
     } else {
@@ -1472,92 +1304,14 @@
 
   function extractProcessVariables() {
     if (!modeler) return;
-
     const elementRegistry = modeler.get('elementRegistry') as any;
-    const variables = new Set<string>(['initiator']);
-
-    elementRegistry.forEach((element: any) => {
-      const bo = element.businessObject;
-      if (!bo) return;
-
-      // Extract from form fields
-      const formFieldsJson = bo.get && bo.get('flowable:formFields');
-      if (formFieldsJson) {
-        try {
-          const fields = JSON.parse(formFieldsJson);
-          fields.forEach((field: any) => {
-            if (field.name) variables.add(field.name);
-          });
-        } catch (e) {
-          // Ignore parsing errors
-        }
-      }
-
-      // Extract from form grids (data tables)
-      const formGridsJson = bo.get && bo.get('flowable:formGrids');
-      if (formGridsJson) {
-        try {
-          const grids = JSON.parse(formGridsJson);
-          grids.forEach((grid: any) => {
-            if (grid.name) {
-              variables.add(grid.name);
-              // Also add column names prefixed with grid name
-              if (Array.isArray(grid.columns)) {
-                grid.columns.forEach((col: any) => {
-                  if (col.name) {
-                    variables.add(`${grid.name}_${col.name}`);
-                  }
-                });
-              }
-            }
-          });
-        } catch (e) {
-          // Ignore parsing errors
-        }
-      }
-
-      // Extract from scripts
-      const script = bo.script;
-      if (script) {
-        const matches = script.match(/execution\.(?:get|set)Variable\(['"]([^'"]+)['"]/g);
-        if (matches) {
-          matches.forEach((match: string) => {
-            const varMatch = match.match(/\(['"]([^'"]+)['"]/);
-            if (varMatch) variables.add(varMatch[1]);
-          });
-        }
-      }
-    });
-
-    processVariables = Array.from(variables).sort();
+    const elements: any[] = [];
+    elementRegistry.forEach((element: any) => elements.push(element));
+    processVariables = parseProcessVariablesFromElements(elements);
   }
 
   function addFormField() {
-    const newField = {
-      id: `field_${Date.now()}`,
-      name: '',
-      label: '',
-      type: 'text' as const,
-      required: false,
-      validation: {},
-      options: [],
-      placeholder: '',
-      defaultValue: '',
-      defaultExpression: '',
-      tooltip: '',
-      readonly: false,
-      hidden: false,
-      hiddenExpression: '',
-      readonlyExpression: '',
-      requiredExpression: '',
-      calculationExpression: '',
-      gridColumn: 1,
-      gridRow: formFields.length + 1,
-      gridWidth: 1,
-      cssClass: '',
-      onChange: '',
-      onBlur: ''
-    };
+    const newField = createFormField(formFields.length);
     formFields = [...formFields, newField];
   }
 
@@ -1603,20 +1357,7 @@
   // ====== Grid (Data Table) Management Functions ======
 
   function addGrid() {
-    const newGrid = {
-      id: `grid_${Date.now()}`,
-      name: '',
-      label: '',
-      description: '',
-      minRows: 0,
-      maxRows: 0,
-      columns: [],
-      gridColumn: 1,
-      gridRow: formGrids.length + formFields.length + 1,
-      gridWidth: formGridColumns,
-      cssClass: '',
-      visibilityExpression: ''
-    };
+    const newGrid = createGrid(formGrids.length + formFields.length, formGridColumns);
     formGrids = [...formGrids, newGrid];
     expandedGridIndex = formGrids.length - 1;
   }
@@ -1653,20 +1394,7 @@
 
   function addGridColumn(gridIndex: number) {
     const grid = formGrids[gridIndex];
-    const newColumn = {
-      id: `col_${Date.now()}`,
-      name: '',
-      label: '',
-      type: 'text' as const,
-      required: false,
-      placeholder: '',
-      options: [],
-      validation: {},
-      hiddenExpression: '',
-      readonlyExpression: '',
-      requiredExpression: '',
-      calculationExpression: ''
-    };
+    const newColumn = createGridColumn();
     grid.columns = [...grid.columns, newColumn];
     formGrids = [...formGrids];
     expandedGridColumnIndex = grid.columns.length - 1;
@@ -1713,57 +1441,7 @@
   }
 
   function validateFormGrids(): string[] {
-    const errors: string[] = [];
-    const names = new Set<string>();
-
-    formGrids.forEach((grid, gridIndex) => {
-      if (!grid.name) {
-        errors.push(`Grid ${gridIndex + 1}: Name is required`);
-      } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(grid.name)) {
-        errors.push(`Grid ${gridIndex + 1}: Name must be a valid identifier`);
-      } else if (names.has(grid.name)) {
-        errors.push(`Grid ${gridIndex + 1}: Duplicate name '${grid.name}'`);
-      } else {
-        names.add(grid.name);
-      }
-
-      if (!grid.label) {
-        errors.push(`Grid ${gridIndex + 1}: Label is required`);
-      }
-
-      if (grid.columns.length === 0) {
-        errors.push(`Grid ${gridIndex + 1}: At least one column is required`);
-      }
-
-      const columnNames = new Set<string>();
-      grid.columns.forEach((column, colIndex) => {
-        if (!column.name) {
-          errors.push(`Grid ${gridIndex + 1}, Column ${colIndex + 1}: Name is required`);
-        } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(column.name)) {
-          errors.push(
-            `Grid ${gridIndex + 1}, Column ${colIndex + 1}: Name must be a valid identifier`
-          );
-        } else if (columnNames.has(column.name)) {
-          errors.push(
-            `Grid ${gridIndex + 1}, Column ${colIndex + 1}: Duplicate column name '${column.name}'`
-          );
-        } else {
-          columnNames.add(column.name);
-        }
-
-        if (!column.label) {
-          errors.push(`Grid ${gridIndex + 1}, Column ${colIndex + 1}: Label is required`);
-        }
-
-        if (column.type === 'select' && column.options.length === 0) {
-          errors.push(
-            `Grid ${gridIndex + 1}, Column ${colIndex + 1}: Options are required for select type`
-          );
-        }
-      });
-    });
-
-    return errors;
+    return validateFormGridsData(formGrids);
   }
 
   function saveFormGrids() {
@@ -1826,10 +1504,7 @@
     const modeling = modeler.get('modeling') as any;
 
     // Include grid configuration in the saved data
-    const fieldsToSave = formFields.map((field, index) => ({
-      ...field,
-      ...(index === 0 ? { _gridConfig: { columns: formGridColumns, gap: formGridGap } } : {})
-    }));
+    const fieldsToSave = serializeFormFields(formFields, { columns: formGridColumns, gap: formGridGap });
 
     const formFieldsJson = JSON.stringify(fieldsToSave);
 
@@ -1923,33 +1598,7 @@
 
 
   function validateFormFields(): string[] {
-    const errors: string[] = [];
-    const names = new Set<string>();
-
-    formFields.forEach((field, index) => {
-      if (!field.name) {
-        errors.push(`Field ${index + 1}: Name is required`);
-      } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(field.name)) {
-        errors.push(`Field ${index + 1}: Name must be a valid identifier`);
-      } else if (names.has(field.name)) {
-        errors.push(`Field ${index + 1}: Duplicate name '${field.name}'`);
-      } else {
-        names.add(field.name);
-      }
-
-      if (!field.label) {
-        errors.push(`Field ${index + 1}: Label is required`);
-      }
-
-      if (
-        (field.type === 'select' || field.type === 'multiselect' || field.type === 'radio') &&
-        field.options.length === 0
-      ) {
-        errors.push(`Field ${index + 1}: Options are required for ${field.type} type`);
-      }
-    });
-
-    return errors;
+    return validateFormFieldsData(formFields);
   }
 
   function validateScript(code: string, format: string): string | null {
@@ -2062,280 +1711,8 @@
 
   // BPMN Diagram Validation
   function validateBpmnDiagram(): { valid: boolean; errors: string[]; warnings: string[] } {
-    if (!modeler) return { valid: false, errors: ['Modeler not initialized'], warnings: [] };
-
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const elementRegistry = modeler.get('elementRegistry') as any;
-
-    // Refresh variables list
     extractProcessVariables();
-
-    let hasStartEvent = false;
-    let hasEndEvent = false;
-    const disconnectedElements: string[] = [];
-
-    // Element types that don't participate in sequence flows
-    const nonFlowElementTypes = new Set([
-      'bpmn:Process',
-      'bpmn:Collaboration',
-      'bpmn:Participant',
-      'bpmn:Lane',
-      'bpmn:LaneSet',
-      'bpmn:SequenceFlow',
-      'bpmn:MessageFlow',
-      'bpmn:Association',
-      'bpmn:DataObject',
-      'bpmn:DataObjectReference',
-      'bpmn:DataStoreReference',
-      'bpmn:DataInput',
-      'bpmn:DataOutput',
-      'bpmn:TextAnnotation',
-      'bpmn:Group',
-      'bpmn:Category',
-      'bpmn:CategoryValue',
-      'label'
-    ]);
-
-    // Element types that don't require incoming connections
-    const noIncomingRequired = new Set([
-      'bpmn:StartEvent',
-      'bpmn:BoundaryEvent', // Attached to host element, triggered by events
-      'bpmn:EventBasedGateway' // Can be used as a start pattern
-    ]);
-
-    // Element types that don't require outgoing connections
-    const noOutgoingRequired = new Set([
-      'bpmn:EndEvent',
-      'bpmn:IntermediateThrowEvent', // Can be terminal (e.g., terminate, escalation, compensation)
-      'bpmn:CompensateEventDefinition'
-    ]);
-
-    // Check if an element is a terminating throw event
-    function isTerminatingThrowEvent(bo: any): boolean {
-      if (!bo.eventDefinitions || bo.eventDefinitions.length === 0) return false;
-      return bo.eventDefinitions.some(
-        (ed: any) =>
-          ed.$type === 'bpmn:TerminateEventDefinition' ||
-          ed.$type === 'bpmn:EscalationEventDefinition' ||
-          ed.$type === 'bpmn:CompensateEventDefinition' ||
-          ed.$type === 'bpmn:SignalEventDefinition' ||
-          ed.$type === 'bpmn:MessageEventDefinition'
-      );
-    }
-
-    // Check if element is inside a subprocess (internal flows handled separately)
-    function isInsideSubProcess(element: any): boolean {
-      let parent = element.parent;
-      while (parent) {
-        if (
-          parent.type === 'bpmn:SubProcess' ||
-          parent.type === 'bpmn:Transaction' ||
-          parent.type === 'bpmn:AdHocSubProcess'
-        ) {
-          return true;
-        }
-        parent = parent.parent;
-      }
-      return false;
-    }
-
-    // Check if a subprocess is collapsed (visual only, no internal elements shown)
-    function isCollapsedSubProcess(element: any): boolean {
-      if (
-        element.type !== 'bpmn:SubProcess' &&
-        element.type !== 'bpmn:Transaction' &&
-        element.type !== 'bpmn:AdHocSubProcess'
-      ) {
-        return false;
-      }
-      // Check if it's collapsed (di:isExpanded attribute)
-      return element.collapsed === true || element.businessObject?.di?.isExpanded === false;
-    }
-
-    // Collect all elements for validation
-    const allElements: any[] = [];
-    elementRegistry.forEach((element: any) => {
-      allElements.push(element);
-    });
-
-    // First pass: identify start/end events and build element map
-    for (const element of allElements) {
-      const type = element.type;
-
-      // Track start and end events (only at process level, not inside subprocesses)
-      if (type === 'bpmn:StartEvent' && !isInsideSubProcess(element)) {
-        hasStartEvent = true;
-      }
-      if (type === 'bpmn:EndEvent' && !isInsideSubProcess(element)) {
-        hasEndEvent = true;
-      }
-    }
-
-    // Second pass: validate connections and element-specific rules
-    for (const element of allElements) {
-      const type = element.type;
-      const bo = element.businessObject;
-
-      // Skip non-flow elements
-      if (nonFlowElementTypes.has(type)) continue;
-
-      // Skip collapsed subprocesses for internal validation
-      if (isCollapsedSubProcess(element)) continue;
-
-      // Get connections from diagram element (not business object)
-      // element.incoming/outgoing contains actual visual connections in the diagram
-      // bo.incoming/outgoing may be out of sync with visual state
-      const incoming = element.incoming || [];
-      const outgoing = element.outgoing || [];
-
-      // Connection validation for flow elements
-      const requiresIncoming = !noIncomingRequired.has(type);
-      const requiresOutgoing = !noOutgoingRequired.has(type);
-
-      // Special handling for intermediate throw events
-      if (type === 'bpmn:IntermediateThrowEvent') {
-        // Check if it's a terminating type that doesn't need outgoing
-        if (isTerminatingThrowEvent(bo)) {
-          // These can be terminal, don't require outgoing
-        } else if (outgoing.length === 0) {
-          // Non-terminating throw events should have outgoing
-          disconnectedElements.push(
-            `${type.replace('bpmn:', '')} "${bo?.name || bo?.id}" has no outgoing connections`
-          );
-        }
-        // Always check incoming for intermediate events
-        if (incoming.length === 0) {
-          disconnectedElements.push(
-            `${type.replace('bpmn:', '')} "${bo?.name || bo?.id}" has no incoming connections`
-          );
-        }
-        continue;
-      }
-
-      // Check incoming connections
-      if (requiresIncoming && incoming.length === 0) {
-        // Don't flag boundary events - they're attached to their host
-        if (type !== 'bpmn:BoundaryEvent') {
-          disconnectedElements.push(
-            `${type.replace('bpmn:', '')} "${bo?.name || bo?.id}" has no incoming connections`
-          );
-        }
-      }
-
-      // Check outgoing connections
-      if (requiresOutgoing && outgoing.length === 0) {
-        disconnectedElements.push(
-          `${type.replace('bpmn:', '')} "${bo?.name || bo?.id}" has no outgoing connections`
-        );
-      }
-
-      // Boundary events must have outgoing (they trigger a flow when event occurs)
-      if (type === 'bpmn:BoundaryEvent' && outgoing.length === 0) {
-        disconnectedElements.push(
-          `Boundary Event "${bo?.name || bo?.id}" has no outgoing connections`
-        );
-      }
-
-      // Check for user tasks without assignee (warning, not error)
-      if (type === 'bpmn:UserTask') {
-        const assignee = bo?.get?.('flowable:assignee');
-        const candidateGroups = bo?.get?.('flowable:candidateGroups');
-        const candidateUsers = bo?.get?.('flowable:candidateUsers');
-
-        if (!assignee && !candidateGroups && !candidateUsers) {
-          warnings.push(`User Task "${bo?.name || bo?.id}" has no assignee or candidates defined`);
-        }
-      }
-
-      // Check for script tasks without scripts (warning, not error)
-      if (type === 'bpmn:ScriptTask') {
-        if (!bo?.script) {
-          warnings.push(`Script Task "${bo?.name || bo?.id}" has no script defined`);
-        }
-      }
-
-      // Check exclusive gateways for conditions (warning, not error)
-      if (type === 'bpmn:ExclusiveGateway') {
-        // Use visual outgoing connections from element
-        const gatewayOutgoing = element.outgoing || [];
-        if (gatewayOutgoing.length > 1) {
-          const hasDefault = bo?.default;
-          const flowsWithConditions = gatewayOutgoing.filter((conn: any) => {
-            const flowBo = conn.businessObject;
-            return flowBo?.conditionExpression || flowBo === hasDefault;
-          });
-          if (flowsWithConditions.length !== gatewayOutgoing.length) {
-            warnings.push(`Exclusive Gateway "${bo?.name || bo?.id}" has flows without conditions`);
-          }
-        }
-      }
-
-      // Check for undefined variables in expressions
-      if (bo) {
-          const propsToCheck = ['conditionExpression', 'flowable:assignee', 'flowable:skipExpression', 'flowable:collection', 'flowable:elementVariable'];
-          propsToCheck.forEach(prop => {
-              let val = '';
-              if (prop === 'conditionExpression') {
-                  val = bo.conditionExpression?.body || '';
-              } else {
-                  val = bo.get(prop) || '';
-              }
-
-              if (val) {
-                  // Extract variables pattern: ${varName}
-                  const matches = val.match(/\$\{([a-zA-Z0-9_]+)\}/g);
-                  if (matches) {
-                      matches.forEach((m: string) => {
-                          const varName = m.substring(2, m.length - 1);
-                          // Skip standard/implicit variables
-                          if (!processVariables.includes(varName) && !['initiator', 'execution', 'task', 'authenticatedUserId'].includes(varName)) {
-                              warnings.push(`Element "${bo?.name || bo?.id}": Variable '${varName}' used in ${prop} but not defined in process`);
-                          }
-                      });
-                  }
-              }
-          });
-      }
-
-      // Check inclusive gateways for conditions (warning, not error)
-      if (type === 'bpmn:InclusiveGateway') {
-        // Use visual outgoing connections from element
-        const gatewayOutgoing = element.outgoing || [];
-        if (gatewayOutgoing.length > 1) {
-          const hasDefault = bo?.default;
-          const flowsWithConditions = gatewayOutgoing.filter((conn: any) => {
-            const flowBo = conn.businessObject;
-            return flowBo?.conditionExpression || flowBo === hasDefault;
-          });
-          if (flowsWithConditions.length !== gatewayOutgoing.length) {
-            warnings.push(`Inclusive Gateway "${bo?.name || bo?.id}" has flows without conditions`);
-          }
-        }
-      }
-    }
-
-    // Critical errors: missing start/end events
-    if (!hasStartEvent) {
-      errors.push('Process must have at least one Start Event');
-    }
-    if (!hasEndEvent) {
-      errors.push('Process must have at least one End Event');
-    }
-
-    // Connection issues are errors (prevent deployment)
-    if (disconnectedElements.length > 0) {
-      if (disconnectedElements.length <= 3) {
-        errors.push(...disconnectedElements);
-      } else {
-        // Provide a summary with the first few issues
-        errors.push(`${disconnectedElements.length} elements have connection issues:`);
-        errors.push(...disconnectedElements.slice(0, 3));
-        errors.push(`...and ${disconnectedElements.length - 3} more`);
-      }
-    }
-
-    return { valid: errors.length === 0, errors, warnings };
+    return validateBpmnModeler(modeler, processVariables);
   }
 
   async function handleDeploy() {
