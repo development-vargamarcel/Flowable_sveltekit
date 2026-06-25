@@ -19,7 +19,13 @@
   import {
     defaultElementProperties,
     parseProcessVariablesFromElements,
-    serializeElementProperties
+    parseStoredFormFields,
+    parseStoredFormGrids,
+    serializeElementProperties,
+    updateElementPropertyInModeler,
+    updateMultiInstancePropertyInModeler,
+    updateMultiInstanceTypeInModeler,
+    updateTimerDefinitionInModeler
   } from '$lib/designer/element-properties';
   import {
     createFormField,
@@ -708,98 +714,14 @@
   }
 
   function loadFormFields(businessObject: any) {
-    try {
-      const formFieldsJson = businessObject.get('flowable:formFields');
-      if (formFieldsJson && typeof formFieldsJson === 'string') {
-        const parsed = JSON.parse(formFieldsJson);
-        // Ensure all fields have the required structure
-        formFields = parsed.map((field: any, index: number) => ({
-          id: field.id || `field_${Date.now()}_${index}`,
-          name: field.name || '',
-          label: field.label || '',
-          type: field.type || 'text',
-          required: Boolean(field.required),
-          validation: field.validation || {},
-          options: Array.isArray(field.options)
-            ? field.options
-            : typeof field.options === 'string' && field.options
-              ? field.options.split(',').map((o: string) => ({ value: o.trim(), label: o.trim() }))
-              : [],
-          placeholder: field.placeholder || '',
-          defaultValue: field.defaultValue || '',
-          defaultExpression: field.defaultExpression || '',
-          tooltip: field.tooltip || '',
-          readonly: Boolean(field.readonly),
-          hidden: Boolean(field.hidden),
-          hiddenExpression: field.hiddenExpression || '',
-          readonlyExpression: field.readonlyExpression || '',
-          requiredExpression: field.requiredExpression || '',
-          calculationExpression: field.calculationExpression || '',
-          gridColumn: field.gridColumn || 1,
-          gridRow: field.gridRow || index + 1,
-          gridWidth: field.gridWidth || 1,
-          cssClass: field.cssClass || '',
-          onChange: field.onChange || '',
-          onBlur: field.onBlur || ''
-        }));
-
-        // Load grid configuration if present
-        if (parsed.length > 0 && parsed[0]._gridConfig) {
-          formGridColumns = parsed[0]._gridConfig.columns || 2;
-          formGridGap = parsed[0]._gridConfig.gap || 16;
-        }
-      } else {
-        formFields = [];
-      }
-    } catch (err) {
-      console.error('Error parsing form fields:', err);
-      formFields = [];
+    const parsedFields = parseStoredFormFields(businessObject.get('flowable:formFields'));
+    formFields = parsedFields.fields;
+    if (parsedFields.gridConfig) {
+      formGridColumns = parsedFields.gridConfig.columns || 2;
+      formGridGap = parsedFields.gridConfig.gap || 16;
     }
 
-    // Load form grids (data tables)
-    try {
-      const formGridsJson = businessObject.get('flowable:formGrids');
-      if (formGridsJson && typeof formGridsJson === 'string') {
-        const parsed = JSON.parse(formGridsJson);
-        formGrids = parsed.map((grid: any, index: number) => ({
-          id: grid.id || `grid_${Date.now()}_${index}`,
-          name: grid.name || '',
-          label: grid.label || '',
-          description: grid.description || '',
-          minRows: grid.minRows || 0,
-          maxRows: grid.maxRows || 0,
-          columns: Array.isArray(grid.columns)
-            ? grid.columns.map((col: any, colIndex: number) => ({
-                id: col.id || `col_${Date.now()}_${colIndex}`,
-                name: col.name || '',
-                label: col.label || '',
-                type: col.type || 'text',
-                required: Boolean(col.required),
-                placeholder: col.placeholder || '',
-                options: Array.isArray(col.options) ? col.options : [],
-                min: col.min,
-                max: col.max,
-                step: col.step,
-                validation: col.validation || {},
-                hiddenExpression: col.hiddenExpression || '',
-                readonlyExpression: col.readonlyExpression || '',
-                requiredExpression: col.requiredExpression || '',
-                calculationExpression: col.calculationExpression || ''
-              }))
-            : [],
-          gridColumn: grid.gridColumn || 1,
-          gridRow: grid.gridRow || index + 1,
-          gridWidth: grid.gridWidth || formGridColumns,
-          cssClass: grid.cssClass || '',
-          visibilityExpression: grid.visibilityExpression || ''
-        }));
-      } else {
-        formGrids = [];
-      }
-    } catch (err) {
-      console.error('Error parsing form grids:', err);
-      formGrids = [];
-    }
+    formGrids = parseStoredFormGrids(businessObject.get('flowable:formGrids'), formGridColumns);
   }
 
   function resetElementProperties() {
@@ -1148,78 +1070,11 @@
     isUpdatingProperty = true;
 
     try {
-      const modeling = modeler.get('modeling') as any;
-      const moddle = modeler.get('moddle') as any;
-      const businessObject = selectedElement.businessObject;
-
-      // Update local state immediately for responsive UI
-      if (property in elementProperties) {
-        (elementProperties as any)[property] = value;
-      }
-
-      if (property === 'name' || property === 'id') {
-        modeling.updateProperties(selectedElement, { [property]: value });
-      } else if (property === 'documentation') {
-        // Update documentation element
-        let documentation = businessObject.documentation;
-        if (!value) {
-          // Remove documentation if empty
-          modeling.updateProperties(selectedElement, { documentation: undefined });
-        } else if (!documentation || documentation.length === 0) {
-          documentation = [moddle.create('bpmn:Documentation', { text: value as string })];
-          modeling.updateProperties(selectedElement, { documentation });
-        } else {
-          documentation[0].text = value as string;
-          modeling.updateProperties(selectedElement, { documentation: [...documentation] });
-        }
-      } else if (property === 'conditionExpression') {
-        // Update sequence flow condition
-        if (!value) {
-          modeling.updateProperties(selectedElement, { conditionExpression: undefined });
-        } else {
-          const conditionExpression = moddle.create('bpmn:FormalExpression', {
-            body: value as string
-          });
-          modeling.updateProperties(selectedElement, { conditionExpression });
-        }
-      } else if (property === 'script') {
-        // Update script task script
-        modeling.updateProperties(selectedElement, {
-          script: value as string,
-          scriptFormat: scriptFormat
-        });
-      } else if (property === 'scriptFormat') {
-        modeling.updateProperties(selectedElement, {
-          scriptFormat: value as string,
-          script: elementProperties.script
-        });
-      } else if (
-        property === 'asyncBefore' ||
-        property === 'asyncAfter' ||
-        property === 'exclusive'
-      ) {
-        // Boolean properties
-        modeling.updateProperties(selectedElement, {
-          [`flowable:${property}`]: value ? 'true' : 'false'
-        });
-      } else if (property === 'multiInstanceType') {
-        updateMultiInstanceType(value as string);
-      } else if (
-        property === 'loopCardinality' ||
-        property === 'collection' ||
-        property === 'elementVariable' ||
-        property === 'completionCondition'
-      ) {
-        updateMultiInstanceProperty(property, value as string);
-      } else if (property === 'timeDate' || property === 'timeDuration' || property === 'timeCycle') {
-        updateTimerDefinition(property, value as string);
-      } else if (property.startsWith('flowable:')) {
-        // Update Flowable extension attributes
-        modeling.updateProperties(selectedElement, { [property]: value });
-      } else {
-        // Generic property update with flowable prefix
-        modeling.updateProperties(selectedElement, { [`flowable:${property}`]: value });
-      }
+      updateElementPropertyInModeler(
+        { modeler, selectedElement, elementProperties, scriptFormat },
+        property,
+        value
+      );
     } finally {
       // Reset the flag after a short delay to allow DOM to update
       setTimeout(() => {
@@ -1230,76 +1085,25 @@
 
   function updateMultiInstanceType(type: string) {
     if (!modeler || !selectedElement) return;
-
-    const modeling = modeler.get('modeling') as any;
-    const moddle = modeler.get('moddle') as any;
-    if (type === 'none') {
-      modeling.updateProperties(selectedElement, { loopCharacteristics: undefined });
-    } else {
-      const loopCharacteristics = moddle.create('bpmn:MultiInstanceLoopCharacteristics', {
-        isSequential: type === 'sequential'
-      });
-      modeling.updateProperties(selectedElement, { loopCharacteristics });
-    }
+    updateMultiInstanceTypeInModeler({ modeler, selectedElement, elementProperties, scriptFormat }, type);
   }
 
   function updateMultiInstanceProperty(property: string, value: string) {
     if (!modeler || !selectedElement) return;
-
-    const modeling = modeler.get('modeling') as any;
-    const moddle = modeler.get('moddle') as any;
-    const businessObject = selectedElement.businessObject;
-    const loopCharacteristics = businessObject.loopCharacteristics;
-
-    if (!loopCharacteristics) return;
-
-    if (property === 'loopCardinality') {
-      if (!value) {
-        loopCharacteristics.loopCardinality = undefined;
-      } else {
-        loopCharacteristics.loopCardinality = moddle.create('bpmn:FormalExpression', {
-          body: value
-        });
-      }
-    } else if (property === 'completionCondition') {
-      if (!value) {
-        loopCharacteristics.completionCondition = undefined;
-      } else {
-        loopCharacteristics.completionCondition = moddle.create('bpmn:FormalExpression', {
-          body: value
-        });
-      }
-    } else if (property === 'collection') {
-      loopCharacteristics.set('flowable:collection', value || undefined);
-    } else if (property === 'elementVariable') {
-      loopCharacteristics.set('flowable:elementVariable', value || undefined);
-    }
-
-    modeling.updateProperties(selectedElement, { loopCharacteristics });
+    updateMultiInstancePropertyInModeler(
+      { modeler, selectedElement, elementProperties, scriptFormat },
+      property,
+      value
+    );
   }
 
   function updateTimerDefinition(property: string, value: string) {
     if (!modeler || !selectedElement) return;
-
-    const modeling = modeler.get('modeling') as any;
-    const moddle = modeler.get('moddle') as any;
-    const businessObject = selectedElement.businessObject;
-    const eventDefinitions = businessObject.eventDefinitions;
-
-    if (!eventDefinitions || !eventDefinitions[0] || eventDefinitions[0].$type !== 'bpmn:TimerEventDefinition') {
-      return;
-    }
-
-    const timerDef = eventDefinitions[0];
-    const newProps: any = {};
-    
-    if (value) {
-      newProps[property] = moddle.create('bpmn:FormalExpression', { body: value });
-    } else {
-      newProps[property] = undefined;
-    }
-    
-    modeling.updateModdleProperties(selectedElement, timerDef, newProps);
+    updateTimerDefinitionInModeler(
+      { modeler, selectedElement, elementProperties, scriptFormat },
+      property,
+      value
+    );
   }
 
   function extractProcessVariables() {
